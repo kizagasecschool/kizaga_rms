@@ -1,0 +1,138 @@
+We are building a School Result Management System using:
+
+- React + Vite
+- Supabase
+- Tailwind CSS
+- React Router
+- Context API
+
+Start with Authentication only.
+
+Requirements:
+
+1. Create Login Page
+   - Email
+   - Password
+   - Show/Hide Password
+   - Remember Me
+   - Forgot Password
+   - Loading State
+   - Error Messages
+
+2. User Roles
+   - admin
+   - headmaster
+   - academic
+   - teacher
+
+3. Database Structure
+
+profiles
+---------
+id uuid primary key references auth.users(id)
+email text
+full_name text
+role text
+created_at timestamptz default now()
+
+4. Authentication Flow
+
+After login:
+- admin → /admin
+- headmaster → /headmaster
+- academic → /academic
+- teacher → /teacher
+
+5. Protected Routes
+
+Create:
+- ProtectedRoute component
+- RoleBasedRoute component
+
+Users must not access routes outside their role.
+
+6. Session Management
+
+- Persist login after refresh
+- Auto redirect if already logged in
+- Logout functionality
+
+7. Supabase Setup
+
+Create:
+- src/lib/supabase.js
+- src/context/AuthContext.jsx
+
+8. Environment Variables
+
+VITE_SUPABASE_URL=
+VITE_SUPABASE_ANON_KEY=
+
+9. Service Role Support
+
+Create separate migration and seeding setup.
+
+Use:
+
+SUPABASE_SERVICE_ROLE_KEY
+
+Only for:
+- SQL migrations
+- Database seeding
+- Admin scripts
+
+Never expose service role key in frontend.
+
+Create:
+
+scripts/
+ ├── seed.js
+ ├── createAdmin.js
+
+Example seed users:
+- admin@school.com
+- headmaster@school.com
+- academic@school.com
+- teacher@school.com
+
+10. SQL Migration
+
+Create migration SQL for:
+
+profiles table
+
+Enable Row Level Security.
+
+Policies:
+
+Admin:
+- full access
+
+Headmaster:
+- read only
+
+Academic:
+- read/write academic records
+
+Teacher:
+- read own profile only
+
+11. Folder Structure
+
+src/
+ ├── pages/auth/Login.jsx
+ ├── routes/
+ ├── context/
+ ├── lib/
+ ├── layouts/
+ ├── components/
+
+Generate complete code for:
+- Login page
+- AuthContext
+- ProtectedRoute
+- RoleBasedRoute
+- Supabase integration
+- SQL migration
+- Seed script
+- Admin creation script
