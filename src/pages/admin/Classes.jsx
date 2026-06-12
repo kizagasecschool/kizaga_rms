@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { useNotification } from '../../context/NotificationContext'
@@ -12,6 +13,7 @@ const TABS = [
 const LEVELS = ['O_LEVEL', 'A_LEVEL']
 
 function AdminClasses() {
+  const navigate = useNavigate()
   const { showToast } = useNotification()
   const [activeTab, setActiveTab] = useState('classes')
   const [loading, setLoading] = useState(true)
@@ -265,6 +267,12 @@ function AdminClasses() {
                     <td className="px-5 py-3.5 text-sm text-gray-700">{c.sort_order}</td>
                     <td className="px-5 py-3.5 text-right">
                       <button
+                        onClick={() => navigate(`/admin/class-subjects?classId=${c.id}`)}
+                        className="text-sm text-emerald-600 hover:text-emerald-800 font-medium mr-3"
+                      >
+                        Subjects
+                      </button>
+                      <button
                         onClick={() => openEdit(c)}
                         className="text-sm text-indigo-600 hover:text-indigo-800 font-medium mr-3"
                       >
@@ -405,6 +413,15 @@ function AdminClasses() {
                     </div>
                   </div>
                 )}
+
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => navigate(`/admin/class-subjects?classId=${selectedClassId}`)}
+                    className="w-full px-3 py-2 text-sm font-medium text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition"
+                  >
+                    Manage Subjects for this Class
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -418,6 +435,7 @@ function AdminClasses() {
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Class</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Level</th>
                     <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Streams</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -453,6 +471,14 @@ function AdminClasses() {
                               ))}
                             </div>
                           )}
+                        </td>
+                        <td className="px-5 py-3.5 text-right text-sm text-gray-700">
+                          <button
+                            onClick={() => navigate(`/admin/class-subjects?classId=${c.id}`)}
+                            className="text-xs text-emerald-600 hover:text-emerald-800 font-medium"
+                          >
+                            Subjects
+                          </button>
                         </td>
                       </tr>
                     )

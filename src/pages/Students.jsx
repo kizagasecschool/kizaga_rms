@@ -67,6 +67,12 @@ function Students() {
   const [csvImporting, setCsvImporting] = useState(false)
   const [csvFile, setCsvFile] = useState(null)
 
+  const [subjectsOpen, setSubjectsOpen] = useState(false)
+  const [subjectsStudent, setSubjectsStudent] = useState(null)
+  const [subjectsStudentId, setSubjectsStudentId] = useState('')
+  const [studentSubjectIds, setStudentSubjectIds] = useState([])
+  const [savingSubjects, setSavingSubjects] = useState(false)
+
   const fetchStudents = useCallback(async () => {
     const { data } = await supabase
       .from('students')
@@ -75,15 +81,19 @@ function Students() {
     if (data) setStudents(data)
   }, [])
 
+  const [subjects, setSubjects] = useState([])
+
   const fetchLookups = useCallback(async () => {
-    const [cRes, sRes, csRes] = await Promise.all([
+    const [cRes, sRes, csRes, subRes] = await Promise.all([
       supabase.from('classes').select('*').order('sort_order'),
       supabase.from('streams').select('*').order('stream_name'),
       supabase.from('class_streams').select('*, classes(*), streams(*)'),
+      supabase.from('subjects').select('*').order('subject_name'),
     ])
     if (cRes.data) setClasses(cRes.data)
     if (sRes.data) setStreams(sRes.data)
     if (csRes.data) setClassStreams(csRes.data)
+    if (subRes.data) setSubjects(subRes.data)
   }, [])
 
   useEffect(() => {
@@ -201,6 +211,73 @@ function Students() {
     }
   }
 
+  const openSubjects = async (student) => {
+    if (!student) return
+    setSubjectsStudent(student)
+    setSubjectsStudentId(student.id)
+    const { data } = await supabase
+      .from('student_subjects')
+      .select('subject_id')
+      .eq('student_id', student.id)
+    setStudentSubjectIds((data || []).map((r) => r.subject_id))
+    setSubjectsOpen(true)
+  }
+
+  const handleSubjectsStudentChange = async (studentId) => {
+    const student = students.find((s) => s.id === studentId)
+    if (!student) return
+    setSubjectsStudent(student)
+    setSubjectsStudentId(studentId)
+    const { data } = await supabase
+      .from('student_subjects')
+      .select('subject_id')
+      .eq('student_id', studentId)
+    setStudentSubjectIds((data || []).map((r) => r.subject_id))
+  }
+
+  const handleToggleSubject = (subjectId) => {
+    setStudentSubjectIds((prev) =>
+      prev.includes(subjectId)
+        ? prev.filter((id) => id !== subjectId)
+        : [...prev, subjectId]
+    )
+  }
+
+  const handleSaveSubjects = async () => {
+    setSavingSubjects(true)
+    try {
+      const existing = await supabase
+        .from('student_subjects')
+        .select('subject_id')
+        .eq('student_id', subjectsStudent.id)
+      const existingIds = (existing.data || []).map((r) => r.subject_id)
+
+      const toRemove = existingIds.filter((id) => !studentSubjectIds.includes(id))
+      const toAdd = studentSubjectIds.filter((id) => !existingIds.includes(id))
+
+      if (toRemove.length > 0) {
+        await supabase
+          .from('student_subjects')
+          .delete()
+          .eq('student_id', subjectsStudent.id)
+          .in('subject_id', toRemove)
+      }
+      if (toAdd.length > 0) {
+        await supabase
+          .from('student_subjects')
+          .insert(toAdd.map((subject_id) => ({ student_id: subjectsStudent.id, subject_id })))
+      }
+      setSubjectsOpen(false)
+      setSubjectsStudent(null)
+      showToast('Subjects updated successfully', 'success')
+    } catch (err) {
+      console.error('Save subjects error:', err)
+      showToast('Failed to update subjects. ' + (err.message || ''), 'error')
+    } finally {
+      setSavingSubjects(false)
+    }
+  }
+
   const handleCsvFile = (e) => {
     const file = e.target.files[0]
     if (!file) return
@@ -312,6 +389,21 @@ function Students() {
             Upload CSV
           </button>
           <button
+            onClick={() => {
+              if (students.length === 0) {
+                showToast('No students available', 'info')
+                return
+              }
+              openSubjects(students[0])
+            }}
+            className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            Subject Assignments
+          </button>
+          <button
             onClick={openCreate}
             className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
           >
@@ -409,6 +501,13 @@ function Students() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
+                      <button
+                        onClick={() => openSubjects(s)}
+                        className="text-sm text-emerald-600 hover:text-emerald-800 font-medium mr-3"
+                        title="Assign subjects"
+                      >
+                        Subjects
+                      </button>
                       <button
                         onClick={() => openEdit(s)}
                         className="text-sm text-indigo-600 hover:text-indigo-800 font-medium mr-3"
@@ -735,6 +834,105 @@ function Students() {
               {csvImporting ? 'Importing...' : `Import ${csvData.length} Student(s)`}
             </button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Subject Assignment Modal */}
+      <Modal isOpen={subjectsOpen} onClose={() => setSubjectsOpen(false)} title="" className="max-w-2xl">
+        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-gradient-to-r from-emerald-50 to-white rounded-t-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h2 className="text-lg font-semibold text-gray-900">Subject Assignments</h2>
+              <p className="text-sm text-gray-500">Assign subjects to each student</p>
+            </div>
+          </div>
+        </div>
+        <div className="mb-4">
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">Select Student</label>
+          <select
+            value={subjectsStudentId}
+            onChange={(e) => handleSubjectsStudentChange(e.target.value)}
+            className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 transition"
+          >
+            {students.map((s) => {
+              const cs = classStreams.find((c) => c.id === s.class_stream_id)
+              const label = `${s.surname}, ${s.first_name} (${s.admission_number})${cs ? ` - ${cs.classes?.class_name || ''} Stream ${cs.streams?.stream_name || ''}` : ''}`
+              return (
+                <option key={s.id} value={s.id}>{label}</option>
+              )
+            })}
+          </select>
+        </div>
+        {subjectsStudent && (
+          <div className="mb-4 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
+            <p className="text-sm font-medium text-emerald-800">
+              {subjectsStudent.surname}, {subjectsStudent.first_name}
+              {subjectsStudent.middle_name ? ` ${subjectsStudent.middle_name}` : ''}
+            </p>
+            <p className="text-xs text-emerald-600">{subjectsStudent.admission_number}</p>
+          </div>
+        )}
+        <p className="text-sm text-gray-600 mb-4">
+          Select the subjects this student will take. Unchecked subjects will be removed.
+        </p>
+        <div className="max-h-80 overflow-y-auto space-y-1.5 mb-6">
+          {subjects.length === 0 && (
+            <p className="text-sm text-gray-400 text-center py-8">No subjects available. Add subjects first.</p>
+          )}
+          {subjects.map((sub) => (
+            <label
+              key={sub.id}
+              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer transition border ${
+                studentSubjectIds.includes(sub.id)
+                  ? 'bg-emerald-50 border-emerald-200'
+                  : 'bg-gray-50 border-gray-100 hover:border-gray-200'
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={studentSubjectIds.includes(sub.id)}
+                onChange={() => handleToggleSubject(sub.id)}
+                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+              />
+              <div className="flex-1">
+                <span className="text-sm font-medium text-gray-800">{sub.subject_name}</span>
+                <span className="text-xs text-gray-400 ml-2">({sub.subject_code})</span>
+              </div>
+              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                sub.subject_type === 'COMPULSORY' ? 'bg-blue-50 text-blue-600' :
+                sub.subject_type === 'OPTIONAL' ? 'bg-amber-50 text-amber-600' :
+                'bg-purple-50 text-purple-600'
+              }`}>
+                {sub.subject_type}
+              </span>
+            </label>
+          ))}
+        </div>
+        <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+          <button
+            type="button"
+            onClick={() => setSubjectsOpen(false)}
+            className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={savingSubjects}
+            onClick={handleSaveSubjects}
+            className="px-6 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition flex items-center gap-2"
+          >
+            {savingSubjects ? (
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+            ) : (
+              'Save Assignments'
+            )}
+          </button>
         </div>
       </Modal>
 

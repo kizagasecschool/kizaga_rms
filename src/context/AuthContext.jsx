@@ -39,7 +39,16 @@ export function AuthProvider({ children }) {
           .select()
           .maybeSingle()
         if (insertError) {
-          console.error('Error creating profile:', insertError)
+          if (insertError.message?.includes('duplicate key')) {
+            const { data: retry } = await supabase
+              .from('profiles')
+              .select('*')
+              .eq('id', userId)
+              .maybeSingle()
+            if (retry) setProfile(retry)
+          } else {
+            console.error('Error creating profile:', insertError)
+          }
           return
         }
         if (newProfile) {

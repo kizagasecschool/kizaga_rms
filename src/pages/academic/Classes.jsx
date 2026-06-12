@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useNotification } from '../../context/NotificationContext'
 function AcademicClasses() {
+  const navigate = useNavigate()
   const { showToast } = useNotification()
   const [loading, setLoading] = useState(true)
   const [classes, setClasses] = useState([])
@@ -126,6 +128,15 @@ function AcademicClasses() {
                     )
                   })}
                 </div>
+
+                <div className="mt-4 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={() => navigate(`/academic/class-subjects?classId=${selectedClassId}`)}
+                    className="w-full px-3 py-2 text-sm font-medium text-emerald-600 bg-emerald-50 rounded-lg hover:bg-emerald-100 transition"
+                  >
+                    Manage Subjects for this Class
+                  </button>
+                </div>
               </div>
             )}
           </div>
@@ -139,12 +150,13 @@ function AcademicClasses() {
             </div>
             <table className="w-full">
               <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Class</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Level</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Streams</th>
-                  <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Count</th>
-                </tr>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Class</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Level</th>
+                    <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Streams</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Count</th>
+                    <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {classes.map((c) => {
@@ -181,6 +193,14 @@ function AcademicClasses() {
                         )}
                       </td>
                       <td className="px-5 py-3.5 text-right text-sm text-gray-700">{assigned.length}</td>
+                      <td className="px-5 py-3.5 text-right">
+                        <button
+                          onClick={() => navigate(`/academic/class-subjects?classId=${c.id}`)}
+                          className="text-xs text-emerald-600 hover:text-emerald-800 font-medium"
+                        >
+                          Subjects
+                        </button>
+                      </td>
                     </tr>
                   )
                 })}

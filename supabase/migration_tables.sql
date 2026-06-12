@@ -330,28 +330,43 @@ CREATE TRIGGER trg_teacher_subjects_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 11. SUBJECT_ASSIGNMENTS
+-- 11. SUBJECT_ASSIGNMENTS (assigned at CLASS level, not stream)
 -- ============================================================
 CREATE TABLE IF NOT EXISTS subject_assignments (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  subject_id      UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
-  class_stream_id UUID NOT NULL REFERENCES class_streams(id) ON DELETE CASCADE,
-  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  class_id   UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-ALTER TABLE subject_assignments ADD COLUMN IF NOT EXISTS subject_id      UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE;
-ALTER TABLE subject_assignments ADD COLUMN IF NOT EXISTS class_stream_id UUID NOT NULL REFERENCES class_streams(id) ON DELETE CASCADE;
-ALTER TABLE subject_assignments ADD COLUMN IF NOT EXISTS created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW();
-ALTER TABLE subject_assignments ADD COLUMN IF NOT EXISTS updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE subject_assignments ADD COLUMN IF NOT EXISTS subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE;
+ALTER TABLE subject_assignments ADD COLUMN IF NOT EXISTS class_id   UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE;
+ALTER TABLE subject_assignments ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE subject_assignments ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
 
-CREATE INDEX IF NOT EXISTS idx_subject_assignments_subject      ON subject_assignments(subject_id);
-CREATE INDEX IF NOT EXISTS idx_subject_assignments_class_stream ON subject_assignments(class_stream_id);
+-- Migrate from old class_stream_id to class_id if needed
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'subject_assignments' AND column_name = 'class_stream_id') THEN
+    UPDATE subject_assignments sa
+    SET class_id = cs.class_id
+    FROM class_streams cs
+    WHERE sa.class_stream_id = cs.id
+      AND sa.class_id IS NULL;
+    ALTER TABLE subject_assignments DROP CONSTRAINT IF EXISTS subject_assignments_class_stream_id_fkey;
+    ALTER TABLE subject_assignments DROP COLUMN IF EXISTS class_stream_id;
+  END IF;
+END $$;
+
+DROP INDEX IF EXISTS idx_subject_assignments_class_stream;
+CREATE INDEX IF NOT EXISTS idx_subject_assignments_class ON subject_assignments(class_id);
+CREATE INDEX IF NOT EXISTS idx_subject_assignments_subject ON subject_assignments(subject_id);
 
 DO $$
 BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_subject_assignment') THEN
-    ALTER TABLE subject_assignments ADD CONSTRAINT uq_subject_assignment UNIQUE (subject_id, class_stream_id);
+    ALTER TABLE subject_assignments ADD CONSTRAINT uq_subject_assignment UNIQUE (subject_id, class_id);
   END IF;
 END $$;
 
@@ -361,7 +376,38 @@ CREATE TRIGGER trg_subject_assignments_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 12. EXAMS
+-- 12. STUDENT_SUBJECTS
+-- ============================================================
+CREATE TABLE IF NOT EXISTS student_subjects (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE,
+  subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE student_subjects ADD COLUMN IF NOT EXISTS student_id UUID NOT NULL REFERENCES students(id) ON DELETE CASCADE;
+ALTER TABLE student_subjects ADD COLUMN IF NOT EXISTS subject_id UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE;
+ALTER TABLE student_subjects ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE student_subjects ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_student_subjects_student ON student_subjects(student_id);
+CREATE INDEX IF NOT EXISTS idx_student_subjects_subject ON student_subjects(subject_id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_student_subject') THEN
+    ALTER TABLE student_subjects ADD CONSTRAINT uq_student_subject UNIQUE (student_id, subject_id);
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_student_subjects_updated_at ON student_subjects;
+CREATE TRIGGER trg_student_subjects_updated_at
+  BEFORE UPDATE ON student_subjects
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================
+-- 13. EXAMS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS exams (
   id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -390,7 +436,7 @@ CREATE TRIGGER trg_exams_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 13. MARKS
+-- 14. MARKS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS marks (
   id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -428,7 +474,7 @@ CREATE TRIGGER trg_marks_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 14. GRADES
+-- 15. GRADES
 -- ============================================================
 CREATE TABLE IF NOT EXISTS grades (
   id        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -469,7 +515,7 @@ CREATE TRIGGER trg_grades_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 15. STUDENT_RESULTS
+-- 16. STUDENT_RESULTS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS student_results (
   id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -510,7 +556,7 @@ CREATE TRIGGER trg_student_results_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 16. ATTENDANCE
+-- 17. ATTENDANCE
 -- ============================================================
 CREATE TABLE IF NOT EXISTS attendance (
   id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -546,7 +592,7 @@ CREATE TRIGGER trg_attendance_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 17. ANNOUNCEMENTS
+-- 18. ANNOUNCEMENTS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS announcements (
   id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -572,7 +618,7 @@ CREATE TRIGGER trg_announcements_updated_at
   FOR EACH ROW EXECUTE FUNCTION set_updated_at();
 
 -- ============================================================
--- 18. AUDIT_LOGS
+-- 19. AUDIT_LOGS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS audit_logs (
   id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -601,7 +647,7 @@ CREATE INDEX IF NOT EXISTS idx_audit_logs_record     ON audit_logs(record_id);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
 
 -- ============================================================
--- 19. SCHOOL_SETTINGS
+-- 20. SCHOOL_SETTINGS
 -- ============================================================
 CREATE TABLE IF NOT EXISTS school_settings (
   id          UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
@@ -808,6 +854,131 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- ============================================================
+-- 21. CURRICULA
+-- ============================================================
+CREATE TABLE IF NOT EXISTS curricula (
+  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name       TEXT NOT NULL UNIQUE,
+  level      TEXT NOT NULL CHECK (level IN ('O_LEVEL', 'A_LEVEL')),
+  is_active  BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE curricula ADD COLUMN IF NOT EXISTS name      TEXT NOT NULL UNIQUE;
+ALTER TABLE curricula ADD COLUMN IF NOT EXISTS level     TEXT NOT NULL CHECK (level IN ('O_LEVEL', 'A_LEVEL'));
+ALTER TABLE curricula ADD COLUMN IF NOT EXISTS is_active BOOLEAN NOT NULL DEFAULT TRUE;
+ALTER TABLE curricula ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE curricula ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+DROP TRIGGER IF EXISTS trg_curricula_updated_at ON curricula;
+CREATE TRIGGER trg_curricula_updated_at
+  BEFORE UPDATE ON curricula
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================
+-- 22. COMBINATIONS (A-Level subject groups like PCM, PCB, HGL)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS combinations (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name          TEXT NOT NULL,
+  code          TEXT NOT NULL UNIQUE,
+  curriculum_id UUID NOT NULL REFERENCES curricula(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE combinations ADD COLUMN IF NOT EXISTS name          TEXT NOT NULL;
+ALTER TABLE combinations ADD COLUMN IF NOT EXISTS code          TEXT NOT NULL UNIQUE;
+ALTER TABLE combinations ADD COLUMN IF NOT EXISTS curriculum_id UUID NOT NULL REFERENCES curricula(id) ON DELETE CASCADE;
+ALTER TABLE combinations ADD COLUMN IF NOT EXISTS created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE combinations ADD COLUMN IF NOT EXISTS updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_combinations_curriculum ON combinations(curriculum_id);
+
+DROP TRIGGER IF EXISTS trg_combinations_updated_at ON combinations;
+CREATE TRIGGER trg_combinations_updated_at
+  BEFORE UPDATE ON combinations
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================
+-- 23. COMBINATION_SUBJECTS (subjects within a combination)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS combination_subjects (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  combination_id  UUID NOT NULL REFERENCES combinations(id) ON DELETE CASCADE,
+  subject_id      UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE combination_subjects ADD COLUMN IF NOT EXISTS combination_id UUID NOT NULL REFERENCES combinations(id) ON DELETE CASCADE;
+ALTER TABLE combination_subjects ADD COLUMN IF NOT EXISTS subject_id     UUID NOT NULL REFERENCES subjects(id) ON DELETE CASCADE;
+ALTER TABLE combination_subjects ADD COLUMN IF NOT EXISTS created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW();
+ALTER TABLE combination_subjects ADD COLUMN IF NOT EXISTS updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_combination_subjects_combination ON combination_subjects(combination_id);
+CREATE INDEX IF NOT EXISTS idx_combination_subjects_subject     ON combination_subjects(subject_id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_combination_subject') THEN
+    ALTER TABLE combination_subjects ADD CONSTRAINT uq_combination_subject UNIQUE (combination_id, subject_id);
+  END IF;
+END $$;
+
+DROP TRIGGER IF EXISTS trg_combination_subjects_updated_at ON combination_subjects;
+CREATE TRIGGER trg_combination_subjects_updated_at
+  BEFORE UPDATE ON combination_subjects
+  FOR EACH ROW EXECUTE FUNCTION set_updated_at();
+
+-- ============================================================
+-- 24. CLASS_CURRICULUM (which curriculum a class uses)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS class_curricula (
+  id            UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  class_id      UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  curriculum_id UUID NOT NULL REFERENCES curricula(id) ON DELETE CASCADE,
+  created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE class_curricula ADD COLUMN IF NOT EXISTS class_id      UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE;
+ALTER TABLE class_curricula ADD COLUMN IF NOT EXISTS curriculum_id UUID NOT NULL REFERENCES curricula(id) ON DELETE CASCADE;
+ALTER TABLE class_curricula ADD COLUMN IF NOT EXISTS created_at    TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_class_curricula_class ON class_curricula(class_id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_class_curriculum') THEN
+    ALTER TABLE class_curricula ADD CONSTRAINT uq_class_curriculum UNIQUE (class_id);
+  END IF;
+END $$;
+
+-- ============================================================
+-- 25. CLASS_COMBINATIONS (A-Level: which combos a class offers)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS class_combinations (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  class_id        UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+  combination_id  UUID NOT NULL REFERENCES combinations(id) ON DELETE CASCADE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE class_combinations ADD COLUMN IF NOT EXISTS class_id       UUID NOT NULL REFERENCES classes(id) ON DELETE CASCADE;
+ALTER TABLE class_combinations ADD COLUMN IF NOT EXISTS combination_id UUID NOT NULL REFERENCES combinations(id) ON DELETE CASCADE;
+ALTER TABLE class_combinations ADD COLUMN IF NOT EXISTS created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW();
+
+CREATE INDEX IF NOT EXISTS idx_class_combinations_class ON class_combinations(class_id);
+
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'uq_class_combination') THEN
+    ALTER TABLE class_combinations ADD CONSTRAINT uq_class_combination UNIQUE (class_id, combination_id);
+  END IF;
+END $$;
+
+-- ============================================================
 -- ROW LEVEL SECURITY
 -- ============================================================
 DO $$
@@ -823,6 +994,12 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subjects'           AND schemaname = 'public') THEN ALTER TABLE subjects           ENABLE ROW LEVEL SECURITY; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'teacher_subjects'   AND schemaname = 'public') THEN ALTER TABLE teacher_subjects   ENABLE ROW LEVEL SECURITY; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'subject_assignments' AND schemaname = 'public') THEN ALTER TABLE subject_assignments ENABLE ROW LEVEL SECURITY; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'student_subjects'    AND schemaname = 'public') THEN ALTER TABLE student_subjects    ENABLE ROW LEVEL SECURITY; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'curricula'           AND schemaname = 'public') THEN ALTER TABLE curricula           ENABLE ROW LEVEL SECURITY; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'combinations'        AND schemaname = 'public') THEN ALTER TABLE combinations        ENABLE ROW LEVEL SECURITY; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'combination_subjects' AND schemaname = 'public') THEN ALTER TABLE combination_subjects ENABLE ROW LEVEL SECURITY; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'class_curricula'      AND schemaname = 'public') THEN ALTER TABLE class_curricula      ENABLE ROW LEVEL SECURITY; END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'class_combinations'   AND schemaname = 'public') THEN ALTER TABLE class_combinations   ENABLE ROW LEVEL SECURITY; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'exams'              AND schemaname = 'public') THEN ALTER TABLE exams              ENABLE ROW LEVEL SECURITY; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'marks'              AND schemaname = 'public') THEN ALTER TABLE marks              ENABLE ROW LEVEL SECURITY; END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE tablename = 'grades'             AND schemaname = 'public') THEN ALTER TABLE grades             ENABLE ROW LEVEL SECURITY; END IF;
@@ -849,6 +1026,8 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admin_all_profiles'           AND tablename = 'profiles') THEN CREATE POLICY "admin_all_profiles" ON profiles FOR ALL USING (get_my_role() = 'admin'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'headmaster_read_profiles'     AND tablename = 'profiles') THEN CREATE POLICY "headmaster_read_profiles" ON profiles FOR SELECT USING (get_my_role() = 'headmaster'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_read_profiles'       AND tablename = 'profiles') THEN CREATE POLICY "academic_read_profiles" ON profiles FOR SELECT USING (get_my_role() = 'academic'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_write_profiles'      AND tablename = 'profiles') THEN CREATE POLICY "academic_write_profiles" ON profiles FOR INSERT WITH CHECK (get_my_role() = 'academic'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_update_profiles'     AND tablename = 'profiles') THEN CREATE POLICY "academic_update_profiles" ON profiles FOR UPDATE USING (get_my_role() = 'academic'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'teacher_own_profile'          AND tablename = 'profiles') THEN CREATE POLICY "teacher_own_profile" ON profiles FOR SELECT USING (id = auth.uid() AND get_my_role() = 'teacher'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'teacher_update_own_profile'   AND tablename = 'profiles') THEN CREATE POLICY "teacher_update_own_profile" ON profiles FOR UPDATE USING (id = auth.uid() AND get_my_role() = 'teacher'); END IF;
 END $$;
@@ -957,6 +1136,28 @@ BEGIN
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admin_all_subject_assignments'  AND tablename = 'subject_assignments') THEN CREATE POLICY "admin_all_subject_assignments" ON subject_assignments FOR ALL USING (get_my_role() = 'admin'); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'read_subject_assignments'       AND tablename = 'subject_assignments') THEN CREATE POLICY "read_subject_assignments" ON subject_assignments FOR SELECT USING (get_my_role() IN ('headmaster', 'academic', 'teacher')); END IF;
   IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_rw_subject_assignments' AND tablename = 'subject_assignments') THEN CREATE POLICY "academic_rw_subject_assignments" ON subject_assignments FOR ALL USING (get_my_role() = 'academic'); END IF;
+END $$;
+
+-- ============================================================
+-- RLS POLICIES: STUDENT_SUBJECTS
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admin_all_student_subjects'      AND tablename = 'student_subjects') THEN CREATE POLICY "admin_all_student_subjects" ON student_subjects FOR ALL USING (get_my_role() = 'admin'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'headmaster_read_student_subjects' AND tablename = 'student_subjects') THEN CREATE POLICY "headmaster_read_student_subjects" ON student_subjects FOR SELECT USING (get_my_role() = 'headmaster'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_rw_student_subjects'    AND tablename = 'student_subjects') THEN CREATE POLICY "academic_rw_student_subjects" ON student_subjects FOR ALL USING (get_my_role() = 'academic'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'teacher_read_student_subjects'   AND tablename = 'student_subjects') THEN
+    CREATE POLICY "teacher_read_student_subjects" ON student_subjects FOR SELECT USING (
+      get_my_role() = 'teacher'
+      AND student_id IN (
+        SELECT s.id FROM students s
+        JOIN class_streams cs ON cs.id = s.class_stream_id
+        JOIN teacher_subjects ts ON ts.class_stream_id = cs.id
+        JOIN teachers t ON t.id = ts.teacher_id
+        WHERE t.profile_id = auth.uid()
+      )
+    );
+  END IF;
 END $$;
 
 -- ============================================================
@@ -1086,6 +1287,56 @@ BEGIN
 END $$;
 
 -- ============================================================
+-- RLS POLICIES: CURRICULA
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admin_all_curricula'      AND tablename = 'curricula') THEN CREATE POLICY "admin_all_curricula" ON curricula FOR ALL USING (get_my_role() = 'admin'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'read_curricula'           AND tablename = 'curricula') THEN CREATE POLICY "read_curricula" ON curricula FOR SELECT USING (get_my_role() IN ('headmaster', 'academic', 'teacher')); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_rw_curricula'    AND tablename = 'curricula') THEN CREATE POLICY "academic_rw_curricula" ON curricula FOR ALL USING (get_my_role() = 'academic'); END IF;
+END $$;
+
+-- ============================================================
+-- RLS POLICIES: COMBINATIONS
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admin_all_combinations'      AND tablename = 'combinations') THEN CREATE POLICY "admin_all_combinations" ON combinations FOR ALL USING (get_my_role() = 'admin'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'read_combinations'           AND tablename = 'combinations') THEN CREATE POLICY "read_combinations" ON combinations FOR SELECT USING (get_my_role() IN ('headmaster', 'academic', 'teacher')); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_rw_combinations'    AND tablename = 'combinations') THEN CREATE POLICY "academic_rw_combinations" ON combinations FOR ALL USING (get_my_role() = 'academic'); END IF;
+END $$;
+
+-- ============================================================
+-- RLS POLICIES: COMBINATION_SUBJECTS
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admin_all_combination_subjects'      AND tablename = 'combination_subjects') THEN CREATE POLICY "admin_all_combination_subjects" ON combination_subjects FOR ALL USING (get_my_role() = 'admin'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'read_combination_subjects'           AND tablename = 'combination_subjects') THEN CREATE POLICY "read_combination_subjects" ON combination_subjects FOR SELECT USING (get_my_role() IN ('headmaster', 'academic', 'teacher')); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_rw_combination_subjects'    AND tablename = 'combination_subjects') THEN CREATE POLICY "academic_rw_combination_subjects" ON combination_subjects FOR ALL USING (get_my_role() = 'academic'); END IF;
+END $$;
+
+-- ============================================================
+-- RLS POLICIES: CLASS_CURRICULA
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admin_all_class_curricula'      AND tablename = 'class_curricula') THEN CREATE POLICY "admin_all_class_curricula" ON class_curricula FOR ALL USING (get_my_role() = 'admin'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'read_class_curricula'           AND tablename = 'class_curricula') THEN CREATE POLICY "read_class_curricula" ON class_curricula FOR SELECT USING (get_my_role() IN ('headmaster', 'academic', 'teacher')); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_rw_class_curricula'    AND tablename = 'class_curricula') THEN CREATE POLICY "academic_rw_class_curricula" ON class_curricula FOR ALL USING (get_my_role() = 'academic'); END IF;
+END $$;
+
+-- ============================================================
+-- RLS POLICIES: CLASS_COMBINATIONS
+-- ============================================================
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'admin_all_class_combinations'      AND tablename = 'class_combinations') THEN CREATE POLICY "admin_all_class_combinations" ON class_combinations FOR ALL USING (get_my_role() = 'admin'); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'read_class_combinations'           AND tablename = 'class_combinations') THEN CREATE POLICY "read_class_combinations" ON class_combinations FOR SELECT USING (get_my_role() IN ('headmaster', 'academic', 'teacher')); END IF;
+  IF NOT EXISTS (SELECT 1 FROM pg_policies WHERE policyname = 'academic_rw_class_combinations'    AND tablename = 'class_combinations') THEN CREATE POLICY "academic_rw_class_combinations" ON class_combinations FOR ALL USING (get_my_role() = 'academic'); END IF;
+END $$;
+
+-- ============================================================
 -- DEFAULT DATA: CLASSES (Form 1–Form 6)
 -- ============================================================
 INSERT INTO classes (class_name, level, sort_order)
@@ -1143,6 +1394,105 @@ WHERE NOT EXISTS (SELECT 1 FROM grades g WHERE g.grade = v.grade AND g.level = v
 INSERT INTO school_settings (school_name, school_code, address, phone, email)
 SELECT 'Sample Secondary School', 'SSS001', 'P.O. Box 1, Dar es Salaam, Tanzania', '+255 700 000 000', 'info@samplesecondary.ac.tz'
 WHERE NOT EXISTS (SELECT 1 FROM school_settings);
+
+-- ============================================================
+-- DEFAULT DATA: CURRICULA
+-- ============================================================
+INSERT INTO curricula (name, level, is_active)
+SELECT v.name, v.level, v.is_active
+FROM (VALUES
+  ('Old Curriculum O-Level', 'O_LEVEL', TRUE),
+  ('New Curriculum O-Level', 'O_LEVEL', TRUE),
+  ('Old Curriculum A-Level', 'A_LEVEL', TRUE),
+  ('New Curriculum A-Level', 'A_LEVEL', TRUE)
+) AS v(name, level, is_active)
+WHERE NOT EXISTS (SELECT 1 FROM curricula c WHERE c.name = v.name);
+
+-- ============================================================
+-- DEFAULT DATA: CLASS CURRICULA
+-- Form 1 & 2 use New Curriculum O-Level
+-- Form 3 & 4 use Old Curriculum O-Level
+-- ============================================================
+INSERT INTO class_curricula (class_id, curriculum_id)
+SELECT c.id, cu.id
+FROM classes c
+CROSS JOIN curricula cu
+WHERE (c.class_name, cu.name) IN (
+  ('Form 1', 'New Curriculum O-Level'),
+  ('Form 2', 'New Curriculum O-Level'),
+  ('Form 3', 'Old Curriculum O-Level'),
+  ('Form 4', 'Old Curriculum O-Level')
+)
+AND NOT EXISTS (
+  SELECT 1 FROM class_curricula cc
+  WHERE cc.class_id = c.id
+);
+
+-- ============================================================
+-- DEFAULT DATA: SAMPLE A-LEVEL COMBINATIONS
+-- ============================================================
+-- These will reference the curricula above. They only insert if
+-- the combination code doesn't already exist.
+INSERT INTO combinations (name, code, curriculum_id)
+SELECT v.name, v.code, c.id
+FROM (VALUES
+  ('Physics Chemistry Mathematics', 'PCM', 'Old Curriculum A-Level'),
+  ('Physics Chemistry Biology',      'PCB', 'Old Curriculum A-Level'),
+  ('History Geography Literature',    'HGL', 'Old Curriculum A-Level'),
+  ('Economics Geography Mathematics', 'EGM', 'Old Curriculum A-Level'),
+  ('Chemistry Biology Geography',     'CBG', 'Old Curriculum A-Level'),
+  ('Physics Advanced Mathematics',    'PAM', 'Old Curriculum A-Level')
+) AS v(name, code, curriculum_name)
+JOIN curricula c ON c.name = v.curriculum_name
+WHERE NOT EXISTS (SELECT 1 FROM combinations x WHERE x.code = v.code);
+
+-- ============================================================
+-- FUNCTION: Register a teacher (creates auth user, profile, teacher record)
+-- Bypasses signup rate limits by using SECURITY DEFINER + auth.create_user()
+-- ============================================================
+CREATE OR REPLACE FUNCTION public.register_teacher(
+  p_email TEXT,
+  p_password TEXT,
+  p_full_name TEXT,
+  p_employee_number TEXT,
+  p_qualification TEXT DEFAULT NULL,
+  p_phone TEXT DEFAULT NULL
+) RETURNS JSONB
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  v_user_id UUID;
+  v_teacher_id UUID;
+BEGIN
+  -- Create auth user (bypasses rate limits via SECURITY DEFINER)
+  v_user_id := auth.create_user(
+    email := p_email,
+    password := p_password,
+    email_confirm := true,
+    user_metadata := jsonb_build_object('full_name', p_full_name, 'role', 'teacher')
+  );
+
+  -- Upsert profile (handles auto-created profiles by trigger)
+  INSERT INTO public.profiles (id, email, full_name, role)
+  VALUES (v_user_id, p_email, p_full_name, 'teacher')
+  ON CONFLICT (id) DO UPDATE SET
+    email = EXCLUDED.email,
+    full_name = EXCLUDED.full_name,
+    role = EXCLUDED.role;
+
+  -- Create teacher record
+  INSERT INTO public.teachers (employee_number, profile_id, qualification, phone, status)
+  VALUES (p_employee_number, v_user_id, p_qualification, p_phone, 'active')
+  RETURNING id INTO v_teacher_id;
+
+  RETURN jsonb_build_object(
+    'user_id', v_user_id,
+    'teacher_id', v_teacher_id,
+    'employee_number', p_employee_number
+  );
+END;
+$$ LANGUAGE plpgsql;
 
 -- ============================================================
 -- END OF SCHEMA

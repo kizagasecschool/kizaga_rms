@@ -27,6 +27,7 @@ function AcademicSubjects() {
   const [formData, setFormData] = useState({})
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
+  const [pendingRoles, setPendingRoles] = useState({})
 
   const fetchSubjects = useCallback(async () => {
     const { data } = await supabase.from('subjects').select('*').order('subject_name')
@@ -181,6 +182,7 @@ function AcademicSubjects() {
   const openComboSubjects = (combo) => {
     setSelectedCombo(combo)
     setComboSubjectsModalOpen(true)
+    setPendingRoles({})
   }
 
   const getAssignedSubjects = (comboId) => {
@@ -611,7 +613,7 @@ function AcademicSubjects() {
 
       <Modal
         isOpen={comboSubjectsModalOpen}
-        onClose={() => setComboSubjectsModalOpen(false)}
+        onClose={() => { setComboSubjectsModalOpen(false); setPendingRoles({}) }}
         title={`Subjects - ${selectedCombo?.combination_name || ''}`}
       >
         <p className="text-xs text-gray-500 mb-4">
@@ -666,14 +668,25 @@ function AcademicSubjects() {
                     </button>
                   </div>
                 ) : (
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => toggleComboSubject(selectedCombo.id, sub.id, 'CORE')}
-                    className="px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 transition disabled:opacity-50"
-                  >
-                    Add
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    <select
+                      value={pendingRoles[sub.id] || 'CORE'}
+                      onChange={(e) => setPendingRoles((prev) => ({ ...prev, [sub.id]: e.target.value }))}
+                      className="px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                    >
+                      {ROLES.map((r) => (
+                        <option key={r} value={r}>{r === 'CORE' ? 'Core' : r === 'SUBSIDIARY' ? 'Subsidiary' : 'Optional'}</option>
+                      ))}
+                    </select>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => toggleComboSubject(selectedCombo.id, sub.id, pendingRoles[sub.id] || 'CORE')}
+                      className="px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 transition disabled:opacity-50"
+                    >
+                      Add
+                    </button>
+                  </div>
                 )}
               </div>
             )
