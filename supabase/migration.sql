@@ -86,3 +86,43 @@ create trigger on_auth_user_created
   after insert on auth.users
   for each row
   execute function public.handle_new_user();
+
+-- =============================================================
+-- Subjects table (academic has full access)
+-- =============================================================
+
+drop table if exists public.subjects;
+
+create table public.subjects (
+  id          uuid primary key default gen_random_uuid(),
+  name        text not null,
+  code        text not null unique,
+  category    text not null default 'core' check (category in ('core', 'elective')),
+  created_at  timestamptz not null default now()
+);
+
+alter table public.subjects enable row level security;
+
+-- Academic: full access
+create policy "Academic full access subjects"
+  on public.subjects for all
+  using (public.get_my_role() = 'academic')
+  with check (public.get_my_role() = 'academic');
+
+-- Admin: full access
+create policy "Admin full access subjects"
+  on public.subjects for all
+  using (public.get_my_role() = 'admin')
+  with check (public.get_my_role() = 'admin');
+
+-- Headmaster: read only
+create policy "Headmaster read subjects"
+  on public.subjects for select
+  using (public.get_my_role() = 'headmaster');
+
+-- Teacher: read only
+create policy "Teacher read subjects"
+  on public.subjects for select
+  using (public.get_my_role() = 'teacher');
+
+create index if not exists idx_subjects_code on public.subjects(code);

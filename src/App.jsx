@@ -6,9 +6,12 @@ import MainLayout from './layouts/MainLayout'
 import Login from './pages/auth/Login'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminClasses from './pages/admin/Classes'
+import AdminSubjects from './pages/admin/Subjects'
 import HeadmasterDashboard from './pages/headmaster/Dashboard'
 import AcademicDashboard from './pages/academic/Dashboard'
 import AcademicClasses from './pages/academic/Classes'
+import AcademicSubjects from './pages/academic/Subjects'
+import Students from './pages/Students'
 import TeacherDashboard from './pages/teacher/Dashboard'
 
 function RootRedirect() {
@@ -50,6 +53,8 @@ function App() {
                 <Routes>
                   <Route index element={<AdminDashboard />} />
                   <Route path="classes" element={<AdminClasses />} />
+                  <Route path="subjects" element={<AdminSubjects />} />
+                  <Route path="students" element={<Students />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -71,6 +76,8 @@ function App() {
                 <Routes>
                   <Route index element={<AcademicDashboard />} />
                   <Route path="classes" element={<AcademicClasses />} />
+                  <Route path="subjects" element={<AcademicSubjects />} />
+                  <Route path="students" element={<Students />} />
                 </Routes>
               </RoleBasedRoute>
             }
