@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/Modal'
+import { useNotification } from '../../context/NotificationContext'
 
 const LEVELS = ['O_LEVEL', 'A_LEVEL']
 const CURRICULUMS = ['OLD', 'NEW']
@@ -8,6 +9,7 @@ const SUBJECT_TYPES = ['COMPULSORY', 'OPTIONAL']
 const ROLES = ['CORE', 'SUBSIDIARY', 'OPTIONAL']
 
 function AcademicSubjects() {
+  const { showToast } = useNotification()
   const [activeLevel, setActiveLevel] = useState('O_LEVEL')
   const [loading, setLoading] = useState(true)
 
@@ -101,9 +103,10 @@ function AcademicSubjects() {
       }
       await fetchSubjects()
       setSubjectModalOpen(false)
+      showToast(editingSubject ? 'Subject updated successfully' : 'Subject created successfully', 'success')
     } catch (err) {
       console.error('Save error:', err)
-      alert('Failed to save. ' + (err.message || ''))
+      showToast('Failed to save. ' + (err.message || ''), 'error')
     } finally {
       setSaving(false)
     }
@@ -115,9 +118,10 @@ function AcademicSubjects() {
       if (error) throw error
       await fetchSubjects()
       setDeleteConfirm(null)
+      showToast('Subject deleted successfully', 'success')
     } catch (err) {
       console.error('Delete error:', err)
-      alert('Failed to delete. ' + (err.message || ''))
+      showToast('Failed to delete. ' + (err.message || ''), 'error')
     }
   }
 
@@ -151,9 +155,10 @@ function AcademicSubjects() {
       }
       await fetchCombinations()
       setComboModalOpen(false)
+      showToast(editingCombo ? 'Combination updated successfully' : 'Combination created successfully', 'success')
     } catch (err) {
       console.error('Save error:', err)
-      alert('Failed to save. ' + (err.message || ''))
+      showToast('Failed to save. ' + (err.message || ''), 'error')
     } finally {
       setSaving(false)
     }
@@ -166,9 +171,10 @@ function AcademicSubjects() {
       await fetchCombinations()
       await fetchCombinationSubjects()
       setDeleteConfirm(null)
+      showToast('Combination deleted successfully', 'success')
     } catch (err) {
       console.error('Delete error:', err)
-      alert('Failed to delete. ' + (err.message || ''))
+      showToast('Failed to delete. ' + (err.message || ''), 'error')
     }
   }
 
@@ -204,9 +210,10 @@ function AcademicSubjects() {
         if (error) throw error
       }
       await fetchCombinationSubjects()
+      showToast(existing ? 'Subject removed from combination' : 'Subject added to combination', 'success')
     } catch (err) {
       console.error('Toggle error:', err)
-      alert('Failed to update subject.')
+      showToast('Failed to update subject.', 'error')
     } finally {
       setSaving(false)
     }
@@ -225,9 +232,11 @@ function AcademicSubjects() {
           .eq('id', existing.id)
         if (error) throw error
         await fetchCombinationSubjects()
+        showToast('Subject role updated', 'success')
       }
     } catch (err) {
       console.error('Update role error:', err)
+      showToast('Failed to update subject role.', 'error')
     } finally {
       setSaving(false)
     }

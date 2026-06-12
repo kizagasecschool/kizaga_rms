@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import Papa from 'papaparse'
 import { supabase } from '../lib/supabase'
 import Modal from '../components/Modal'
+import { useNotification } from '../context/NotificationContext'
 
 const STATUSES = ['active', 'inactive', 'graduated', 'transferred', 'expelled']
 
@@ -42,6 +43,7 @@ function downloadTemplate() {
 }
 
 function Students() {
+  const { showToast } = useNotification()
   const [loading, setLoading] = useState(true)
 
   const [students, setStudents] = useState([])
@@ -177,9 +179,10 @@ function Students() {
       }
       await fetchStudents()
       setFormOpen(false)
+      showToast(editing ? 'Student updated successfully' : 'Student registered successfully', 'success')
     } catch (err) {
       console.error('Save error:', err)
-      alert('Failed to save. ' + (err.message || ''))
+      showToast('Failed to save. ' + (err.message || ''), 'error')
     } finally {
       setSaving(false)
     }
@@ -191,9 +194,10 @@ function Students() {
       if (error) throw error
       await fetchStudents()
       setDeleteConfirm(null)
+      showToast('Student deleted successfully', 'success')
     } catch (err) {
       console.error('Delete error:', err)
-      alert('Failed to delete. ' + (err.message || ''))
+      showToast('Failed to delete. ' + (err.message || ''), 'error')
     }
   }
 
@@ -266,7 +270,11 @@ function Students() {
     setCsvErrors([])
     setCsvFile(null)
     await fetchStudents()
-    alert(`Imported: ${imported}, Failed: ${failed}`)
+    if (failed > 0) {
+      showToast(`Imported: ${imported}, Failed: ${failed}`, 'warning')
+    } else {
+      showToast(`${imported} student(s) imported successfully`, 'success')
+    }
   }
 
   if (loading) {
@@ -427,92 +435,123 @@ function Students() {
       </div>
 
       {/* Add/Edit Modal */}
-      <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} title={editing ? 'Edit Student' : 'Add Student'} className="max-w-3xl">
+      <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} title="" className="max-w-3xl">
+        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-gradient-to-r from-indigo-50 to-white rounded-t-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">{editing ? 'Edit Student' : 'Register New Student'}</h2>
+              <p className="text-sm text-gray-500">{editing ? 'Update the student\'s information below' : 'Fill in the student\'s details below'}</p>
+            </div>
+          </div>
+        </div>
         <form onSubmit={handleSave} className="space-y-6">
 
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Full Name</p>
-            <div className="flex gap-4">
-              <div className="w-44">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Surname *</label>
+          <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
+            <div className="flex items-center gap-2 mb-4">
+              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+              </svg>
+              <span className="text-sm font-semibold text-gray-800">Full Name</span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Surname <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   required
                   value={formData.surname || ''}
                   onChange={(e) => setFormData({ ...formData, surname: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  placeholder="e.g. Doe"
                 />
               </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">First Name *</label>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">First Name <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   required
                   value={formData.first_name || ''}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  placeholder="e.g. John"
                 />
               </div>
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Middle Name</label>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Middle Name</label>
                 <input
                   type="text"
                   value={formData.middle_name || ''}
                   onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  placeholder="e.g. Andrew"
                 />
               </div>
             </div>
           </div>
 
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Student Info</p>
-            <div className="flex gap-4">
-              <div className="w-44">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Admission Number *</label>
+          <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
+            <div className="flex items-center gap-2 mb-4">
+              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+              </svg>
+              <span className="text-sm font-semibold text-gray-800">Student Information</span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Admission Number <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   required
                   value={formData.admission_number || ''}
                   onChange={(e) => setFormData({ ...formData, admission_number: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. S001"
                 />
               </div>
-              <div className="w-36">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Gender *</label>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Gender <span className="text-red-500">*</span></label>
                 <select
                   required
                   value={formData.gender || 'Male'}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
                 >
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
                 </select>
               </div>
-              <div className="w-48">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth *</label>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Date of Birth <span className="text-red-500">*</span></label>
                 <input
                   type="date"
                   required
                   value={formData.date_of_birth || ''}
                   onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
                 />
               </div>
             </div>
           </div>
 
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Enrollment</p>
-            <div className="flex gap-4">
-              <div className="flex-[2]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Class / Stream</label>
+          <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
+            <div className="flex items-center gap-2 mb-4">
+              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
+              </svg>
+              <span className="text-sm font-semibold text-gray-800">Enrollment</span>
+            </div>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="col-span-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Class / Stream</label>
                 <select
                   value={formData.class_stream_id || ''}
                   onChange={(e) => setFormData({ ...formData, class_stream_id: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
                 >
                   <option value="">-- Not assigned --</option>
                   {getClassStreamOptions().map((o) => (
@@ -520,21 +559,21 @@ function Students() {
                   ))}
                 </select>
               </div>
-              <div className="w-48">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Admission Date</label>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Admission Date</label>
                 <input
                   type="date"
                   value={formData.admission_date || ''}
                   onChange={(e) => setFormData({ ...formData, admission_date: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
                 />
               </div>
-              <div className="w-36">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Status</label>
                 <select
                   value={formData.status || 'active'}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
@@ -544,53 +583,68 @@ function Students() {
             </div>
           </div>
 
-          <div>
-            <p className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3">Parent / Contact</p>
-            <div className="flex gap-4 mb-4">
-              <div className="flex-1">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Parent Name</label>
+          <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
+            <div className="flex items-center gap-2 mb-4">
+              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" />
+              </svg>
+              <span className="text-sm font-semibold text-gray-800">Parent / Contact Information</span>
+            </div>
+            <div className="grid grid-cols-2 gap-4 mb-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Parent / Guardian Name</label>
                 <input
                   type="text"
                   value={formData.parent_name || ''}
                   onChange={(e) => setFormData({ ...formData, parent_name: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  placeholder="e.g. Andrew Doe"
                 />
               </div>
-              <div className="w-56">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Phone Number</label>
                 <input
                   type="text"
                   value={formData.parent_phone || ''}
                   onChange={(e) => setFormData({ ...formData, parent_phone: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  placeholder="e.g. +255712345678"
                 />
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">Physical Address</label>
               <input
                 type="text"
                 value={formData.address || ''}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                placeholder="e.g. Dar es Salaam"
               />
             </div>
           </div>
 
-          <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
+          <div className="flex items-center justify-end gap-3 pt-2 border-t border-gray-100">
             <button
               type="button"
               onClick={() => setFormOpen(false)}
-              className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+              className="px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2 shadow-lg shadow-indigo-200"
             >
-              {saving ? 'Saving...' : editing ? 'Update Student' : 'Register Student'}
+              {saving ? (
+                <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+              ) : (
+                <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                </svg>
+                {editing ? 'Update Student' : 'Register Student'}</>
+              )}
             </button>
           </div>
         </form>

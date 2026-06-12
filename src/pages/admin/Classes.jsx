@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/Modal'
+import { useNotification } from '../../context/NotificationContext'
 
 const TABS = [
   { key: 'classes', label: 'Classes' },
@@ -11,6 +12,7 @@ const TABS = [
 const LEVELS = ['O_LEVEL', 'A_LEVEL']
 
 function AdminClasses() {
+  const { showToast } = useNotification()
   const [activeTab, setActiveTab] = useState('classes')
   const [loading, setLoading] = useState(true)
 
@@ -109,9 +111,10 @@ function AdminClasses() {
         await fetchStreams()
       }
       setModalOpen(false)
+      showToast(editingItem ? 'Updated successfully' : 'Created successfully', 'success')
     } catch (err) {
       console.error('Save error:', err)
-      alert('Failed to save. ' + (err.message || ''))
+      showToast('Failed to save. ' + (err.message || ''), 'error')
     } finally {
       setSaving(false)
     }
@@ -129,9 +132,10 @@ function AdminClasses() {
         await fetchStreams()
       }
       setDeleteConfirm(null)
+      showToast('Deleted successfully', 'success')
     } catch (err) {
       console.error('Delete error:', err)
-      alert('Failed to delete. ' + (err.message || ''))
+      showToast('Failed to delete. ' + (err.message || ''), 'error')
     }
   }
 
@@ -151,9 +155,10 @@ function AdminClasses() {
         if (error) throw error
       }
       await fetchClassStreams()
+      showToast(assigned ? 'Stream removed from class' : 'Stream assigned to class', 'success')
     } catch (err) {
       console.error('Toggle error:', err)
-      alert('Failed to update assignment.')
+      showToast('Failed to update assignment.', 'error')
     }
   }
 

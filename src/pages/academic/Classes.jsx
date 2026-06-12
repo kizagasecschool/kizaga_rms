@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useNotification } from '../../context/NotificationContext'
 function AcademicClasses() {
+  const { showToast } = useNotification()
   const [loading, setLoading] = useState(true)
   const [classes, setClasses] = useState([])
   const [streams, setStreams] = useState([])
@@ -45,9 +47,10 @@ function AcademicClasses() {
         if (error) throw error
       }
       await fetchData()
+      showToast(assigned ? 'Stream removed from class' : 'Stream assigned to class', 'success')
     } catch (err) {
       console.error('Toggle error:', err)
-      alert('Failed to update assignment.')
+      showToast('Failed to update assignment.', 'error')
     } finally {
       setSaving(false)
     }
