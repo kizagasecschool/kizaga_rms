@@ -65,7 +65,7 @@ function AcademicClasses() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-3 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
       </div>
     )
   }
@@ -85,7 +85,7 @@ function AcademicClasses() {
             <select
               value={selectedClassId}
               onChange={(e) => setSelectedClassId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
               <option value="">-- Choose a class --</option>
               {classes.map((c) => (
@@ -105,11 +105,11 @@ function AcademicClasses() {
                         key={s.id}
                         className={`flex items-center justify-between px-3 py-2.5 rounded-lg border cursor-pointer transition ${
                           assigned
-                            ? 'bg-indigo-50 border-indigo-200'
+                            ? 'bg-maroon-50 border-maroon-200'
                             : 'bg-gray-50 border-gray-100 hover:border-gray-200'
                         }`}
                       >
-                        <span className={`text-sm font-medium ${assigned ? 'text-indigo-700' : 'text-gray-600'}`}>
+                        <span className={`text-sm font-medium ${assigned ? 'text-maroon-700' : 'text-gray-600'}`}>
                           Stream {s.stream_name}
                         </span>
                         <button
@@ -119,7 +119,7 @@ function AcademicClasses() {
                           className={`text-xs font-medium px-2.5 py-1 rounded-md transition ${
                             assigned
                               ? 'bg-red-100 text-red-600 hover:bg-red-200'
-                              : 'bg-indigo-100 text-indigo-600 hover:bg-indigo-200'
+                              : 'bg-maroon-100 text-maroon-600 hover:bg-maroon-200'
                           } disabled:opacity-50`}
                         >
                           {assigned ? 'Remove' : 'Assign'}
@@ -184,7 +184,7 @@ function AcademicClasses() {
                             {assigned.map((s) => (
                               <span
                                 key={s.id}
-                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700"
+                                className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-maroon-50 text-maroon-700"
                               >
                                 Stream {s.stream_name}
                               </span>

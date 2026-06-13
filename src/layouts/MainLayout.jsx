@@ -67,7 +67,7 @@ function MainLayout() {
       `}>
         {/* Header */}
         <div className="flex items-center gap-3 px-5 h-16 border-b border-gray-100 shrink-0">
-          <div className="w-9 h-9 bg-indigo-600 rounded-lg flex items-center justify-center shrink-0">
+          <div className="w-9 h-9 bg-maroon-600 rounded-lg flex items-center justify-center shrink-0">
             <svg className="w-5 h-5 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
             </svg>
@@ -90,7 +90,7 @@ function MainLayout() {
                 className={`
                   flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition
                   ${isActive
-                    ? 'bg-indigo-50 text-indigo-700'
+                    ? 'bg-maroon-50 text-maroon-700'
                     : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900'
                   }
                 `}
@@ -107,7 +107,7 @@ function MainLayout() {
         {/* Footer */}
         <div className="flex items-center justify-between p-4 border-t border-gray-100 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
+            <div className="w-8 h-8 rounded-full bg-maroon-600 text-white flex items-center justify-center text-xs font-bold shrink-0">
               {profile?.full_name?.[0]?.toUpperCase() || 'U'}
             </div>
             <div className="min-w-0">
@@ -140,7 +140,7 @@ function MainLayout() {
             </svg>
           </button>
           <div className="flex items-center gap-2">
-            <div className="w-7 h-7 rounded-full bg-indigo-600 text-white flex items-center justify-center text-xs font-bold">
+            <div className="w-7 h-7 rounded-full bg-maroon-600 text-white flex items-center justify-center text-xs font-bold">
               {profile?.full_name?.[0]?.toUpperCase() || 'U'}
             </div>
             <span className="text-sm font-medium text-gray-700 capitalize">{role}</span>

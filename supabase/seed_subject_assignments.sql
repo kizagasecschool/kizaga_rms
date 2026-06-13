@@ -11,21 +11,21 @@
 -- Uses _O suffix to avoid UNIQUE subject_code conflicts with
 -- existing A-Level subjects (KISW, BIO, CHEM, etc.)
 -- ============================================================
-INSERT INTO subjects (subject_code, subject_name, subject_type, level)
-SELECT v.code, v.name, v.type, 'O_LEVEL'
+INSERT INTO subjects (subject_code, subject_name, subject_type, level, curriculum)
+SELECT v.code, v.name, v.type, 'O_LEVEL', v.curriculum
 FROM (VALUES
-  ('KISW_O', 'Kiswahili (O-Level)',          'COMPULSORY'),
-  ('ENGL_O', 'English Language (O-Level)',    'COMPULSORY'),
-  ('MATH_O', 'Mathematics (O-Level)',         'COMPULSORY'),
-  ('CIV_O',  'Civics (O-Level)',             'COMPULSORY'),
-  ('BIO_O',  'Biology (O-Level)',            'COMPULSORY'),
-  ('CHEM_O', 'Chemistry (O-Level)',          'COMPULSORY'),
-  ('PHY_O',  'Physics (O-Level)',            'COMPULSORY'),
-  ('GEO_O',  'Geography (O-Level)',          'COMPULSORY'),
-  ('HIST_O', 'History (O-Level)',            'COMPULSORY'),
-  ('BK_O',   'Bible Knowledge (O-Level)',    'OPTIONAL'),
-  ('IT_O',   'Information Technology (O-Level)', 'OPTIONAL')
-) AS v(code, name, type)
+  ('KISW_O', 'Kiswahili (O-Level)',          'COMPULSORY', NULL),
+  ('ENGL_O', 'English Language (O-Level)',    'COMPULSORY', NULL),
+  ('MATH_O', 'Mathematics (O-Level)',         'COMPULSORY', NULL),
+  ('CIV_O',  'Civics (O-Level)',             'COMPULSORY', NULL),
+  ('BIO_O',  'Biology (O-Level)',            'COMPULSORY', NULL),
+  ('CHEM_O', 'Chemistry (O-Level)',          'COMPULSORY', NULL),
+  ('PHY_O',  'Physics (O-Level)',            'COMPULSORY', NULL),
+  ('GEO_O',  'Geography (O-Level)',          'COMPULSORY', NULL),
+  ('HIST_O', 'History (O-Level)',            'COMPULSORY', NULL),
+  ('BK_O',   'Bible Knowledge (O-Level)',    'OPTIONAL',   'OLD'),
+  ('IT_O',   'Information Technology (O-Level)', 'OPTIONAL', 'NEW')
+) AS v(code, name, type, curriculum)
 WHERE NOT EXISTS (
   SELECT 1 FROM subjects s WHERE s.subject_code = v.code
 )
@@ -63,24 +63,36 @@ WHERE NOT EXISTS (
 ON CONFLICT (subject_code) DO NOTHING;
 
 -- ============================================================
--- 3. O-LEVEL: SUBJECT → CLASS ASSIGNMENTS
--- Assign core subjects to Form 1–4.
--- Optional subjects (BK_O, IT_O) assigned to all forms too.
+-- 3. O-LEVEL: SUBJECT → CLASS ASSIGNMENTS (curriculum-aware)
+-- Core subjects (curriculum IS NULL) go to all classes.
+-- Curriculum-specific subjects only go to matching classes:
+--   Form 1-2 (New Curriculum) → only NEW subjects
+--   Form 3-4 (Old Curriculum) → only OLD subjects
 -- ============================================================
-WITH class_ids AS (
-  SELECT id, class_name FROM classes WHERE class_name IN ('Form 1','Form 2','Form 3','Form 4')
-),
-subject_ids AS (
-  SELECT id, subject_code FROM subjects WHERE level = 'O_LEVEL'
+WITH class_cur AS (
+  SELECT c.id AS class_id, cu.name AS curriculum_name
+  FROM classes c
+  JOIN class_curricula cc ON cc.class_id = c.id
+  JOIN curricula cu ON cu.id = cc.curriculum_id
+  WHERE c.class_name IN ('Form 1','Form 2','Form 3','Form 4')
 )
 INSERT INTO subject_assignments (subject_id, class_id)
-SELECT s.id, c.id
-FROM subject_ids s
-CROSS JOIN class_ids c
-WHERE NOT EXISTS (
-  SELECT 1 FROM subject_assignments sa
-  WHERE sa.subject_id = s.id AND sa.class_id = c.id
-);
+SELECT s.id, cc.class_id
+FROM subjects s
+JOIN class_cur cc ON TRUE
+WHERE s.level = 'O_LEVEL'
+  AND (
+    s.curriculum IS NULL
+    OR (
+      (cc.curriculum_name LIKE 'New%' AND s.curriculum = 'NEW')
+      OR
+      (cc.curriculum_name LIKE 'Old%' AND s.curriculum = 'OLD')
+    )
+  )
+  AND NOT EXISTS (
+    SELECT 1 FROM subject_assignments sa
+    WHERE sa.subject_id = s.id AND sa.class_id = cc.class_id
+  );
 
 -- ============================================================
 -- 4. A-LEVEL: COMBINATION → SUBJECT ASSIGNMENTS

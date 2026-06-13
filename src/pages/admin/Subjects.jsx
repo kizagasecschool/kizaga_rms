@@ -247,7 +247,7 @@ function AdminSubjects() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-3 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
       </div>
     )
   }
@@ -267,7 +267,7 @@ function AdminSubjects() {
             onClick={() => setActiveLevel(l)}
             className={`px-5 py-2 text-sm font-medium rounded-md transition ${
               activeLevel === l
-                ? 'bg-white text-indigo-700 shadow-sm'
+                ? 'bg-white text-maroon-700 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -288,7 +288,7 @@ function AdminSubjects() {
                   onClick={() => setCurriculumFilter(c)}
                   className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition ${
                     curriculumFilter === c
-                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                      ? 'bg-maroon-50 border-maroon-200 text-maroon-700'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
@@ -298,7 +298,7 @@ function AdminSubjects() {
             </div>
             <button
               onClick={openSubjectCreate}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+              className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
             >
               + Add Subject
             </button>
@@ -352,7 +352,7 @@ function AdminSubjects() {
                     <td className="px-5 py-3.5 text-right">
                       <button
                         onClick={() => openSubjectEdit(s)}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium mr-3"
+                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
                       >
                         Edit
                       </button>
@@ -378,7 +378,7 @@ function AdminSubjects() {
             <p className="text-sm text-gray-500">{combinations.length} combination(s)</p>
             <button
               onClick={openComboCreate}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+              className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
             >
               + Add Combination
             </button>
@@ -410,14 +410,14 @@ function AdminSubjects() {
                     <div className="flex items-center gap-1 shrink-0">
                       <button
                         onClick={() => openComboSubjects(combo)}
-                        className="px-3 py-1.5 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-lg hover:bg-indigo-100 transition"
+                        className="px-3 py-1.5 text-xs font-medium text-maroon-600 bg-maroon-50 rounded-lg hover:bg-maroon-100 transition"
                         title="Manage subjects"
                       >
                         Subjects
                       </button>
                       <button
                         onClick={() => openComboEdit(combo)}
-                        className="p-1.5 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition"
+                        className="p-1.5 text-gray-400 hover:text-maroon-600 hover:bg-gray-100 rounded-lg transition"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                           <path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0115.75 21H5.25A2.25 2.25 0 013 18.75V8.25A2.25 2.25 0 015.25 6H10" />
@@ -508,7 +508,7 @@ function AdminSubjects() {
                 maxLength={6}
                 value={formData.subject_code || ''}
                 onChange={(e) => setFormData({ ...formData, subject_code: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
                 placeholder="e.g. PHY"
               />
             </div>
@@ -519,7 +519,7 @@ function AdminSubjects() {
                 required
                 value={formData.subject_name || ''}
                 onChange={(e) => setFormData({ ...formData, subject_name: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
                 placeholder="e.g. Physics"
               />
             </div>
@@ -530,7 +530,7 @@ function AdminSubjects() {
               <select
                 value={formData.subject_type || 'COMPULSORY'}
                 onChange={(e) => setFormData({ ...formData, subject_type: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
               >
                 {SUBJECT_TYPES.map((t) => (
                   <option key={t} value={t}>{t === 'COMPULSORY' ? 'Compulsory' : 'Optional'}</option>
@@ -542,7 +542,7 @@ function AdminSubjects() {
               <select
                 value={formData.curriculum || 'OLD'}
                 onChange={(e) => setFormData({ ...formData, curriculum: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
               >
                 {CURRICULUMS.map((c) => (
                   <option key={c} value={c}>{c === 'OLD' ? 'Old Curriculum' : 'New Curriculum'}</option>
@@ -561,7 +561,7 @@ function AdminSubjects() {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+              className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition"
             >
               {saving ? 'Saving...' : editingSubject ? 'Update' : 'Create'}
             </button>
@@ -583,7 +583,7 @@ function AdminSubjects() {
               required
               value={formData.combination_name || ''}
               onChange={(e) => setFormData({ ...formData, combination_name: e.target.value })}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
               placeholder="e.g. PCB"
             />
           </div>
@@ -593,7 +593,7 @@ function AdminSubjects() {
               type="text"
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
               placeholder="e.g. Physics, Chemistry, Biology – Medicine"
             />
           </div>
@@ -608,7 +608,7 @@ function AdminSubjects() {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+              className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition"
             >
               {saving ? 'Saving...' : editingCombo ? 'Update' : 'Create'}
             </button>
@@ -644,7 +644,7 @@ function AdminSubjects() {
                 key={sub.id}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition ${
                   isAssigned
-                    ? 'bg-indigo-50 border-indigo-200'
+                    ? 'bg-maroon-50 border-maroon-200'
                     : 'bg-gray-50 border-gray-100 hover:border-gray-200'
                 }`}
               >
@@ -658,7 +658,7 @@ function AdminSubjects() {
                       value={currentRole}
                       disabled={saving}
                       onChange={(e) => updateComboSubjectRole(selectedCombo.id, sub.id, e.target.value)}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-maroon-500"
                     >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>{r === 'CORE' ? 'Core' : r === 'SUBSIDIARY' ? 'Subsidiary' : 'Optional'}</option>
@@ -678,7 +678,7 @@ function AdminSubjects() {
                     <select
                       value={pendingRoles[sub.id] || 'CORE'}
                       onChange={(e) => setPendingRoles((prev) => ({ ...prev, [sub.id]: e.target.value }))}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                      className="px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-maroon-500"
                     >
                       {ROLES.map((r) => (
                         <option key={r} value={r}>{r === 'CORE' ? 'Core' : r === 'SUBSIDIARY' ? 'Subsidiary' : 'Optional'}</option>
@@ -688,7 +688,7 @@ function AdminSubjects() {
                       type="button"
                       disabled={saving}
                       onClick={() => toggleComboSubject(selectedCombo.id, sub.id, pendingRoles[sub.id] || 'CORE')}
-                      className="px-2.5 py-1 text-xs font-medium text-indigo-600 bg-indigo-50 rounded-md hover:bg-indigo-100 transition disabled:opacity-50"
+                      className="px-2.5 py-1 text-xs font-medium text-maroon-600 bg-maroon-50 rounded-md hover:bg-maroon-100 transition disabled:opacity-50"
                     >
                       Add
                     </button>

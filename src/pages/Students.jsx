@@ -73,27 +73,51 @@ function Students() {
   const [studentSubjectIds, setStudentSubjectIds] = useState([])
   const [savingSubjects, setSavingSubjects] = useState(false)
 
+  // Bulk stream assignment states
+  const [streamAssignOpen, setStreamAssignOpen] = useState(false)
+  const [streamAssignClassId, setStreamAssignClassId] = useState('')
+  const [streamAssignStreamId, setStreamAssignStreamId] = useState('')
+  const [streamAssignStudents, setStreamAssignStudents] = useState([])
+  const [streamAssignSelected, setStreamAssignSelected] = useState([])
+  const [streamAssignSaving, setStreamAssignSaving] = useState(false)
+
+  // A-Level combination states
+  const [combinations, setCombinations] = useState([])
+  const [combinationSubjects, setCombinationSubjects] = useState([])
+  const [selectedCombinationId, setSelectedCombinationId] = useState('')
+  const [currentStudentCombinationId, setCurrentStudentCombinationId] = useState(null)
+
   const fetchStudents = useCallback(async () => {
     const { data } = await supabase
       .from('students')
-      .select('*, class_streams(*)')
+      .select('*, class_streams(*), classes(*)')
       .order('surname')
     if (data) setStudents(data)
   }, [])
 
   const [subjects, setSubjects] = useState([])
+  const [classCurricula, setClassCurricula] = useState([])
+  const [curricula, setCurricula] = useState([])
 
   const fetchLookups = useCallback(async () => {
-    const [cRes, sRes, csRes, subRes] = await Promise.all([
+    const [cRes, sRes, csRes, subRes, ccRes, curRes, comboRes, csbjRes] = await Promise.all([
       supabase.from('classes').select('*').order('sort_order'),
       supabase.from('streams').select('*').order('stream_name'),
       supabase.from('class_streams').select('*, classes(*), streams(*)'),
       supabase.from('subjects').select('*').order('subject_name'),
+      supabase.from('class_curricula').select('*'),
+      supabase.from('curricula').select('*'),
+      supabase.from('combinations').select('*').order('code'),
+      supabase.from('combination_subjects').select('*'),
     ])
     if (cRes.data) setClasses(cRes.data)
     if (sRes.data) setStreams(sRes.data)
     if (csRes.data) setClassStreams(csRes.data)
     if (subRes.data) setSubjects(subRes.data)
+    if (ccRes.data) setClassCurricula(ccRes.data)
+    if (curRes.data) setCurricula(curRes.data)
+    if (comboRes.data) setCombinations(comboRes.data)
+    if (csbjRes.data) setCombinationSubjects(csbjRes.data)
   }, [])
 
   useEffect(() => {
@@ -114,18 +138,10 @@ function Students() {
     }
   })
 
-  const getClassStreamOptions = () => {
-    return classStreams.map((cs) => {
-      const cls = classes.find((c) => c.id === cs.class_id)
-      const str = streams.find((s) => s.id === cs.stream_id)
-      return { id: cs.id, label: cls && str ? `${cls.class_name} - Stream ${str.stream_name}` : cs.id }
-    })
-  }
-
   const filtered = students.filter((s) => {
     const q = search.toLowerCase()
     if (q && !s.admission_number.toLowerCase().includes(q) && !s.first_name.toLowerCase().includes(q) && !s.surname.toLowerCase().includes(q)) return false
-    if (filterClass && s.class_stream_id !== filterClass && !(filterClass === 'none' && !s.class_stream_id)) return false
+    if (filterClass && s.class_id !== filterClass && !(filterClass === 'none' && !s.class_id && !s.class_stream_id)) return false
     if (filterStatus && s.status !== filterStatus) return false
     return true
   })
@@ -139,7 +155,7 @@ function Students() {
       surname: '',
       gender: 'Male',
       date_of_birth: '',
-      class_stream_id: '',
+      class_id: '',
       admission_date: new Date().toISOString().slice(0, 10),
       status: 'active',
       parent_name: '',
@@ -158,7 +174,7 @@ function Students() {
       surname: student.surname,
       gender: student.gender,
       date_of_birth: student.date_of_birth,
-      class_stream_id: student.class_stream_id || '',
+      class_id: student.class_id || '',
       admission_date: student.admission_date,
       status: student.status,
       parent_name: student.parent_name || '',
@@ -174,7 +190,7 @@ function Students() {
     try {
       const payload = {
         ...formData,
-        class_stream_id: formData.class_stream_id || null,
+        class_id: formData.class_id || null,
         middle_name: formData.middle_name || null,
         parent_name: formData.parent_name || null,
         parent_phone: formData.parent_phone || null,
@@ -211,15 +227,49 @@ function Students() {
     }
   }
 
+  // Helper: get student's level from class_id or class_stream
+  const getStudentLevel = (student) => {
+    if (student?.class_id) {
+      const cls = classes.find((c) => c.id === student.class_id)
+      if (cls) return cls.level
+    }
+    const cs = classStreams.find((c) => c.id === student?.class_stream_id)
+    const cls = cs ? classes.find((c) => c.id === cs.class_id) : null
+    return cls?.level || null
+  }
+
   const openSubjects = async (student) => {
     if (!student) return
     setSubjectsStudent(student)
     setSubjectsStudentId(student.id)
-    const { data } = await supabase
-      .from('student_subjects')
-      .select('subject_id')
-      .eq('student_id', student.id)
-    setStudentSubjectIds((data || []).map((r) => r.subject_id))
+    const level = getStudentLevel(student)
+
+    if (level === 'A_LEVEL') {
+      // Fetch current combination assignment
+      const { data: combData } = await supabase
+        .from('student_combinations')
+        .select('combination_id')
+        .eq('student_id', student.id)
+        .maybeSingle()
+      const combId = combData?.combination_id || ''
+      setSelectedCombinationId(combId)
+      setCurrentStudentCombinationId(combId || null)
+      // Fetch current subjects (for display)
+      const { data: subData } = await supabase
+        .from('student_subjects')
+        .select('subject_id')
+        .eq('student_id', student.id)
+      setStudentSubjectIds((subData || []).map((r) => r.subject_id))
+    } else {
+      // O-Level: keep checkbox system unchanged
+      setSelectedCombinationId('')
+      setCurrentStudentCombinationId(null)
+      const { data } = await supabase
+        .from('student_subjects')
+        .select('subject_id')
+        .eq('student_id', student.id)
+      setStudentSubjectIds((data || []).map((r) => r.subject_id))
+    }
     setSubjectsOpen(true)
   }
 
@@ -228,11 +278,31 @@ function Students() {
     if (!student) return
     setSubjectsStudent(student)
     setSubjectsStudentId(studentId)
-    const { data } = await supabase
-      .from('student_subjects')
-      .select('subject_id')
-      .eq('student_id', studentId)
-    setStudentSubjectIds((data || []).map((r) => r.subject_id))
+    const level = getStudentLevel(student)
+
+    if (level === 'A_LEVEL') {
+      const { data: combData } = await supabase
+        .from('student_combinations')
+        .select('combination_id')
+        .eq('student_id', studentId)
+        .maybeSingle()
+      const combId = combData?.combination_id || ''
+      setSelectedCombinationId(combId)
+      setCurrentStudentCombinationId(combId || null)
+      const { data: subData } = await supabase
+        .from('student_subjects')
+        .select('subject_id')
+        .eq('student_id', studentId)
+      setStudentSubjectIds((subData || []).map((r) => r.subject_id))
+    } else {
+      setSelectedCombinationId('')
+      setCurrentStudentCombinationId(null)
+      const { data } = await supabase
+        .from('student_subjects')
+        .select('subject_id')
+        .eq('student_id', studentId)
+      setStudentSubjectIds((data || []).map((r) => r.subject_id))
+    }
   }
 
   const handleToggleSubject = (subjectId) => {
@@ -243,36 +313,113 @@ function Students() {
     )
   }
 
+  // A-Level: subjects in the selected combination
+  const getSelectedComboSubjects = () => {
+    if (!selectedCombinationId) return []
+    const subjectIds = combinationSubjects
+      .filter((cs) => cs.combination_id === selectedCombinationId)
+      .map((cs) => cs.subject_id)
+    return subjects.filter((s) => subjectIds.includes(s.id))
+  }
+
+  // A-Level: get available combinations for student's class
+  const getALevelCombinationsForStudent = () => {
+    if (!subjectsStudent) return []
+    const cs = classStreams.find((c) => c.id === subjectsStudent.class_stream_id)
+    const classId = subjectsStudent.class_id || cs?.class_id
+    // Get combination IDs available for this class (from class_combinations)
+    // If class_combinations has data, filter; otherwise show all A-Level combinations
+    return combinations.filter((c) => {
+      // Filter: only combinations whose curriculum is A_LEVEL
+      // (curricula linked via combination.curriculum_id)
+      return true // all combinations are A-Level by design
+    })
+  }
+
   const handleSaveSubjects = async () => {
     setSavingSubjects(true)
     try {
-      const existing = await supabase
-        .from('student_subjects')
-        .select('subject_id')
-        .eq('student_id', subjectsStudent.id)
-      const existingIds = (existing.data || []).map((r) => r.subject_id)
+      const level = getStudentLevel(subjectsStudent)
 
-      const toRemove = existingIds.filter((id) => !studentSubjectIds.includes(id))
-      const toAdd = studentSubjectIds.filter((id) => !existingIds.includes(id))
+      if (level === 'A_LEVEL') {
+        // ── A-Level: save combination + auto-populate subjects ──
+        if (!selectedCombinationId) {
+          showToast('Tafadhali chagua combination kwanza', 'error')
+          return
+        }
 
-      if (toRemove.length > 0) {
+        // 1. Save/update student_combinations
         await supabase
+          .from('student_combinations')
+          .upsert(
+            { student_id: subjectsStudent.id, combination_id: selectedCombinationId },
+            { onConflict: 'student_id' }
+          )
+
+        // 2. Get subjects from chosen combination
+        const newSubjectIds = combinationSubjects
+          .filter((cs) => cs.combination_id === selectedCombinationId)
+          .map((cs) => cs.subject_id)
+
+        // 3. Delete all old A-Level subject assignments for this student
+        const oldALevelSubjectIds = subjects
+          .filter((s) => s.level === 'A_LEVEL')
+          .map((s) => s.id)
+        if (oldALevelSubjectIds.length > 0) {
+          await supabase
+            .from('student_subjects')
+            .delete()
+            .eq('student_id', subjectsStudent.id)
+            .in('subject_id', oldALevelSubjectIds)
+        }
+
+        // 4. Insert new subjects from the combination
+        if (newSubjectIds.length > 0) {
+          await supabase
+            .from('student_subjects')
+            .upsert(
+              newSubjectIds.map((subject_id) => ({
+                student_id: subjectsStudent.id,
+                subject_id,
+              })),
+              { onConflict: 'student_id,subject_id' }
+            )
+        }
+
+        const combo = combinations.find((c) => c.id === selectedCombinationId)
+        showToast(`Combination ${combo?.code || ''} imehifadhiwa na masomo yamewekwa`, 'success')
+
+      } else {
+        // ── O-Level: keep existing checkbox system ──
+        const existing = await supabase
           .from('student_subjects')
-          .delete()
+          .select('subject_id')
           .eq('student_id', subjectsStudent.id)
-          .in('subject_id', toRemove)
+        const existingIds = (existing.data || []).map((r) => r.subject_id)
+
+        const toRemove = existingIds.filter((id) => !studentSubjectIds.includes(id))
+        const toAdd = studentSubjectIds.filter((id) => !existingIds.includes(id))
+
+        if (toRemove.length > 0) {
+          await supabase
+            .from('student_subjects')
+            .delete()
+            .eq('student_id', subjectsStudent.id)
+            .in('subject_id', toRemove)
+        }
+        if (toAdd.length > 0) {
+          await supabase
+            .from('student_subjects')
+            .insert(toAdd.map((subject_id) => ({ student_id: subjectsStudent.id, subject_id })))
+        }
+        showToast('Masomo yamehifadhiwa', 'success')
       }
-      if (toAdd.length > 0) {
-        await supabase
-          .from('student_subjects')
-          .insert(toAdd.map((subject_id) => ({ student_id: subjectsStudent.id, subject_id })))
-      }
+
       setSubjectsOpen(false)
       setSubjectsStudent(null)
-      showToast('Subjects updated successfully', 'success')
     } catch (err) {
       console.error('Save subjects error:', err)
-      showToast('Failed to update subjects. ' + (err.message || ''), 'error')
+      showToast('Imeshindwa kuhifadhi. ' + (err.message || ''), 'error')
     } finally {
       setSavingSubjects(false)
     }
@@ -298,6 +445,7 @@ function Students() {
             return
           }
           const csId = resolveClassStream(row.class, row.stream)
+          const cId = resolveClassId(row.class)
           valid.push({
             admission_number: row.admission_number.trim(),
             first_name: row.first_name.trim(),
@@ -305,6 +453,7 @@ function Students() {
             surname: row.surname.trim(),
             gender: row.gender.trim(),
             date_of_birth: row.date_of_birth.trim(),
+            class_id: cId,
             class_stream_id: csId,
             admission_date: (row.admission_date || '').trim() || new Date().toISOString().slice(0, 10),
             parent_name: (row.parent_name || '').trim() || null,
@@ -317,6 +466,12 @@ function Students() {
         setCsvErrors(errors)
       },
     })
+  }
+
+  const resolveClassId = (className) => {
+    if (!className) return null
+    const cls = classes.find((c) => c.class_name.toLowerCase() === className.trim().toLowerCase())
+    return cls?.id || null
   }
 
   const resolveClassStream = (className, streamName) => {
@@ -354,10 +509,40 @@ function Students() {
     }
   }
 
+  const getFilteredSubjectsForStudent = () => {
+    if (!subjectsStudent) return []
+    const studentClass = subjectsStudent.class_id
+      ? classes.find((c) => c.id === subjectsStudent.class_id)
+      : (() => {
+          const cs = classStreams.find((c) => c.id === subjectsStudent.class_stream_id)
+          return cs ? classes.find((c) => c.id === cs.class_id) : null
+        })()
+    const studentClassLevel = studentClass?.level || ''
+    
+    // Filter by level (O_LEVEL vs A_LEVEL)
+    let filtered = subjects.filter((s) => s.level === studentClassLevel)
+    
+    if (studentClassLevel === 'O_LEVEL') {
+      const studentClassCurriculumRel = studentClass ? classCurricula.find((cc) => cc.class_id === studentClass.id) : null
+      const studentClassCurriculum = studentClassCurriculumRel ? curricula.find((c) => c.id === studentClassCurriculumRel.curriculum_id) : null
+      
+      let tag = null
+      if (studentClassCurriculum?.name) {
+        const name = studentClassCurriculum.name.toLowerCase()
+        tag = (name.includes('new') || name.includes('mpya') || name.includes('cbc') || name.includes('competency')) ? 'NEW' : 'OLD'
+      }
+      
+      if (tag) {
+        filtered = filtered.filter((s) => !s.curriculum || s.curriculum === tag)
+      }
+    }
+    return filtered
+  }
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-3 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
       </div>
     )
   }
@@ -404,8 +589,17 @@ function Students() {
             Subject Assignments
           </button>
           <button
+            onClick={() => setStreamAssignOpen(true)}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition flex items-center gap-2"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+            </svg>
+            Assign Streams
+          </button>
+          <button
             onClick={openCreate}
-            className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+            className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
           >
             + Add Student
           </button>
@@ -423,24 +617,24 @@ function Students() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by admission number or name..."
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             />
           </div>
           <select
             value={filterClass}
             onChange={(e) => setFilterClass(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
           >
             <option value="">All Classes</option>
             <option value="none">Unassigned</option>
-            {getClassStreamOptions().map((o) => (
-              <option key={o.id} value={o.id}>{o.label}</option>
+            {classes.map((c) => (
+              <option key={c.id} value={c.id}>{c.class_name}</option>
             ))}
           </select>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
           >
             <option value="">All Statuses</option>
             {STATUSES.map((s) => (
@@ -471,6 +665,9 @@ function Students() {
               )}
               {filtered.map((s) => {
                 const cs = s.class_streams || null
+                const cls = s.classes || null
+                const displayClass = cls?.class_name || cs?.classes?.class_name || null
+                const displayStream = cs?.streams?.stream_name || null
                 return (
                   <tr key={s.id} className="hover:bg-gray-50 transition">
                     <td className="px-5 py-3.5">
@@ -485,8 +682,8 @@ function Students() {
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">{s.gender}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">
-                      {cs?.classes && cs?.streams
-                        ? `${cs.classes.class_name} - Stream ${cs.streams.stream_name}`
+                      {displayClass
+                        ? `${displayClass}${displayStream ? ` - Stream ${displayStream}` : ''}`
                         : <span className="text-gray-400">None</span>}
                     </td>
                     <td className="px-5 py-3.5">
@@ -510,7 +707,7 @@ function Students() {
                       </button>
                       <button
                         onClick={() => openEdit(s)}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium mr-3"
+                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
                       >
                         Edit
                       </button>
@@ -535,10 +732,10 @@ function Students() {
 
       {/* Add/Edit Modal */}
       <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} title="" className="max-w-3xl">
-        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-gradient-to-r from-indigo-50 to-white rounded-t-xl">
+        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-maroon-50/50 rounded-t-xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <div className="w-10 h-10 bg-maroon-100 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
               </svg>
             </div>
@@ -552,7 +749,7 @@ function Students() {
 
           <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
             <div className="flex items-center gap-2 mb-4">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4 text-maroon-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
               </svg>
               <span className="text-sm font-semibold text-gray-800">Full Name</span>
@@ -565,7 +762,7 @@ function Students() {
                   required
                   value={formData.surname || ''}
                   onChange={(e) => setFormData({ ...formData, surname: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. Doe"
                 />
               </div>
@@ -576,7 +773,7 @@ function Students() {
                   required
                   value={formData.first_name || ''}
                   onChange={(e) => setFormData({ ...formData, first_name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. John"
                 />
               </div>
@@ -586,7 +783,7 @@ function Students() {
                   type="text"
                   value={formData.middle_name || ''}
                   onChange={(e) => setFormData({ ...formData, middle_name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. Andrew"
                 />
               </div>
@@ -595,7 +792,7 @@ function Students() {
 
           <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
             <div className="flex items-center gap-2 mb-4">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4 text-maroon-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
               </svg>
               <span className="text-sm font-semibold text-gray-800">Student Information</span>
@@ -608,7 +805,7 @@ function Students() {
                   required
                   value={formData.admission_number || ''}
                   onChange={(e) => setFormData({ ...formData, admission_number: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. S001"
                 />
               </div>
@@ -618,7 +815,7 @@ function Students() {
                   required
                   value={formData.gender || 'Male'}
                   onChange={(e) => setFormData({ ...formData, gender: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
                 >
                   <option value="Male">Male</option>
                   <option value="Female">Female</option>
@@ -631,7 +828,7 @@ function Students() {
                   required
                   value={formData.date_of_birth || ''}
                   onChange={(e) => setFormData({ ...formData, date_of_birth: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
                 />
               </div>
             </div>
@@ -639,22 +836,23 @@ function Students() {
 
           <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
             <div className="flex items-center gap-2 mb-4">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4 text-maroon-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 21h16.5M4.5 3h15M5.25 3v18m13.5-18v18M9 6.75h1.5m-1.5 3h1.5m-1.5 3h1.5m3-6H15m-1.5 3H15m-1.5 3H15M9 21v-3.375c0-.621.504-1.125 1.125-1.125h3.75c.621 0 1.125.504 1.125 1.125V21" />
               </svg>
               <span className="text-sm font-semibold text-gray-800">Enrollment</span>
             </div>
             <div className="grid grid-cols-3 gap-4">
               <div className="col-span-1">
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Class / Stream</label>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Class <span className="text-red-500">*</span></label>
                 <select
-                  value={formData.class_stream_id || ''}
-                  onChange={(e) => setFormData({ ...formData, class_stream_id: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
+                  required
+                  value={formData.class_id || ''}
+                  onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
                 >
-                  <option value="">-- Not assigned --</option>
-                  {getClassStreamOptions().map((o) => (
-                    <option key={o.id} value={o.id}>{o.label}</option>
+                  <option value="">-- Select Class --</option>
+                  {classes.map((c) => (
+                    <option key={c.id} value={c.id}>{c.class_name}</option>
                   ))}
                 </select>
               </div>
@@ -664,7 +862,7 @@ function Students() {
                   type="date"
                   value={formData.admission_date || ''}
                   onChange={(e) => setFormData({ ...formData, admission_date: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
                 />
               </div>
               <div>
@@ -672,7 +870,7 @@ function Students() {
                 <select
                   value={formData.status || 'active'}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
@@ -684,7 +882,7 @@ function Students() {
 
           <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
             <div className="flex items-center gap-2 mb-4">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4 text-maroon-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M20.25 14.15v4.25c0 1.094-.787 2.036-1.872 2.18-2.087.277-4.216.42-6.378.42s-4.291-.143-6.378-.42c-1.085-.144-1.872-1.086-1.872-2.18v-4.25m16.5 0a2.18 2.18 0 00.75-1.661V8.706c0-1.081-.768-2.015-1.837-2.175a48.114 48.114 0 00-3.413-.387m4.5 8.006c-.194.165-.42.295-.673.38A23.978 23.978 0 0112 15.75c-2.648 0-5.195-.429-7.577-1.22a2.016 2.016 0 01-.673-.38m0 0A2.18 2.18 0 013 12.489V8.706c0-1.081.768-2.015 1.837-2.175a48.111 48.111 0 013.413-.387m7.5 0V5.25A2.25 2.25 0 0013.5 3h-3a2.25 2.25 0 00-2.25 2.25v.894m7.5 0a48.667 48.667 0 00-7.5 0" />
               </svg>
               <span className="text-sm font-semibold text-gray-800">Parent / Contact Information</span>
@@ -696,7 +894,7 @@ function Students() {
                   type="text"
                   value={formData.parent_name || ''}
                   onChange={(e) => setFormData({ ...formData, parent_name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. Andrew Doe"
                 />
               </div>
@@ -706,7 +904,7 @@ function Students() {
                   type="text"
                   value={formData.parent_phone || ''}
                   onChange={(e) => setFormData({ ...formData, parent_phone: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. +255712345678"
                 />
               </div>
@@ -717,7 +915,7 @@ function Students() {
                 type="text"
                 value={formData.address || ''}
                 onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                 placeholder="e.g. Dar es Salaam"
               />
             </div>
@@ -734,7 +932,7 @@ function Students() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2 shadow-lg shadow-indigo-200"
+              className="px-6 py-2.5 text-sm font-medium text-white bg-maroon-600 rounded-xl hover:bg-maroon-700 active:bg-maroon-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
               {saving ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
@@ -755,12 +953,13 @@ function Students() {
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 text-sm text-blue-800">
             <p className="font-medium mb-1">CSV Format Instructions</p>
             <ul className="list-disc list-inside space-y-1 text-xs">
-              <li>Download the <button onClick={downloadTemplate} className="text-indigo-600 underline font-medium">template</button> first</li>
+              <li>Download the <button onClick={downloadTemplate} className="text-maroon-600 underline font-medium">template</button> first</li>
               <li>Required columns: <strong>admission_number, first_name, surname, gender, date_of_birth</strong></li>
               <li>Gender must be <strong>Male</strong> or <strong>Female</strong></li>
               <li>Date format: <strong>YYYY-MM-DD</strong> (e.g., 2010-05-15)</li>
-              <li>Use <strong>class</strong> and <strong>stream</strong> columns to assign students (must match existing class/stream names)</li>
-              <li>Leave <strong>class</strong> and <strong>stream</strong> empty to skip class assignment</li>
+              <li>Use <strong>class</strong> column to assign student to a class (must match existing class name like "Form 1")</li>
+              <li>Use <strong>stream</strong> column to also assign stream (optional — stream can be added later via bulk assignment)</li>
+              <li>Leave <strong>class</strong> empty to skip class assignment</li>
               <li>File must be UTF-8 encoded CSV</li>
             </ul>
           </div>
@@ -771,7 +970,7 @@ function Students() {
               type="file"
               accept=".csv"
               onChange={handleCsvFile}
-              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"
+              className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-maroon-50 file:text-maroon-700 hover:file:bg-maroon-100"
             />
           </div>
 
@@ -801,13 +1000,15 @@ function Students() {
                   <tbody className="divide-y divide-gray-100">
                     {csvData.map((row, i) => {
                       const cs = row.class_stream_id ? classStreamMap[row.class_stream_id] : null
+                      const cls = row.class_id ? classes.find(c => c.id === row.class_id) : null
+                      const displayName = cls ? cls.class_name : (cs ? `${cs.class_name} - ${cs.stream_name}` : '-')
                       return (
                         <tr key={i}>
                           <td className="px-3 py-2 text-gray-500">{i + 1}</td>
                           <td className="px-3 py-2 font-medium text-gray-700">{row.admission_number}</td>
                           <td className="px-3 py-2 text-gray-600">{row.surname}, {row.first_name}</td>
                           <td className="px-3 py-2 text-gray-600">{row.gender}</td>
-                          <td className="px-3 py-2 text-gray-600">{cs ? `${cs.class_name} - ${cs.stream_name}` : '-'}</td>
+                          <td className="px-3 py-2 text-gray-600">{displayName}</td>
                         </tr>
                       )
                     })}
@@ -829,7 +1030,7 @@ function Students() {
               type="button"
               disabled={csvData.length === 0 || csvImporting}
               onClick={handleCsvImport}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+              className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition"
             >
               {csvImporting ? 'Importing...' : `Import ${csvData.length} Student(s)`}
             </button>
@@ -837,9 +1038,9 @@ function Students() {
         </div>
       </Modal>
 
-      {/* Subject Assignment Modal */}
+      {/* Subject / Combination Assignment Modal */}
       <Modal isOpen={subjectsOpen} onClose={() => setSubjectsOpen(false)} title="" className="max-w-2xl">
-        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-gradient-to-r from-emerald-50 to-white rounded-t-xl">
+        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-emerald-50/50 rounded-t-xl">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-emerald-100 rounded-xl flex items-center justify-center">
               <svg className="w-5 h-5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -847,13 +1048,23 @@ function Students() {
               </svg>
             </div>
             <div className="flex-1">
-              <h2 className="text-lg font-semibold text-gray-900">Subject Assignments</h2>
-              <p className="text-sm text-gray-500">Assign subjects to each student</p>
+              <h2 className="text-lg font-semibold text-gray-900">
+                {subjectsStudent && getStudentLevel(subjectsStudent) === 'A_LEVEL'
+                  ? 'Combination Assignment (A-Level)'
+                  : 'Subject Assignments'}
+              </h2>
+              <p className="text-sm text-gray-500">
+                {subjectsStudent && getStudentLevel(subjectsStudent) === 'A_LEVEL'
+                  ? 'Chagua combination — masomo yatawekwa kiotomatiki'
+                  : 'Assign subjects to each student'}
+              </p>
             </div>
           </div>
         </div>
+
+        {/* Student selector */}
         <div className="mb-4">
-          <label className="block text-xs font-medium text-gray-600 mb-1.5">Select Student</label>
+          <label className="block text-xs font-medium text-gray-600 mb-1.5">Chagua Mwanafunzi</label>
           <select
             value={subjectsStudentId}
             onChange={(e) => handleSubjectsStudentChange(e.target.value)}
@@ -861,58 +1072,151 @@ function Students() {
           >
             {students.map((s) => {
               const cs = classStreams.find((c) => c.id === s.class_stream_id)
-              const label = `${s.surname}, ${s.first_name} (${s.admission_number})${cs ? ` - ${cs.classes?.class_name || ''} Stream ${cs.streams?.stream_name || ''}` : ''}`
+              const cls = classes.find((c) => c.id === s.class_id)
+              const classLabel = cls?.class_name || cs?.classes?.class_name || ''
+              const streamLabel = cs?.streams?.stream_name || ''
+              const label = `${s.surname}, ${s.first_name} (${s.admission_number})${classLabel ? ` - ${classLabel}${streamLabel ? ` Stream ${streamLabel}` : ''}` : ''}`
               return (
                 <option key={s.id} value={s.id}>{label}</option>
               )
             })}
           </select>
         </div>
+
+        {/* Student info badge */}
         {subjectsStudent && (
-          <div className="mb-4 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100">
-            <p className="text-sm font-medium text-emerald-800">
-              {subjectsStudent.surname}, {subjectsStudent.first_name}
-              {subjectsStudent.middle_name ? ` ${subjectsStudent.middle_name}` : ''}
-            </p>
-            <p className="text-xs text-emerald-600">{subjectsStudent.admission_number}</p>
+          <div className="mb-4 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium text-emerald-800">
+                {subjectsStudent.surname}, {subjectsStudent.first_name}
+                {subjectsStudent.middle_name ? ` ${subjectsStudent.middle_name}` : ''}
+              </p>
+              <p className="text-xs text-emerald-600">{subjectsStudent.admission_number}</p>
+            </div>
+            <span className={`text-xs font-semibold px-3 py-1 rounded-full ${
+              getStudentLevel(subjectsStudent) === 'A_LEVEL'
+                ? 'bg-violet-100 text-violet-700'
+                : 'bg-sky-100 text-sky-700'
+            }`}>
+              {getStudentLevel(subjectsStudent) === 'A_LEVEL' ? 'A-Level' : 'O-Level'}
+            </span>
           </div>
         )}
-        <p className="text-sm text-gray-600 mb-4">
-          Select the subjects this student will take. Unchecked subjects will be removed.
-        </p>
-        <div className="max-h-80 overflow-y-auto space-y-1.5 mb-6">
-          {subjects.length === 0 && (
-            <p className="text-sm text-gray-400 text-center py-8">No subjects available. Add subjects first.</p>
-          )}
-          {subjects.map((sub) => (
-            <label
-              key={sub.id}
-              className={`flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer transition border ${
-                studentSubjectIds.includes(sub.id)
-                  ? 'bg-emerald-50 border-emerald-200'
-                  : 'bg-gray-50 border-gray-100 hover:border-gray-200'
-              }`}
-            >
-              <input
-                type="checkbox"
-                checked={studentSubjectIds.includes(sub.id)}
-                onChange={() => handleToggleSubject(sub.id)}
-                className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
-              />
-              <div className="flex-1">
-                <span className="text-sm font-medium text-gray-800">{sub.subject_name}</span>
-                <span className="text-xs text-gray-400 ml-2">({sub.subject_code})</span>
+
+        {/* ── A-LEVEL: Combination Picker ── */}
+        {subjectsStudent && getStudentLevel(subjectsStudent) === 'A_LEVEL' && (
+          <div className="space-y-4 mb-6">
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1.5">
+                Combination <span className="text-red-500">*</span>
+              </label>
+              <select
+                value={selectedCombinationId}
+                onChange={(e) => setSelectedCombinationId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-violet-400 focus:ring-4 focus:ring-violet-500/10 transition"
+              >
+                <option value="">-- Chagua Combination --</option>
+                {getALevelCombinationsForStudent().map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.code} — {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* Subjects preview from combination */}
+            {selectedCombinationId && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Masomo katika Combination hii</p>
+                {getSelectedComboSubjects().length === 0 ? (
+                  <p className="text-sm text-amber-600 bg-amber-50 px-4 py-3 rounded-xl border border-amber-100">
+                    Combination hii haina masomo yaliyowekwa bado. Weka masomo kwenye Subjects page kwanza.
+                  </p>
+                ) : (
+                  <div className="space-y-1.5 max-h-60 overflow-y-auto">
+                    {getSelectedComboSubjects().map((sub) => (
+                      <div
+                        key={sub.id}
+                        className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-violet-50 border border-violet-100"
+                      >
+                        <svg className="w-4 h-4 text-violet-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                        </svg>
+                        <div className="flex-1">
+                          <span className="text-sm font-medium text-gray-800">{sub.subject_name}</span>
+                          <span className="text-xs text-gray-400 ml-2">({sub.subject_code})</span>
+                        </div>
+                        <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                          sub.subject_type === 'COMPULSORY' ? 'bg-blue-50 text-blue-600' :
+                          sub.subject_type === 'ELECTIVE'   ? 'bg-purple-50 text-purple-600' :
+                          'bg-amber-50 text-amber-600'
+                        }`}>
+                          {sub.subject_type}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {currentStudentCombinationId && currentStudentCombinationId !== selectedCombinationId && (
+                  <p className="mt-2 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+                    ⚠️ Mwanafunzi ana combination tofauti tayari. Kubadilisha kutaondoa masomo ya zamani na kuweka ya combination mpya.
+                  </p>
+                )}
               </div>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
-                sub.subject_type === 'COMPULSORY' ? 'bg-blue-50 text-blue-600' :
-                sub.subject_type === 'OPTIONAL' ? 'bg-amber-50 text-amber-600' :
-                'bg-purple-50 text-purple-600'
-              }`}>
-                {sub.subject_type}
-              </span>
-            </label>
-          ))}
-        </div>
+            )}
+          </div>
+        )}
+
+        {/* ── O-LEVEL: Checkbox system (unchanged) ── */}
+        {subjectsStudent && getStudentLevel(subjectsStudent) !== 'A_LEVEL' && (
+          <div className="mb-6">
+            <p className="text-sm text-gray-600 mb-4">
+              Chagua masomo ya mwanafunzi. Masomo yasiyochaguliwa yataondolewa.
+            </p>
+            <div className="max-h-80 overflow-y-auto space-y-1.5">
+              {getFilteredSubjectsForStudent().length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-8">Hakuna masomo kwa darasa hili. Ongeza masomo kwenye Subjects page kwanza.</p>
+              )}
+              {getFilteredSubjectsForStudent().map((sub) => (
+                <label
+                  key={sub.id}
+                  className={`flex items-center gap-3 px-4 py-2.5 rounded-xl cursor-pointer transition border ${
+                    studentSubjectIds.includes(sub.id)
+                      ? 'bg-emerald-50 border-emerald-200'
+                      : 'bg-gray-50 border-gray-100 hover:border-gray-200'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={studentSubjectIds.includes(sub.id)}
+                    onChange={() => handleToggleSubject(sub.id)}
+                    className="w-4 h-4 text-emerald-600 border-gray-300 rounded focus:ring-emerald-500"
+                  />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium text-gray-800">{sub.subject_name}</span>
+                    <span className="text-xs text-gray-400 ml-2">({sub.subject_code})</span>
+                  </div>
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    sub.subject_type === 'COMPULSORY' ? 'bg-blue-50 text-blue-600' :
+                    sub.subject_type === 'OPTIONAL' ? 'bg-amber-50 text-amber-600' :
+                    'bg-purple-50 text-purple-600'
+                  }`}>
+                    {sub.subject_type}
+                  </span>
+                </label>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* No class assigned */}
+        {subjectsStudent && !getStudentLevel(subjectsStudent) && (
+          <p className="text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-xl px-4 py-3 mb-6">
+            ⚠️ Mwanafunzi huyu hana darasa. Mpe darasa kwanza kabla ya kuweka masomo.
+          </p>
+        )}
+
         <div className="flex justify-end gap-3 pt-2 border-t border-gray-100">
           <button
             type="button"
@@ -923,14 +1227,193 @@ function Students() {
           </button>
           <button
             type="button"
-            disabled={savingSubjects}
+            disabled={savingSubjects || (subjectsStudent && getStudentLevel(subjectsStudent) === 'A_LEVEL' && !selectedCombinationId)}
             onClick={handleSaveSubjects}
-            className="px-6 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 transition flex items-center gap-2"
+            className="px-6 py-2.5 text-sm font-medium text-white bg-emerald-600 rounded-xl hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
           >
             {savingSubjects ? (
-              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Inahifadhi...</>
             ) : (
-              'Save Assignments'
+              subjectsStudent && getStudentLevel(subjectsStudent) === 'A_LEVEL'
+                ? `Hifadhi Combination`
+                : 'Hifadhi Masomo'
+            )}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Bulk Stream Assignment Modal */}
+      <Modal isOpen={streamAssignOpen} onClose={() => { setStreamAssignOpen(false); setStreamAssignClassId(''); setStreamAssignStreamId(''); setStreamAssignSelected([]) }} title="" className="max-w-3xl">
+        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-blue-50/50 rounded-t-xl">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25zM6.75 12h.008v.008H6.75V12zm0 3h.008v.008H6.75V15zm0 3h.008v.008H6.75V18z" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-gray-900">Bulk Stream Assignment</h2>
+              <p className="text-sm text-gray-500">Wanafunzi walio darasani pasipo stream wanaweza kupewa stream</p>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-6">
+          {/* Step 1: Select Class */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">1. Chagua Darasa</label>
+            <select
+              value={streamAssignClassId}
+              onChange={(e) => {
+                setStreamAssignClassId(e.target.value)
+                setStreamAssignStreamId('')
+                setStreamAssignSelected([])
+                const cid = e.target.value
+                if (cid) {
+                  const unassigned = students.filter(s => s.class_id === cid && !s.class_stream_id)
+                  setStreamAssignStudents(unassigned)
+                } else {
+                  setStreamAssignStudents([])
+                }
+              }}
+              className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition"
+            >
+              <option value="">-- Chagua Darasa --</option>
+              {classes.map((c) => (
+                <option key={c.id} value={c.id}>{c.class_name}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Step 2: Select Stream */}
+          {streamAssignClassId && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">2. Chagua Stream</label>
+              <select
+                value={streamAssignStreamId}
+                onChange={(e) => setStreamAssignStreamId(e.target.value)}
+                className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-blue-400 focus:ring-4 focus:ring-blue-500/10 transition"
+              >
+                <option value="">-- Chagua Stream --</option>
+                {classStreams
+                  .filter(cs => cs.class_id === streamAssignClassId)
+                  .map(cs => {
+                    const str = streams.find(s => s.id === cs.stream_id)
+                    return (
+                      <option key={cs.id} value={cs.id}>
+                        {str ? `Stream ${str.stream_name}` : cs.id}
+                      </option>
+                    )
+                  })}
+              </select>
+            </div>
+          )}
+
+          {/* Step 3: Student List */}
+          {streamAssignClassId && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="block text-sm font-medium text-gray-700">
+                  3. Chagua Wanafunzi ({streamAssignStudents.length} hawana stream)
+                </label>
+                {streamAssignStudents.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (streamAssignSelected.length === streamAssignStudents.length) {
+                        setStreamAssignSelected([])
+                      } else {
+                        setStreamAssignSelected(streamAssignStudents.map(s => s.id))
+                      }
+                    }}
+                    className="text-xs font-medium text-blue-600 hover:text-blue-800"
+                  >
+                    {streamAssignSelected.length === streamAssignStudents.length ? 'Deselect All' : 'Select All'}
+                  </button>
+                )}
+              </div>
+              {streamAssignStudents.length === 0 ? (
+                <p className="text-sm text-gray-400 text-center py-6 bg-gray-50 rounded-xl border border-gray-100">
+                  Wanafunzi wote wa darasa hili wameshapewa stream
+                </p>
+              ) : (
+                <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-xl">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="bg-gray-50 border-b border-gray-200">
+                        <th className="w-10 px-3 py-2.5"></th>
+                        <th className="text-left px-3 py-2.5 font-medium text-gray-500">Admission</th>
+                        <th className="text-left px-3 py-2.5 font-medium text-gray-500">Jina</th>
+                        <th className="text-left px-3 py-2.5 font-medium text-gray-500">Gender</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {streamAssignStudents.map((s) => (
+                        <tr key={s.id} className={`hover:bg-gray-50 transition ${streamAssignSelected.includes(s.id) ? 'bg-blue-50' : ''}`}>
+                          <td className="px-3 py-2.5">
+                            <input
+                              type="checkbox"
+                              checked={streamAssignSelected.includes(s.id)}
+                              onChange={() => {
+                                setStreamAssignSelected(prev =>
+                                  prev.includes(s.id)
+                                    ? prev.filter(id => id !== s.id)
+                                    : [...prev, s.id]
+                                )
+                              }}
+                              className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                            />
+                          </td>
+                          <td className="px-3 py-2.5 font-medium text-gray-700">{s.admission_number}</td>
+                          <td className="px-3 py-2.5 text-gray-600">{s.surname}, {s.first_name}</td>
+                          <td className="px-3 py-2.5 text-gray-600">{s.gender}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="flex items-center justify-end gap-3 pt-6 border-t border-gray-100 mt-6">
+          <button
+            type="button"
+            onClick={() => { setStreamAssignOpen(false); setStreamAssignClassId(''); setStreamAssignStreamId(''); setStreamAssignSelected([]) }}
+            className="px-5 py-2.5 text-sm font-medium text-gray-600 bg-white border border-gray-200 rounded-xl hover:bg-gray-50 transition"
+          >
+            Close
+          </button>
+          <button
+            type="button"
+            disabled={!streamAssignStreamId || streamAssignSelected.length === 0 || streamAssignSaving}
+            onClick={async () => {
+              setStreamAssignSaving(true)
+              try {
+                const { error } = await supabase
+                  .from('students')
+                  .update({ class_stream_id: streamAssignStreamId })
+                  .in('id', streamAssignSelected)
+                if (error) throw error
+                await fetchStudents()
+                showToast(`Wanafunzi ${streamAssignSelected.length} wamepewa stream`, 'success')
+                setStreamAssignOpen(false)
+                setStreamAssignClassId('')
+                setStreamAssignStreamId('')
+                setStreamAssignSelected([])
+              } catch (err) {
+                showToast('Failed: ' + (err.message || ''), 'error')
+              } finally {
+                setStreamAssignSaving(false)
+              }
+            }}
+            className="px-6 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
+          >
+            {streamAssignSaving ? (
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Inahifadhi...</>
+            ) : (
+              `Weka Stream kwa ${streamAssignSelected.length} mwanafunzi`
             )}
           </button>
         </div>

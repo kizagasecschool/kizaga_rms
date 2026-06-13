@@ -20,6 +20,8 @@ function Teachers() {
   const [combinations, setCombinations] = useState([])
   const [combinationSubjects, setCombinationSubjects] = useState([])
   const [classCombinations, setClassCombinations] = useState([])
+  const [curricula, setCurricula] = useState([])
+  const [classCurricula, setClassCurricula] = useState([])
 
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -46,7 +48,7 @@ function Teachers() {
   }, [])
 
   const fetchLookups = useCallback(async () => {
-    const [cRes, sRes, csRes, subRes, saRes, coRes, cs2Res, ccRes] = await Promise.all([
+    const [cRes, sRes, csRes, subRes, saRes, coRes, cs2Res, ccRes, curRes, ccurRes] = await Promise.all([
       supabase.from('classes').select('*').order('sort_order'),
       supabase.from('streams').select('*').order('stream_name'),
       supabase.from('class_streams').select('*, classes(*), streams(*)'),
@@ -55,6 +57,8 @@ function Teachers() {
       supabase.from('combinations').select('*').order('name'),
       supabase.from('combination_subjects').select('*'),
       supabase.from('class_combinations').select('*'),
+      supabase.from('curricula').select('*'),
+      supabase.from('class_curricula').select('*'),
     ])
     if (cRes.data) setClasses(cRes.data)
     if (sRes.data) setStreams(sRes.data)
@@ -64,6 +68,8 @@ function Teachers() {
     if (coRes.data) setCombinations(coRes.data)
     if (cs2Res.data) setCombinationSubjects(cs2Res.data)
     if (ccRes.data) setClassCombinations(ccRes.data)
+    if (curRes.data) setCurricula(curRes.data)
+    if (ccurRes.data) setClassCurricula(ccurRes.data)
   }, [])
 
   const fetchAssignments = useCallback(async () => {
@@ -108,6 +114,14 @@ function Teachers() {
     return assignments.filter((a) => a.teacher_id === teacherId)
   }
 
+  const getClassCurriculumTag = (classId) => {
+    const rel = classCurricula?.find(cc => cc.class_id === classId)
+    if (!rel) return null
+    const cur = curricula?.find(c => c.id === rel.curriculum_id)
+    if (!cur) return null
+    return cur.name?.includes('New') ? 'NEW' : 'OLD'
+  }
+
   const getClassSubjects = (classId) => {
     if (!classId) return []
     const cls = classes.find(c => c.id === classId)
@@ -116,7 +130,12 @@ function Teachers() {
       const subjectIds = subjectAssignments
         .filter(sa => sa.class_id === classId)
         .map(sa => sa.subject_id)
-      return subjects.filter(s => subjectIds.includes(s.id))
+      let classSubs = subjects.filter(s => subjectIds.includes(s.id))
+      const tag = getClassCurriculumTag(classId)
+      if (tag) {
+        classSubs = classSubs.filter(s => !s.curriculum || s.curriculum === tag)
+      }
+      return classSubs
     }
     if (cls.level === 'A_LEVEL') {
       const comboIds = classCombinations
@@ -307,6 +326,10 @@ function Teachers() {
   }
 
   const handleAssign = async () => {
+    if (!assignTeacher?.id) {
+      showToast('Teacher not selected', 'error')
+      return
+    }
     if (!assignClassId || assignStreamIds.length === 0 || assignSubjectIds.length === 0) {
       showToast('Please select streams and subjects', 'error')
       return
@@ -391,12 +414,13 @@ function Teachers() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-3 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
       </div>
     )
   }
 
   return (
+    <ErrorBoundary>
     <div>
       <div className="mb-8 flex items-start justify-between">
         <div>
@@ -405,7 +429,7 @@ function Teachers() {
         </div>
         <button
           onClick={openCreate}
-          className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+          className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
         >
           + Add Teacher
         </button>
@@ -422,13 +446,13 @@ function Teachers() {
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               placeholder="Search by name or employee number..."
-              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             />
           </div>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+            className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
           >
             <option value="">All Statuses</option>
             {STATUSES.map((s) => (
@@ -484,14 +508,14 @@ function Teachers() {
                     <td className="px-5 py-3.5 text-right">
                       <button
                         onClick={() => openAssign(t)}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium mr-3"
+                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
                         title="Assign subjects & classes"
                       >
                         Assign
                       </button>
                       <button
                         onClick={() => openEdit(t)}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium mr-3"
+                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
                       >
                         Edit
                       </button>
@@ -516,10 +540,10 @@ function Teachers() {
 
       {/* Add/Edit Modal */}
       <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} title="" className="max-w-2xl">
-        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-gradient-to-r from-indigo-50 to-white rounded-t-xl">
+        <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-maroon-50/50 rounded-t-xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-indigo-100 rounded-xl flex items-center justify-center">
-              <svg className="w-5 h-5 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <div className="w-10 h-10 bg-maroon-100 rounded-xl flex items-center justify-center">
+              <svg className="w-5 h-5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
               </svg>
             </div>
@@ -532,7 +556,7 @@ function Teachers() {
         <form onSubmit={handleSave} className="space-y-6">
           <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
             <div className="flex items-center gap-2 mb-4">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4 text-maroon-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
               </svg>
               <span className="text-sm font-semibold text-gray-800">Personal Information</span>
@@ -545,7 +569,7 @@ function Teachers() {
                   required
                   value={formData.full_name || ''}
                   onChange={(e) => setFormData({ ...formData, full_name: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. John Doe"
                 />
               </div>
@@ -556,7 +580,7 @@ function Teachers() {
                     type="text"
                     value={formData.qualification || ''}
                     onChange={(e) => setFormData({ ...formData, qualification: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                     placeholder="e.g. B.Ed, MSc"
                   />
                 </div>
@@ -566,7 +590,7 @@ function Teachers() {
                     type="text"
                     value={formData.phone || ''}
                     onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                    className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                     placeholder="e.g. +255712345678"
                   />
                 </div>
@@ -576,7 +600,7 @@ function Teachers() {
 
           <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
             <div className="flex items-center gap-2 mb-4">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4 text-maroon-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
               </svg>
               <span className="text-sm font-semibold text-gray-800">Account & Employee Information</span>
@@ -589,7 +613,7 @@ function Teachers() {
                   required
                   value={formData.employee_number || ''}
                   onChange={(e) => setFormData({ ...formData, employee_number: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. T001"
                 />
               </div>
@@ -600,7 +624,7 @@ function Teachers() {
                   required
                   value={formData.email || ''}
                   onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="e.g. john@school.ac.tz"
                 />
               </div>
@@ -614,7 +638,7 @@ function Teachers() {
                   minLength={6}
                   value={formData.password || ''}
                   onChange={(e) => setFormData({ ...formData, password: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition placeholder:text-gray-400"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
                   placeholder="Min. 6 characters"
                 />
               </div>
@@ -625,7 +649,7 @@ function Teachers() {
                 <select
                   value={formData.status || 'active'}
                   onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
                 >
                   {STATUSES.map((s) => (
                     <option key={s} value={s}>{s === 'on_leave' ? 'On Leave' : s.charAt(0).toUpperCase() + s.slice(1)}</option>
@@ -646,7 +670,7 @@ function Teachers() {
             <button
               type="submit"
               disabled={saving}
-              className="px-6 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 active:bg-indigo-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2 shadow-lg shadow-indigo-200"
+              className="px-6 py-2.5 text-sm font-medium text-white bg-maroon-600 rounded-xl hover:bg-maroon-700 active:bg-maroon-800 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-2"
             >
               {saving ? (
                 <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
@@ -669,14 +693,14 @@ function Teachers() {
         className="max-w-3xl"
       >
         <div className="space-y-6">
-          <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4 text-sm text-indigo-800">
+          <div className="bg-maroon-50 border border-maroon-200 rounded-lg p-4 text-sm text-maroon-800">
             <p className="font-medium mb-1">Bulk assign subjects to this teacher</p>
             <p className="text-xs">Select a class, choose streams and subjects, then click Assign.</p>
           </div>
 
           <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
             <div className="flex items-center gap-2 mb-4">
-              <svg className="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+              <svg className="w-4 h-4 text-maroon-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
               </svg>
               <span className="text-sm font-semibold text-gray-800">New Assignment</span>
@@ -695,7 +719,7 @@ function Teachers() {
                     .map(cs => cs.id)
                   setAssignStreamIds(allStreamIds)
                 }}
-                className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-500/10 transition"
+                className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
               >
                 <option value="">-- Select Class --</option>
                 {['O_LEVEL', 'A_LEVEL'].map(level => {
@@ -723,7 +747,7 @@ function Teachers() {
                         const allIds = classStreams.filter(cs => cs.class_id === assignClassId).map(cs => cs.id)
                         setAssignStreamIds(prev => prev.length === allIds.length ? [] : allIds)
                       }}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                      className="text-xs text-maroon-600 hover:text-maroon-800 font-medium"
                     >
                       {assignStreamIds.length === classStreams.filter(cs => cs.class_id === assignClassId).length ? 'Deselect All' : 'Select All'}
                     </button>
@@ -736,7 +760,7 @@ function Teachers() {
                         <label
                           key={cs.id}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition ${
-                            checked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                            checked ? 'border-maroon-400 bg-maroon-50 text-maroon-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                           }`}
                         >
                           <input
@@ -750,7 +774,7 @@ function Teachers() {
                             className="sr-only"
                           />
                           {checked ? (
-                            <svg className="w-3.5 h-3.5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                            <svg className="w-3.5 h-3.5 text-maroon-600" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
                           ) : (
@@ -777,7 +801,7 @@ function Teachers() {
                         const classSubjects = getClassSubjects(assignClassId)
                         setAssignSubjectIds(prev => prev.length === classSubjects.length ? [] : classSubjects.map(s => s.id))
                       }}
-                      className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                      className="text-xs text-maroon-600 hover:text-maroon-800 font-medium"
                     >
                       {assignSubjectIds.length === getClassSubjects(assignClassId).length ? 'Deselect All' : 'Select All'}
                     </button>
@@ -789,7 +813,7 @@ function Teachers() {
                         <label
                           key={sub.id}
                           className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition ${
-                            checked ? 'border-indigo-400 bg-indigo-50 text-indigo-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                            checked ? 'border-maroon-400 bg-maroon-50 text-maroon-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
                           }`}
                         >
                           <input
@@ -803,7 +827,7 @@ function Teachers() {
                             className="sr-only"
                           />
                           {checked ? (
-                            <svg className="w-3.5 h-3.5 text-indigo-600" fill="currentColor" viewBox="0 0 20 20">
+                            <svg className="w-3.5 h-3.5 text-maroon-600" fill="currentColor" viewBox="0 0 20 20">
                               <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                             </svg>
                           ) : (
@@ -825,7 +849,7 @@ function Teachers() {
                   type="button"
                   disabled={saving || assignStreamIds.length === 0 || assignSubjectIds.length === 0}
                   onClick={handleAssign}
-                  className="w-full px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+                  className="w-full px-5 py-2.5 text-sm font-medium text-white bg-maroon-600 rounded-xl hover:bg-maroon-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
                 >
                   {saving ? (
                     <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Assigning...</>
@@ -928,6 +952,7 @@ function Teachers() {
         </div>
       </Modal>
     </div>
+    </ErrorBoundary>
   )
 }
 

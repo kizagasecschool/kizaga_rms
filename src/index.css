@@ -1,5 +1,18 @@
 @import "tailwindcss";
 
+@theme {
+  --color-maroon-50: #fdf2f3;
+  --color-maroon-100: #fde8e9;
+  --color-maroon-200: #fbd0d4;
+  --color-maroon-300: #f7a9b0;
+  --color-maroon-400: #f27a86;
+  --color-maroon-500: #e84c5c;
+  --color-maroon-600: #b91c3b;
+  --color-maroon-700: #99152e;
+  --color-maroon-800: #7a1224;
+  --color-maroon-900: #3f0d12;
+}
+
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }

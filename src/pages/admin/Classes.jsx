@@ -175,7 +175,7 @@ function AdminClasses() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-3 border-gray-200 border-t-indigo-600 rounded-full animate-spin" />
+        <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
       </div>
     )
   }
@@ -195,7 +195,7 @@ function AdminClasses() {
             onClick={() => setActiveTab(tab.key)}
             className={`px-4 py-2 text-sm font-medium rounded-md transition ${
               activeTab === tab.key
-                ? 'bg-white text-indigo-700 shadow-sm'
+                ? 'bg-white text-maroon-700 shadow-sm'
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
@@ -216,7 +216,7 @@ function AdminClasses() {
                   onClick={() => setLevelFilter(l)}
                   className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition ${
                     levelFilter === l
-                      ? 'bg-indigo-50 border-indigo-200 text-indigo-700'
+                      ? 'bg-maroon-50 border-maroon-200 text-maroon-700'
                       : 'border-gray-200 text-gray-600 hover:bg-gray-50'
                   }`}
                 >
@@ -226,7 +226,7 @@ function AdminClasses() {
             </div>
             <button
               onClick={openCreate}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+              className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
             >
               + Add Class
             </button>
@@ -274,7 +274,7 @@ function AdminClasses() {
                       </button>
                       <button
                         onClick={() => openEdit(c)}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium mr-3"
+                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
                       >
                         Edit
                       </button>
@@ -300,7 +300,7 @@ function AdminClasses() {
             <p className="text-sm text-gray-500">{streams.length} stream(s) total</p>
             <button
               onClick={openCreate}
-              className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition"
+              className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
             >
               + Add Stream
             </button>
@@ -330,7 +330,7 @@ function AdminClasses() {
                     <td className="px-5 py-3.5 text-right">
                       <button
                         onClick={() => openEdit(s)}
-                        className="text-sm text-indigo-600 hover:text-indigo-800 font-medium mr-3"
+                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
                       >
                         Edit
                       </button>
@@ -357,7 +357,7 @@ function AdminClasses() {
             <select
               value={selectedClassId}
               onChange={(e) => setSelectedClassId(e.target.value)}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
               <option value="">-- Choose a class --</option>
               {classes.map((c) => (
@@ -379,8 +379,8 @@ function AdminClasses() {
                       .map((cs) => {
                         const stream = streams.find((s) => s.id === cs.stream_id)
                         return (
-                          <div key={cs.id} className="flex items-center justify-between px-3 py-2 bg-indigo-50 rounded-lg">
-                            <span className="text-sm font-medium text-indigo-700">
+                          <div key={cs.id} className="flex items-center justify-between px-3 py-2 bg-maroon-50 rounded-lg">
+                            <span className="text-sm font-medium text-maroon-700">
                               Stream {stream?.stream_name}
                             </span>
                             <button
@@ -404,7 +404,7 @@ function AdminClasses() {
                           <span className="text-sm text-gray-700">Stream {s.stream_name}</span>
                           <button
                             onClick={() => toggleAssignment(selectedClassId, s.id, false)}
-                            className="text-xs text-indigo-600 hover:text-indigo-800 font-medium"
+                            className="text-xs text-maroon-600 hover:text-maroon-800 font-medium"
                           >
                             Assign
                           </button>
@@ -464,7 +464,7 @@ function AdminClasses() {
                               {assigned.map((s) => (
                                 <span
                                   key={s.id}
-                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-50 text-indigo-700"
+                                  className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-maroon-50 text-maroon-700"
                                 >
                                   Stream {s.stream_name}
                                 </span>
@@ -509,7 +509,7 @@ function AdminClasses() {
                   required
                   value={formData.class_name || ''}
                   onChange={(e) => setFormData({ ...formData, class_name: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
                   placeholder="e.g. Form 1"
                 />
               </div>
@@ -518,7 +518,7 @@ function AdminClasses() {
                 <select
                   value={formData.level || 'O_LEVEL'}
                   onChange={(e) => setFormData({ ...formData, level: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
                 >
                   <option value="O_LEVEL">O-Level (Form 1-4)</option>
                   <option value="A_LEVEL">A-Level (Form 5-6)</option>
@@ -532,7 +532,7 @@ function AdminClasses() {
                   min={1}
                   value={formData.sort_order || ''}
                   onChange={(e) => setFormData({ ...formData, sort_order: e.target.value })}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
                 />
               </div>
             </>
@@ -544,7 +544,7 @@ function AdminClasses() {
                 required
                 value={formData.stream_name || ''}
                 onChange={(e) => setFormData({ ...formData, stream_name: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
                 placeholder="e.g. A"
               />
             </div>
@@ -560,7 +560,7 @@ function AdminClasses() {
             <button
               type="submit"
               disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 transition"
+              className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition"
             >
               {saving ? 'Saving...' : editingItem ? 'Update' : 'Create'}
             </button>

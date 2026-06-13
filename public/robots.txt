@@ -1,0 +1,14 @@
+# robots.txt for Kizaga Secondary School
+User-agent: *
+Allow: /
+Disallow: /login
+Disallow: /admin
+Disallow: /teacher
+Disallow: /academic
+Disallow: /headmaster
+Disallow: /api/
+
+Sitemap: https://www.kizaga-school.ac.tz/sitemap.xml
+
+# Crawl delay for polite crawling
+Crawl-delay: 10

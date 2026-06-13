@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head><title>Kizaga RMS — Seed Users</title></head>
+<body style="font-family:system-ui;max-width:640px;margin:2rem auto;padding:1rem">
+  <h2>Kizaga RMS — Seed Auth Users</h2>
+  <p>Open this file in a browser <strong>after</strong> entering your Supabase project keys below.</p>
+  <p style="color:red;font-weight:bold">⚠️ Do NOT commit this file after pasting real keys!</p>
+  <hr>
+  <label>Supabase URL:<br><input id="url" size="60" value="https://your-project.supabase.co"></label><br><br>
+  <label>Service Role Key:<br><textarea id="key" rows="3" cols="60">your-service-role-key</textarea></label><br><br>
+  <button onclick="run()">Create Users</button>
+  <pre id="out" style="margin-top:1rem;background:#f5f5f5;padding:1rem;border-radius:8px"></pre>
+  <script>
+    const USERS = [
+      { email: 'admin@school.com',     password: 'Admin@123',     full_name: 'Admin User',       role: 'admin' },
+      { email: 'headmaster@school.com', password: 'Headmaster@123', full_name: 'Headmaster User', role: 'headmaster' },
+      { email: 'academic@school.com',   password: 'Academic@123',   full_name: 'Academic User',   role: 'academic' },
+      { email: 'teacher@school.com',    password: 'Teacher@123',    full_name: 'Teacher User',    role: 'teacher' },
+    ]
+
+    async function run() {
+      const base = document.getElementById('url').value.replace(/\/+$/, '')
+      const key  = document.getElementById('key').value.trim()
+      const out  = document.getElementById('out')
+      out.textContent = 'Working...'
+
+      for (const u of USERS) {
+        let msg = ''
+        // 1. Create via admin API
+        const r1 = await fetch(`${base}/auth/v1/admin/users`, {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json', apikey:key, Authorization:`Bearer ${key}` },
+          body: JSON.stringify({ email: u.email, password: u.password, email_confirm: true,
+            user_metadata: { full_name: u.full_name, role: u.role } }),
+        })
+        const d1 = await r1.json()
+        if (d1?.id) {
+          msg = `✅ ${u.email} — created id ${d1.id.slice(0,8)}…`
+          // 2. Upsert profile
+          await fetch(`${base}/rest/v1/profiles`, {
+            method: 'POST',
+            headers: { 'Content-Type':'application/json', apikey:key, Authorization:`Bearer ${key}`,
+              Prefer: 'resolution=merge-duplicates' },
+            body: JSON.stringify({ id: d1.id, email: u.email, full_name: u.full_name, role: u.role }),
+          })
+          msg += ` + profile`
+        } else if (d1?.msg?.includes('already exists') || d1?.error?.description?.includes('already exists')) {
+          msg = `⏭️ ${u.email} — already exists`
+        } else {
+          msg = `❌ ${u.email} — ${d1?.msg || d1?.error?.message || JSON.stringify(d1)}`
+        }
+        out.textContent += '\n' + msg
+      }
+    }
+  </script>
+</body>
+</html>
