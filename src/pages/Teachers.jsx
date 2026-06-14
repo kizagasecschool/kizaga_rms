@@ -422,7 +422,7 @@ function Teachers() {
   return (
     <ErrorBoundary>
     <div>
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-8 flex flex-col sm:flex-row items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Teacher Registration</h1>
           <p className="text-gray-500 mt-1">Register, edit, and manage teachers. Assign classes and subjects.</p>
@@ -573,7 +573,7 @@ function Teachers() {
                   placeholder="e.g. John Doe"
                 />
               </div>
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1.5">Qualification</label>
                   <input
@@ -605,7 +605,7 @@ function Teachers() {
               </svg>
               <span className="text-sm font-semibold text-gray-800">Account & Employee Information</span>
             </div>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Employee Number <span className="text-red-500">*</span></label>
                 <input
@@ -871,7 +871,7 @@ function Teachers() {
               </div>
             ) : (
               <div className="space-y-2">
-                {Object.entries(getAssignmentsByClassSubject()).map(([classId, subjects]) => {
+                {Object.entries(getAssignmentsByClassSubject()).map(([classId, subjectMap]) => {
                   const cls = classes.find(c => c.id === classId)
                   const streamNames = classStreams
                     .filter(cs => cs.class_id === classId)
@@ -888,7 +888,7 @@ function Teachers() {
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(subjects).map(([subjectId, entries]) => {
+                        {Object.entries(subjectMap).map(([subjectId, entries]) => {
                           const sub = subjects.find(s => s.id === subjectId)
                           return (
                             <span

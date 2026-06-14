@@ -43,10 +43,14 @@ function ClassSubjects() {
     if (csRes.data) setClassStreams(csRes.data)
     if (subRes.data) setSubjects(subRes.data)
     if (curRes.data) setCurricula(curRes.data)
+    if (combRes.error) console.error('combinations fetch error:', combRes.error)
     if (combRes.data) setCombinations(combRes.data)
+    if (csSubRes.error) console.error('combination_subjects fetch error:', csSubRes.error)
     if (csSubRes.data) setCombinationSubjects(csSubRes.data)
     if (saRes.data) setSubjectAssignments(saRes.data)
+    if (ccRes.error) console.error('class_curricula fetch error:', ccRes.error)
     if (ccRes.data) setClassCurricula(ccRes.data)
+    if (ccombRes.error) console.error('class_combinations fetch error:', ccombRes.error)
     if (ccombRes.data) setClassCombinations(ccombRes.data)
   }, [])
 
@@ -90,11 +94,12 @@ function ClassSubjects() {
       return
     }
 
-    const { data: studData } = await supabase
+    const { data: studData, error: studErr } = await supabase
       .from('students')
       .select('*')
       .in('class_stream_id', streamIds)
       .order('surname')
+    if (studErr) console.error('fetchStudents error:', studErr)
 
     if (studData) setStudents(studData)
 
@@ -236,9 +241,8 @@ function ClassSubjects() {
       } else {
         await supabase.from('subject_assignments').insert({ class_id: selectedClassId, subject_id: subjectId })
 
-        // If the subject is COMPULSORY, auto-assign to all students in this class
-        const sub = subjects.find((s) => s.id === subjectId)
-        if (sub && sub.subject_type === 'COMPULSORY' && students.length > 0) {
+        // Auto-assign to all students in this class
+        if (students.length > 0) {
           const { data: existingAssigned } = await supabase
             .from('student_subjects')
             .select('student_id')
@@ -276,6 +280,13 @@ function ClassSubjects() {
     setSaving(true)
     try {
       if (curriculumId) {
+        // Skip re-sync if same curriculum already set
+        if (classCurriculumRel && classCurriculumRel.curriculum_id === curriculumId) {
+          showToast('Curriculum unchanged', 'info')
+          setChangingCurriculum(false)
+          return
+        }
+
         if (classCurriculumRel) {
           await supabase.from('class_curricula').update({ curriculum_id: curriculumId }).eq('class_id', selectedClassId)
         } else {
@@ -334,38 +345,35 @@ function ClassSubjects() {
             }
           }
 
-          // 6. Insert compulsory matching subjects to all students in student_subjects (avoiding duplicates)
-          if (students.length > 0) {
-            const compulsorySubs = matchingSubjects.filter((s) => s.subject_type === 'COMPULSORY')
-            if (compulsorySubs.length > 0) {
-              const { data: existingStudentSubjects } = await supabase
-                .from('student_subjects')
-                .select('student_id, subject_id')
-                .in('student_id', students.map((s) => s.id))
+          // 6. Insert all matching subjects to all students in student_subjects (avoiding duplicates)
+          if (students.length > 0 && matchingSubjects.length > 0) {
+            const { data: existingStudentSubjects } = await supabase
+              .from('student_subjects')
+              .select('student_id, subject_id')
+              .in('student_id', students.map((s) => s.id))
 
-              const existingMap = {}
-              if (existingStudentSubjects) {
-                existingStudentSubjects.forEach((row) => {
-                  if (!existingMap[row.student_id]) existingMap[row.student_id] = []
-                  existingMap[row.student_id].push(row.subject_id)
-                })
-              }
+            const existingMap = {}
+            if (existingStudentSubjects) {
+              existingStudentSubjects.forEach((row) => {
+                if (!existingMap[row.student_id]) existingMap[row.student_id] = []
+                existingMap[row.student_id].push(row.subject_id)
+              })
+            }
 
-              const studentSubsToInsert = []
-              for (const student of students) {
-                const studentExisting = existingMap[student.id] || []
-                for (const sub of compulsorySubs) {
-                  if (!studentExisting.includes(sub.id)) {
-                    studentSubsToInsert.push({
-                      student_id: student.id,
-                      subject_id: sub.id,
-                    })
-                  }
+            const studentSubsToInsert = []
+            for (const student of students) {
+              const studentExisting = existingMap[student.id] || []
+              for (const sub of matchingSubjects) {
+                if (!studentExisting.includes(sub.id)) {
+                  studentSubsToInsert.push({
+                    student_id: student.id,
+                    subject_id: sub.id,
+                  })
                 }
               }
-              if (studentSubsToInsert.length > 0) {
-                await supabase.from('student_subjects').insert(studentSubsToInsert)
-              }
+            }
+            if (studentSubsToInsert.length > 0) {
+              await supabase.from('student_subjects').insert(studentSubsToInsert)
             }
           }
         }
@@ -540,9 +548,11 @@ function ClassSubjects() {
   const availableCurricula = curricula.filter((c) => c.level === classLevel)
   const classComboIds = getClassComboIds()
 
-  // Available combos for this class (those assigned via class_combinations)
-  const availableCombos = classCurriculum
-    ? combinations.filter((c) => c.curriculum_id === classCurriculum.id)
+  // Available combos for this class
+  const availableCombos = classLevel === 'A_LEVEL'
+    ? (classCurriculum
+        ? combinations.filter((c) => c.curriculum_id === classCurriculum.id)
+        : combinations)
     : []
 
   // Combos offered by this class (subset of availableCombos)
@@ -621,33 +631,11 @@ function ClassSubjects() {
               )}
             </div>
           )}
-
-          {selectedClassId && displaySubjects.length > 0 && students.length > 0 && (
-            <div className="sm:pt-5 sm:ml-auto flex items-center gap-3">
-              <button
-                onClick={handleAssignAll}
-                disabled={assigningAll}
-                className="px-4 py-2.5 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition flex items-center gap-2"
-              >
-                {assigningAll ? (
-                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Assigning...</>
-                ) : (
-                  <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
-                  </svg>
-                  Assign All to Students</>
-                )}
-              </button>
-              <span className="text-xs text-gray-400">
-                {students.length} student(s) &middot; {compulsorySubjects.length} compulsory &middot; {optionalSubjects.length} optional
-              </span>
-            </div>
-          )}
         </div>
       </div>
 
       {/* A-Level: Combination selector */}
-      {selectedClassId && classLevel === 'A_LEVEL' && classCurriculum && (
+      {selectedClassId && classLevel === 'A_LEVEL' && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
             <h2 className="text-sm font-semibold text-gray-800">Combinations for this Class</h2>
@@ -656,7 +644,7 @@ function ClassSubjects() {
           <div className="p-4">
             {availableCombos.length === 0 && (
               <p className="text-sm text-gray-400 text-center py-4">
-                No combinations found for the {classCurriculum.name} curriculum.
+                No combinations found{classCurriculum ? ` for the ${classCurriculum.name} curriculum` : ''}.
               </p>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
@@ -708,12 +696,17 @@ function ClassSubjects() {
       {/* O-Level: Subject management panel */}
       {selectedClassId && classLevel === 'O_LEVEL' && classCurriculum && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-            <h2 className="text-sm font-semibold text-gray-800">Subjects for this Class</h2>
-            <p className="text-xs text-gray-500 mt-0.5">
-              Select which O-Level subjects this class offers based on the <strong>{classCurriculum.name}</strong>.
-              {getCurriculumTag() && ' Only subjects matching this curriculum are shown.'}
-            </p>
+          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
+            <div>
+              <h2 className="text-sm font-semibold text-gray-800">Subjects for this Class</h2>
+              <p className="text-xs text-gray-500 mt-0.5">
+                Select which O-Level subjects this class offers based on the <strong>{classCurriculum.name}</strong>.
+                {getCurriculumTag() && ' Only subjects matching this curriculum are shown.'}
+              </p>
+            </div>
+            <span className="text-xs text-gray-400">
+              {students.length} student(s) &middot; {compulsorySubjects.length} compulsory &middot; {optionalSubjects.length} optional
+            </span>
           </div>
           <div className="p-4">
             {getAvailableSubjects().length === 0 && (
@@ -757,6 +750,27 @@ function ClassSubjects() {
                 )
               })}
             </div>
+            {displaySubjects.length > 0 && students.length > 0 && (
+              <div className="mt-4 flex items-center gap-3">
+                <button
+                  onClick={handleAssignAll}
+                  disabled={assigningAll}
+                  className="px-4 py-2.5 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition flex items-center gap-2"
+                >
+                  {assigningAll ? (
+                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Assigning...</>
+                  ) : (
+                    <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                    </svg>
+                    Assign All to Students</>
+                  )}
+                </button>
+                <span className="text-xs text-gray-400">
+                  Assign all {displaySubjects.length} subject(s) to all {students.length} student(s)
+                </span>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -795,20 +809,20 @@ function ClassSubjects() {
       )}
 
       {/* A-Level: no combos selected for class */}
-      {selectedClassId && !loading && classLevel === 'A_LEVEL' && classCurriculum && getClassComboIds().length === 0 && (
+      {selectedClassId && !loading && classLevel === 'A_LEVEL' && getClassComboIds().length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
           Select one or more combinations above to assign them to students.
         </div>
       )}
 
       {/* A-Level: student combination & optional subjects grid */}
-      {selectedClassId && !loading && classLevel === 'A_LEVEL' && classCurriculum && offeredCombos.length > 0 && students.length === 0 && (
+      {selectedClassId && !loading && classLevel === 'A_LEVEL' && offeredCombos.length > 0 && students.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
           No students enrolled in this class.
         </div>
       )}
 
-      {selectedClassId && !loading && classLevel === 'A_LEVEL' && classCurriculum && offeredCombos.length > 0 && students.length > 0 && (
+      {selectedClassId && !loading && classLevel === 'A_LEVEL' && offeredCombos.length > 0 && students.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
             <div>

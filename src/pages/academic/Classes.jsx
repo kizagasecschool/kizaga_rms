@@ -148,6 +148,7 @@ function AcademicClasses() {
             <div className="px-5 py-4 border-b border-gray-100">
               <h3 className="text-sm font-semibold text-gray-900">All Class Streams</h3>
             </div>
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
@@ -206,6 +207,7 @@ function AcademicClasses() {
                 })}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       </div>

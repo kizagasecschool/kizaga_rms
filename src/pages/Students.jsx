@@ -88,10 +88,11 @@ function Students() {
   const [currentStudentCombinationId, setCurrentStudentCombinationId] = useState(null)
 
   const fetchStudents = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('students')
-      .select('*, class_streams(*), classes(*)')
+      .select('*')
       .order('surname')
+    if (error) console.error('fetchStudents error:', error)
     if (data) setStudents(data)
   }, [])
 
@@ -549,12 +550,12 @@ function Students() {
 
   return (
     <div>
-      <div className="mb-8 flex items-start justify-between">
+      <div className="mb-8 flex flex-col sm:flex-row items-start justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Student Registration</h1>
           <p className="text-gray-500 mt-1">Register, edit, and manage students</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={downloadTemplate}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center gap-2"
@@ -664,10 +665,10 @@ function Students() {
                 </tr>
               )}
               {filtered.map((s) => {
-                const cs = s.class_streams || null
-                const cls = s.classes || null
-                const displayClass = cls?.class_name || cs?.classes?.class_name || null
-                const displayStream = cs?.streams?.stream_name || null
+                const cs = s.class_stream_id ? classStreamMap[s.class_stream_id] : null
+                const cls = s.class_id ? classes.find((c) => c.id === s.class_id) : null
+                const displayClass = cls?.class_name || cs?.class_name || null
+                const displayStream = cs?.stream_name || null
                 return (
                   <tr key={s.id} className="hover:bg-gray-50 transition">
                     <td className="px-5 py-3.5">
@@ -754,7 +755,7 @@ function Students() {
               </svg>
               <span className="text-sm font-semibold text-gray-800">Full Name</span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Surname <span className="text-red-500">*</span></label>
                 <input
@@ -797,7 +798,7 @@ function Students() {
               </svg>
               <span className="text-sm font-semibold text-gray-800">Student Information</span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Admission Number <span className="text-red-500">*</span></label>
                 <input
@@ -841,7 +842,7 @@ function Students() {
               </svg>
               <span className="text-sm font-semibold text-gray-800">Enrollment</span>
             </div>
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="col-span-1">
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Class <span className="text-red-500">*</span></label>
                 <select
@@ -887,7 +888,7 @@ function Students() {
               </svg>
               <span className="text-sm font-semibold text-gray-800">Parent / Contact Information</span>
             </div>
-            <div className="grid grid-cols-2 gap-4 mb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Parent / Guardian Name</label>
                 <input
@@ -1071,10 +1072,10 @@ function Students() {
             className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-emerald-400 focus:ring-4 focus:ring-emerald-500/10 transition"
           >
             {students.map((s) => {
-              const cs = classStreams.find((c) => c.id === s.class_stream_id)
-              const cls = classes.find((c) => c.id === s.class_id)
-              const classLabel = cls?.class_name || cs?.classes?.class_name || ''
-              const streamLabel = cs?.streams?.stream_name || ''
+              const cs = s.class_stream_id ? classStreamMap[s.class_stream_id] : null
+              const cls = s.class_id ? classes.find((c) => c.id === s.class_id) : null
+              const classLabel = cls?.class_name || cs?.class_name || ''
+              const streamLabel = cs?.stream_name || ''
               const label = `${s.surname}, ${s.first_name} (${s.admission_number})${classLabel ? ` - ${classLabel}${streamLabel ? ` Stream ${streamLabel}` : ''}` : ''}`
               return (
                 <option key={s.id} value={s.id}>{label}</option>

@@ -12,10 +12,17 @@ import AcademicDashboard from './pages/academic/Dashboard'
 import AcademicClasses from './pages/academic/Classes'
 import AcademicSubjects from './pages/academic/Subjects'
 import AcademicExams from './pages/academic/Exams'
+import AcademicResults from './pages/academic/Results'
+import AcademicYears from './pages/academic/AcademicYears'
+import EnterMarks from './pages/teacher/EnterMarks'
+import MyStudents from './pages/teacher/MyStudents'
 import Students from './pages/Students'
 import Teachers from './pages/Teachers'
 import ClassSubjects from './pages/ClassSubjects'
 import TeacherDashboard from './pages/teacher/Dashboard'
+import Profile from './pages/Profile'
+import Notifications from './pages/Notifications'
+import SendNotification from './pages/SendNotification'
 
 function App() {
   return (
@@ -41,6 +48,7 @@ function App() {
                   <Route path="subjects" element={<AdminSubjects />} />
                   <Route path="students" element={<Students />} />
                   <Route path="class-subjects" element={<ClassSubjects />} />
+                  <Route path="academic-years" element={<AcademicYears />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -67,6 +75,9 @@ function App() {
                   <Route path="students" element={<Students />} />
                   <Route path="class-subjects" element={<ClassSubjects />} />
                   <Route path="exams" element={<AcademicExams />} />
+                  <Route path="results" element={<AcademicResults />} />
+                  <Route path="academic-years" element={<AcademicYears />} />
+                  <Route path="enter-marks" element={<EnterMarks />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -77,10 +88,15 @@ function App() {
               <RoleBasedRoute allowedRoles={['teacher']}>
                 <Routes>
                   <Route index element={<TeacherDashboard />} />
+                  <Route path="enter-marks" element={<EnterMarks />} />
+                  <Route path="students" element={<MyStudents />} />
                 </Routes>
               </RoleBasedRoute>
             }
           />
+          <Route path="profile" element={<Profile />} />
+          <Route path="notifications" element={<Notifications />} />
+          <Route path="send-notification" element={<SendNotification />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

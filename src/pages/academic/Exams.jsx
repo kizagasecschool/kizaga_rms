@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { useNotification } from '../../context/NotificationContext'
+import { useAuth } from '../../context/AuthContext'
 
 const EXAM_TYPES = ['WEEKLY', 'MONTHLY', 'MIDTERM_1', 'TERMINAL', 'MIDTERM_2', 'ANNUAL', 'SERIES_1', 'SERIES_2', 'SERIES_3', 'MOCK', 'PRE_NATIONAL']
 
@@ -17,6 +19,7 @@ const STATUS_COLORS = {
 
 function AcademicExams() {
   const { showToast } = useNotification()
+  const { profile } = useAuth()
   const [loading, setLoading] = useState(true)
   const [exams, setExams] = useState([])
   const [classes, setClasses] = useState([])
@@ -143,6 +146,18 @@ function AcademicExams() {
         const { data, error } = await supabase.from('exams').insert(payload).select('id').single()
         if (error) throw error
         await syncExamClasses(data.id)
+
+        // Notify teachers about new exam
+        supabase.rpc('notify_exam_teachers', {
+          p_exam_id: data.id,
+          p_sender_id: profile.id,
+          p_title: `New Exam: ${formData.name}`,
+          p_message: `A new ${formData.exam_type} exam "${formData.name}" has been created for your class.`,
+          p_type: 'exam_created',
+          p_link: '/academic/exams',
+        }).then(({ error: notifErr }) => {
+          if (notifErr) console.error('Notification error:', notifErr)
+        })
       }
 
       await fetchExams()
@@ -200,6 +215,21 @@ function AcademicExams() {
       if (newStatus === 'processed') {
         const { error: processError } = await supabase.rpc('process_exam', { p_exam_id: examId })
         if (processError) throw processError
+
+        // Notify teachers about processed results
+        const exam = exams.find((e) => e.id === examId)
+        if (exam) {
+          supabase.rpc('notify_exam_teachers', {
+            p_exam_id: examId,
+            p_sender_id: profile.id,
+            p_title: `Results Processed: ${exam.name}`,
+            p_message: `Results for "${exam.name}" have been processed and are available.`,
+            p_type: 'results_processed',
+            p_link: '/academic/exams',
+          }).then(({ error: notifErr }) => {
+            if (notifErr) console.error('Notification error:', notifErr)
+          })
+        }
       }
       const { error } = await supabase.rpc('transition_exam_status', { p_exam_id: examId, p_new_status: newStatus })
       if (error) throw error
@@ -238,7 +268,7 @@ function AcademicExams() {
         <p className="text-gray-500 mt-1">Create and manage exams, track status workflow</p>
       </div>
 
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 flex-wrap gap-2">
         <p className="text-sm text-gray-500">{exams.length} exam(s)</p>
         <button
           onClick={openCreate}
@@ -249,6 +279,7 @@ function AcademicExams() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
             <tr className="border-b border-gray-200 bg-gray-50">
@@ -259,13 +290,14 @@ function AcademicExams() {
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Dates</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Classes</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+              <th className="text-center px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">View</th>
               <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
             {exams.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">
+                <td colSpan={9} className="px-5 py-10 text-center text-sm text-gray-400">
                   No exams found. Click "+ Create Exam" to create one.
                 </td>
               </tr>
@@ -290,6 +322,14 @@ function AcademicExams() {
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${STATUS_COLORS[exam.status] || 'bg-gray-100 text-gray-600'}`}>
                     {exam.status.replace('_', ' ')}
                   </span>
+                </td>
+                <td className="px-5 py-3.5 text-center">
+                  <Link
+                    to={`/academic/results?examId=${exam.id}`}
+                    className="inline-flex items-center px-2.5 py-1 text-xs font-medium text-maroon-600 bg-maroon-50 hover:bg-maroon-100 rounded-md transition"
+                  >
+                    View
+                  </Link>
                 </td>
                 <td className="px-5 py-3.5 text-right">
                   <div className="flex items-center justify-end gap-1">
@@ -331,6 +371,7 @@ function AcademicExams() {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       <Modal
@@ -352,7 +393,7 @@ function AcademicExams() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Exam Type</label>
               <select
@@ -379,7 +420,7 @@ function AcademicExams() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
               <select
@@ -412,7 +453,7 @@ function AcademicExams() {
             </div>
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
               <input

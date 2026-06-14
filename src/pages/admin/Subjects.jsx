@@ -67,7 +67,7 @@ function AdminSubjects() {
       subject_name: '',
       level: activeLevel,
       subject_type: 'COMPULSORY',
-      curriculum: 'OLD',
+      curriculum: '',
     })
     setSubjectModalOpen(true)
   }
@@ -79,7 +79,7 @@ function AdminSubjects() {
       subject_name: subject.subject_name,
       level: subject.level,
       subject_type: subject.subject_type,
-      curriculum: subject.curriculum || 'OLD',
+      curriculum: subject.curriculum ?? '',
     })
     setSubjectModalOpen(true)
   }
@@ -93,7 +93,7 @@ function AdminSubjects() {
         subject_name: formData.subject_name,
         level: formData.level,
         subject_type: formData.subject_type,
-        curriculum: formData.level === 'O_LEVEL' ? formData.curriculum : null,
+        curriculum: formData.level === 'O_LEVEL' ? (formData.curriculum || null) : null,
       }
       if (editingSubject) {
         const { error } = await supabase.from('subjects').update(payload).eq('id', editingSubject.id)
@@ -279,8 +279,8 @@ function AdminSubjects() {
       {/* ==================== O-LEVEL ==================== */}
       {activeLevel === 'O_LEVEL' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-gray-500">Curriculum:</span>
               {['all', ...CURRICULUMS].map((c) => (
                 <button
@@ -305,6 +305,7 @@ function AdminSubjects() {
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
@@ -367,6 +368,7 @@ function AdminSubjects() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -374,7 +376,7 @@ function AdminSubjects() {
       {/* ==================== A-LEVEL ==================== */}
       {activeLevel === 'A_LEVEL' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <p className="text-sm text-gray-500">{combinations.length} combination(s)</p>
             <button
               onClick={openComboCreate}
@@ -499,7 +501,7 @@ function AdminSubjects() {
         title={editingSubject ? 'Edit Subject' : 'Add Subject'}
       >
         <form onSubmit={handleSaveSubject} className="space-y-4">
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Subject Code</label>
               <input
@@ -524,7 +526,7 @@ function AdminSubjects() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
               <select
@@ -540,10 +542,11 @@ function AdminSubjects() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Curriculum</label>
               <select
-                value={formData.curriculum || 'OLD'}
+                value={formData.curriculum}
                 onChange={(e) => setFormData({ ...formData, curriculum: e.target.value })}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
               >
+                <option value="">Shared (Both)</option>
                 {CURRICULUMS.map((c) => (
                   <option key={c} value={c}>{c === 'OLD' ? 'Old Curriculum' : 'New Curriculum'}</option>
                 ))}

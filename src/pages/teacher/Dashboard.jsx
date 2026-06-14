@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
@@ -78,6 +79,25 @@ function TeacherDashboard() {
           </div>
         ))}
       </div>
+
+      {!loading && (
+        <div className="mt-8">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h2>
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              <Link
+                to="/teacher/enter-marks"
+                className="flex items-center gap-3 px-4 py-3 rounded-lg border border-gray-200 text-sm font-medium text-gray-700 hover:border-maroon-300 hover:text-maroon-600 hover:bg-maroon-50/50 transition"
+              >
+                <svg className="w-5 h-5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                Enter Marks
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!loading && stats.students === 0 && (
         <div className="mt-8 bg-amber-50 border border-amber-200 rounded-xl p-5 text-sm text-amber-700">

@@ -207,8 +207,8 @@ function AdminClasses() {
       {/* Classes Tab */}
       {activeTab === 'classes' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
               <span className="text-sm text-gray-500">Level:</span>
               {['all', ...LEVELS].map((l) => (
                 <button
@@ -233,6 +233,7 @@ function AdminClasses() {
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
@@ -289,6 +290,7 @@ function AdminClasses() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -296,7 +298,7 @@ function AdminClasses() {
       {/* Streams Tab */}
       {activeTab === 'streams' && (
         <div>
-          <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <p className="text-sm text-gray-500">{streams.length} stream(s) total</p>
             <button
               onClick={openCreate}
@@ -307,6 +309,7 @@ function AdminClasses() {
           </div>
 
           <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
@@ -345,6 +348,7 @@ function AdminClasses() {
                 ))}
               </tbody>
             </table>
+            </div>
           </div>
         </div>
       )}
@@ -429,6 +433,7 @@ function AdminClasses() {
           <div className="lg:col-span-2">
             <h3 className="text-sm font-semibold text-gray-900 mb-3">All Assignments</h3>
             <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
@@ -485,6 +490,7 @@ function AdminClasses() {
                   })}
                 </tbody>
               </table>
+              </div>
             </div>
           </div>
         </div>
