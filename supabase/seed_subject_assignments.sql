@@ -105,42 +105,98 @@ WHERE s.level = 'O_LEVEL'
 INSERT INTO combination_subjects (combination_id, subject_id)
 SELECT c.id, s.id
 FROM combinations c, subjects s
-WHERE c.code = 'PCM' AND s.subject_code IN ('PHY', 'CHEM', 'MATH', 'ACOM', 'HISTM')
+WHERE c.code = 'PCM' AND s.subject_code IN ('PHY', 'CHEM', 'MATH', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
 AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
 
--- PCB: Physics, Chemistry, Biology
+-- PCB: Physics, Chemistry, Biology (+ BAM compulsory subsidiary)
 INSERT INTO combination_subjects (combination_id, subject_id)
 SELECT c.id, s.id
 FROM combinations c, subjects s
-WHERE c.code = 'PCB' AND s.subject_code IN ('PHY', 'CHEM', 'BIO', 'BAM', 'ACOM')
+WHERE c.code = 'PCB' AND s.subject_code IN ('PHY', 'CHEM', 'BIO', 'BAM', 'ACOM', 'HISTM', 'COMP', 'ACCT')
 AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
 
--- HGL: History, Geography, Literature (Language)
+-- CBG: Chemistry, Biology, Geography (+ BAM compulsory subsidiary)
 INSERT INTO combination_subjects (combination_id, subject_id)
 SELECT c.id, s.id
 FROM combinations c, subjects s
-WHERE c.code = 'HGL' AND s.subject_code IN ('HIST', 'GEOG', 'LANG', 'ACOM', 'HISTM')
+WHERE c.code = 'CBG' AND s.subject_code IN ('CHEM', 'BIO', 'GEOG', 'BAM', 'ACOM', 'HISTM', 'COMP', 'ACCT')
+AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
+
+-- PGM: Physics, Geography, Advanced Mathematics
+INSERT INTO combination_subjects (combination_id, subject_id)
+SELECT c.id, s.id
+FROM combinations c, subjects s
+WHERE c.code = 'PGM' AND s.subject_code IN ('PHY', 'GEOG', 'MATH', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
+AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
+
+-- CBA: Chemistry, Biology, Agriculture
+INSERT INTO combination_subjects (combination_id, subject_id)
+SELECT c.id, s.id
+FROM combinations c, subjects s
+WHERE c.code = 'CBA' AND s.subject_code IN ('CHEM', 'BIO', 'AGRI', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
+AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
+
+-- ECA: Economics, Commerce, Accountancy
+INSERT INTO combination_subjects (combination_id, subject_id)
+SELECT c.id, s.id
+FROM combinations c, subjects s
+WHERE c.code = 'ECA' AND s.subject_code IN ('ECON', 'COMM', 'ACCT', 'ACOM', 'HISTM', 'COMP', 'BAM')
+AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
+
+-- HGE: History, Geography, Economics (+ BAM compulsory subsidiary)
+INSERT INTO combination_subjects (combination_id, subject_id)
+SELECT c.id, s.id
+FROM combinations c, subjects s
+WHERE c.code = 'HGE' AND s.subject_code IN ('HIST', 'GEOG', 'ECON', 'BAM', 'ACOM', 'HISTM', 'COMP', 'ACCT')
+AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
+
+-- EGA: Economics, Geography, Accountancy
+INSERT INTO combination_subjects (combination_id, subject_id)
+SELECT c.id, s.id
+FROM combinations c, subjects s
+WHERE c.code = 'EGA' AND s.subject_code IN ('ECON', 'GEOG', 'ACCT', 'ACOM', 'HISTM', 'COMP', 'BAM')
 AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
 
 -- EGM: Economics, Geography, Advanced Mathematics
 INSERT INTO combination_subjects (combination_id, subject_id)
 SELECT c.id, s.id
 FROM combinations c, subjects s
-WHERE c.code = 'EGM' AND s.subject_code IN ('ECON', 'GEOG', 'MATH', 'ACOM', 'HISTM')
+WHERE c.code = 'EGM' AND s.subject_code IN ('ECON', 'GEOG', 'MATH', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
 AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
 
--- CBG: Chemistry, Biology, Geography
+-- HKL: History, Kiswahili, Literature
 INSERT INTO combination_subjects (combination_id, subject_id)
 SELECT c.id, s.id
 FROM combinations c, subjects s
-WHERE c.code = 'CBG' AND s.subject_code IN ('CHEM', 'BIO', 'GEOG', 'BAM', 'ACOM')
+WHERE c.code = 'HKL' AND s.subject_code IN ('HIST', 'KISW', 'LITE', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
 AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
 
--- PAM: Physics, Advanced Mathematics
+-- HGK: History, Geography, Kiswahili
 INSERT INTO combination_subjects (combination_id, subject_id)
 SELECT c.id, s.id
 FROM combinations c, subjects s
-WHERE c.code = 'PAM' AND s.subject_code IN ('PHY', 'MATH', 'COMP', 'ACOM', 'HISTM')
+WHERE c.code = 'HGK' AND s.subject_code IN ('HIST', 'GEOG', 'KISW', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
+AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
+
+-- HGL: History, Geography, Language
+INSERT INTO combination_subjects (combination_id, subject_id)
+SELECT c.id, s.id
+FROM combinations c, subjects s
+WHERE c.code = 'HGL' AND s.subject_code IN ('HIST', 'GEOG', 'LANG', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
+AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
+
+-- KLF: Kiswahili, Literature, French
+INSERT INTO combination_subjects (combination_id, subject_id)
+SELECT c.id, s.id
+FROM combinations c, subjects s
+WHERE c.code = 'KLF' AND s.subject_code IN ('KISW', 'LITE', 'FREN', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
+AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
+
+-- HKE: History, Kiswahili, Economics
+INSERT INTO combination_subjects (combination_id, subject_id)
+SELECT c.id, s.id
+FROM combinations c, subjects s
+WHERE c.code = 'HKE' AND s.subject_code IN ('HIST', 'KISW', 'ECON', 'ACOM', 'HISTM', 'COMP', 'BAM', 'ACCT')
 AND NOT EXISTS (SELECT 1 FROM combination_subjects cs WHERE cs.combination_id = c.id AND cs.subject_id = s.id);
 
 -- ============================================================

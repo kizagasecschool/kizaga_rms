@@ -312,13 +312,12 @@ function Login() {
                   />
                   <span className="text-sm text-slate-600">Remember me</span>
                 </label>
-                <button
-                  type="button"
-                  onClick={() => setResetMode(true)}
+                <Link
+                  to="/forgot-password"
                   className="text-sm font-medium text-maroon-600 hover:text-maroon-500 hover:underline"
                 >
                   Forgot password?
-                </button>
+                </Link>
               </div>
 
               <button

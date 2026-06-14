@@ -1,3 +1,4 @@
+import ForgotPassword from './pages/auth/ForgotPassword'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import ProtectedRoute from './routes/ProtectedRoute'
 import RoleBasedRoute from './routes/RoleBasedRoute'
@@ -29,6 +30,7 @@ function App() {
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/" element={<Landing />} />
         <Route
           element={

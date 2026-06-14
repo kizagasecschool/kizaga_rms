@@ -35,7 +35,7 @@ function AdminSubjects() {
   }, [])
 
   const fetchCombinations = useCallback(async () => {
-    const { data } = await supabase.from('combinations').select('*').order('combination_name')
+    const { data } = await supabase.from('combinations').select('*').order('name')
     if (data) setCombinations(data)
   }, [])
 
@@ -126,15 +126,18 @@ function AdminSubjects() {
     }
   }
 
+  const comboName = (combo) => combo.name || combo.combination_name || ''
+  const comboDesc = (combo) => combo.description || ''
+
   const openComboCreate = () => {
     setEditingCombo(null)
-    setFormData({ combination_name: '', description: '' })
+    setFormData({ code: '', name: '', description: '' })
     setComboModalOpen(true)
   }
 
   const openComboEdit = (combo) => {
     setEditingCombo(combo)
-    setFormData({ combination_name: combo.combination_name, description: combo.description || '' })
+    setFormData({ code: combo.code || '', name: combo.name || combo.combination_name || '', description: combo.description || '' })
     setComboModalOpen(true)
   }
 
@@ -142,16 +145,21 @@ function AdminSubjects() {
     e.preventDefault()
     setSaving(true)
     try {
+      const payload = {
+        code: formData.code.toUpperCase(),
+        name: formData.name,
+        description: formData.description,
+      }
       if (editingCombo) {
         const { error } = await supabase
           .from('combinations')
-          .update({ combination_name: formData.combination_name, description: formData.description })
+          .update(payload)
           .eq('id', editingCombo.id)
         if (error) throw error
       } else {
         const { error } = await supabase
           .from('combinations')
-          .insert({ combination_name: formData.combination_name, description: formData.description })
+          .insert(payload)
         if (error) throw error
       }
       await fetchCombinations()
@@ -404,9 +412,14 @@ function AdminSubjects() {
                 <div key={combo.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-sm transition">
                   <div className="px-5 py-4 border-b border-gray-100 flex items-start justify-between">
                     <div>
-                      <h3 className="text-base font-semibold text-gray-900">{combo.combination_name}</h3>
-                      {combo.description && (
-                        <p className="text-xs text-gray-500 mt-0.5">{combo.description}</p>
+                      <div className="flex items-center gap-2 mb-0.5">
+                        {combo.code && (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-bold bg-maroon-50 text-maroon-700">{combo.code}</span>
+                        )}
+                        <h3 className="text-base font-semibold text-gray-900">{comboName(combo)}</h3>
+                      </div>
+                      {comboDesc(combo) && (
+                        <p className="text-xs text-gray-500 mt-0.5">{comboDesc(combo)}</p>
                       )}
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
@@ -426,7 +439,7 @@ function AdminSubjects() {
                         </svg>
                       </button>
                       <button
-                        onClick={() => setDeleteConfirm({ type: 'combination', id: combo.id, name: combo.combination_name })}
+                        onClick={() => setDeleteConfirm({ type: 'combination', id: combo.id, name: comboName(combo) })}
                         className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
                       >
                         <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -452,7 +465,7 @@ function AdminSubjects() {
                       </div>
                     </div>
                     <div>
-                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Subsidiary (1)</span>
+                      <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Subsidiary</span>
                       <div className="flex flex-wrap gap-1.5 mt-1.5">
                         {subsidiary.length === 0 && <span className="text-xs text-gray-400">None assigned</span>}
                         {subsidiary.map((cs) => {
@@ -484,7 +497,7 @@ function AdminSubjects() {
                   <div className="px-5 py-2.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between">
                     <span className="text-xs text-gray-500">{assigned.length} subject(s) total</span>
                     <span className="text-xs text-gray-400">
-                      {combo.description?.split('–')[0]?.trim() || ''}
+                      {comboDesc(combo)?.split('–')[0]?.trim() || combo.name || ''}
                     </span>
                   </div>
                 </div>
@@ -579,16 +592,30 @@ function AdminSubjects() {
         title={editingCombo ? 'Edit Combination' : 'Add Combination'}
       >
         <form onSubmit={handleSaveCombo} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Combination Name</label>
-            <input
-              type="text"
-              required
-              value={formData.combination_name || ''}
-              onChange={(e) => setFormData({ ...formData, combination_name: e.target.value })}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-              placeholder="e.g. PCB"
-            />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Code</label>
+              <input
+                type="text"
+                required
+                maxLength={3}
+                value={formData.code || ''}
+                onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+                placeholder="e.g. PCB"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Name</label>
+              <input
+                type="text"
+                required
+                value={formData.name || ''}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+                placeholder="e.g. Physics, Chemistry, Biology"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
@@ -597,7 +624,7 @@ function AdminSubjects() {
               value={formData.description || ''}
               onChange={(e) => setFormData({ ...formData, description: e.target.value })}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-              placeholder="e.g. Physics, Chemistry, Biology – Medicine"
+              placeholder="e.g. Medicine and Health Sciences"
             />
           </div>
           <div className="flex justify-end gap-3 pt-2">
@@ -623,7 +650,7 @@ function AdminSubjects() {
       <Modal
         isOpen={comboSubjectsModalOpen}
         onClose={() => { setComboSubjectsModalOpen(false); setPendingRoles({}) }}
-        title={`Subjects - ${selectedCombo?.combination_name || ''}`}
+        title={`Subjects - ${comboName(selectedCombo) || ''}`}
       >
         <p className="text-xs text-gray-500 mb-4">
           Select A-Level subjects and assign their role in this combination.

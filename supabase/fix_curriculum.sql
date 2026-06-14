@@ -126,20 +126,29 @@ AND NOT EXISTS (
 );
 
 -- ============================================================
--- 9. SEED DATA: SAMPLE A-LEVEL COMBINATIONS
+-- 9. SEED DATA: ALL 14 A-LEVEL COMBINATIONS (from kizaga.txt)
 -- (Old Curriculum A-Level only)
 -- ============================================================
 INSERT INTO public.combinations (name, code, curriculum_id)
 SELECT v.name, v.code, c.id
 FROM (VALUES
-  ('Physics Chemistry Mathematics', 'PCM', 'Old Curriculum A-Level'),
-  ('Physics Chemistry Biology',      'PCB', 'Old Curriculum A-Level'),
-  ('History Geography Literature',    'HGL', 'Old Curriculum A-Level'),
-  ('Economics Geography Mathematics', 'EGM', 'Old Curriculum A-Level'),
-  ('Chemistry Biology Geography',     'CBG', 'Old Curriculum A-Level'),
-  ('Physics Advanced Mathematics',    'PAM', 'Old Curriculum A-Level')
+  ('Physics Chemistry Mathematics',        'PCM', 'Old Curriculum A-Level'),
+  ('Physics Chemistry Biology',            'PCB', 'Old Curriculum A-Level'),
+  ('Chemistry Biology Geography',          'CBG', 'Old Curriculum A-Level'),
+  ('Physics Geography Mathematics',        'PGM', 'Old Curriculum A-Level'),
+  ('Chemistry Biology Agriculture',        'CBA', 'Old Curriculum A-Level'),
+  ('Economics Commerce Accountancy',       'ECA', 'Old Curriculum A-Level'),
+  ('History Geography Economics',          'HGE', 'Old Curriculum A-Level'),
+  ('Economics Geography Accountancy',      'EGA', 'Old Curriculum A-Level'),
+  ('Economics Geography Mathematics',      'EGM', 'Old Curriculum A-Level'),
+  ('History Kiswahili Literature',         'HKL', 'Old Curriculum A-Level'),
+  ('History Geography Kiswahili',          'HGK', 'Old Curriculum A-Level'),
+  ('History Geography Language',           'HGL', 'Old Curriculum A-Level'),
+  ('Kiswahili Literature French',          'KLF', 'Old Curriculum A-Level'),
+  ('History Kiswahili Economics',          'HKE', 'Old Curriculum A-Level')
 ) AS v(name, code, curriculum_name)
-JOIN public.curricula c ON c.name = v.curriculum_name;
+JOIN public.curricula c ON c.name = v.curriculum_name
+WHERE NOT EXISTS (SELECT 1 FROM public.combinations);
 
 -- ============================================================
 -- 10. ENABLE RLS & POLICIES
