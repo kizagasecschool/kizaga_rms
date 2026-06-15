@@ -8,6 +8,7 @@ import Login from './pages/auth/Login'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminClasses from './pages/admin/Classes'
 import AdminSubjects from './pages/admin/Subjects'
+import AdminUsers from './pages/admin/Users'
 import HeadmasterDashboard from './pages/headmaster/Dashboard'
 import AcademicDashboard from './pages/academic/Dashboard'
 import AcademicClasses from './pages/academic/Classes'
@@ -45,6 +46,7 @@ function App() {
               <RoleBasedRoute allowedRoles={['admin']}>
                 <Routes>
                   <Route index element={<AdminDashboard />} />
+                  <Route path="users" element={<AdminUsers />} />
                   <Route path="teachers" element={<Teachers />} />
                   <Route path="classes" element={<AdminClasses />} />
                   <Route path="subjects" element={<AdminSubjects />} />
