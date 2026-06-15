@@ -16,12 +16,8 @@ function Teachers() {
   const [classStreams, setClassStreams] = useState([])
   const [subjects, setSubjects] = useState([])
   const [assignments, setAssignments] = useState([])
-  const [subjectAssignments, setSubjectAssignments] = useState([])
-  const [combinations, setCombinations] = useState([])
-  const [combinationSubjects, setCombinationSubjects] = useState([])
   const [classCombinations, setClassCombinations] = useState([])
-  const [curricula, setCurricula] = useState([])
-  const [classCurricula, setClassCurricula] = useState([])
+  const [combinationSubjects, setCombinationSubjects] = useState([])
 
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -48,28 +44,20 @@ function Teachers() {
   }, [])
 
   const fetchLookups = useCallback(async () => {
-    const [cRes, sRes, csRes, subRes, saRes, coRes, cs2Res, ccRes, curRes, ccurRes] = await Promise.all([
+    const [cRes, sRes, csRes, subRes, cs2Res, ccRes] = await Promise.all([
       supabase.from('classes').select('*').order('sort_order'),
       supabase.from('streams').select('*').order('stream_name'),
       supabase.from('class_streams').select('*, classes(*), streams(*)'),
       supabase.from('subjects').select('*').order('subject_name'),
-      supabase.from('subject_assignments').select('*'),
-      supabase.from('combinations').select('*').order('name'),
       supabase.from('combination_subjects').select('*'),
       supabase.from('class_combinations').select('*'),
-      supabase.from('curricula').select('*'),
-      supabase.from('class_curricula').select('*'),
     ])
     if (cRes.data) setClasses(cRes.data)
     if (sRes.data) setStreams(sRes.data)
     if (csRes.data) setClassStreams(csRes.data)
     if (subRes.data) setSubjects(subRes.data)
-    if (saRes.data) setSubjectAssignments(saRes.data)
-    if (coRes.data) setCombinations(coRes.data)
     if (cs2Res.data) setCombinationSubjects(cs2Res.data)
     if (ccRes.data) setClassCombinations(ccRes.data)
-    if (curRes.data) setCurricula(curRes.data)
-    if (ccurRes.data) setClassCurricula(ccurRes.data)
   }, [])
 
   const fetchAssignments = useCallback(async () => {
@@ -93,14 +81,6 @@ function Teachers() {
     load()
   }, [fetchTeachers, fetchLookups, fetchAssignments])
 
-  const getClassStreamOptions = () => {
-    return classStreams.map((cs) => {
-      const cls = classes.find((c) => c.id === cs.class_id)
-      const str = streams.find((s) => s.id === cs.stream_id)
-      return { id: cs.id, label: cls && str ? `${cls.class_name} - Stream ${str.stream_name}` : cs.id }
-    })
-  }
-
   const filtered = teachers.filter((t) => {
     const q = search.toLowerCase()
     const fullName = (t.profiles?.full_name || '').toLowerCase()
@@ -114,28 +94,12 @@ function Teachers() {
     return assignments.filter((a) => a.teacher_id === teacherId)
   }
 
-  const getClassCurriculumTag = (classId) => {
-    const rel = classCurricula?.find(cc => cc.class_id === classId)
-    if (!rel) return null
-    const cur = curricula?.find(c => c.id === rel.curriculum_id)
-    if (!cur) return null
-    return cur.name?.includes('New') ? 'NEW' : 'OLD'
-  }
-
   const getClassSubjects = (classId) => {
     if (!classId) return []
     const cls = classes.find(c => c.id === classId)
     if (!cls) return []
     if (cls.level === 'O_LEVEL') {
-      const subjectIds = subjectAssignments
-        .filter(sa => sa.class_id === classId)
-        .map(sa => sa.subject_id)
-      let classSubs = subjects.filter(s => subjectIds.includes(s.id))
-      const tag = getClassCurriculumTag(classId)
-      if (tag) {
-        classSubs = classSubs.filter(s => !s.curriculum || s.curriculum === tag)
-      }
-      return classSubs
+      return subjects.filter(s => s.level === 'O_LEVEL')
     }
     if (cls.level === 'A_LEVEL') {
       const comboIds = classCombinations
@@ -202,88 +166,33 @@ function Teachers() {
         await fetchTeachers()
         setFormOpen(false)
         showToast('Teacher updated successfully', 'success')
-      } else {
-        const edgeFnUrl = import.meta.env.VITE_EDGE_FUNCTION_URL || ''
-
-        // Try Supabase Edge Function first (preferred for production)
-        if (edgeFnUrl) {
-          try {
-            const res = await fetch(`${edgeFnUrl}/register-teacher`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                email: formData.email,
-                password: formData.password,
-                full_name: formData.full_name,
-                employee_number: formData.employee_number,
-                qualification: formData.qualification || null,
-                phone: formData.phone || null,
-              }),
-            })
-            const data = await res.json()
-            if (res.ok) {
-              await fetchTeachers()
-              setFormOpen(false)
-              showToast('Teacher registered successfully', 'success')
-              return
-            }
-            console.warn('Edge Function failed, falling back:', data.error)
-          } catch (fnErr) {
-            console.warn('Edge Function unreachable, falling back:', fnErr)
-          }
-        }
-
-        // Try RPC function (PostgreSQL function)
-        const { data: rpcData, error: rpcErr } = await supabase.rpc('register_teacher', {
-          p_email: formData.email,
-          p_password: formData.password,
-          p_full_name: formData.full_name,
-          p_employee_number: formData.employee_number,
-          p_qualification: formData.qualification || null,
-          p_phone: formData.phone || null,
-        })
-
-        if (!rpcErr && rpcData) {
-          await fetchTeachers()
-          setFormOpen(false)
-          showToast('Teacher registered successfully', 'success')
-          return
-        }
-
-        // Fallback: use Auth Admin API via Vite dev proxy
-        const res = await fetch('/api/auth/admin/users', {
+        } else {
+        const res = await fetch('/api/register-teacher', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+          },
           body: JSON.stringify({
             email: formData.email,
             password: formData.password,
-            email_confirm: true,
-            user_metadata: { full_name: formData.full_name, role: 'teacher' },
-          }),
-        })
-        const authData = await res.json()
-        if (!res.ok) throw new Error(authData.msg || authData.error || 'Failed to create user')
-
-        const { error: profileErr } = await supabase
-          .from('profiles')
-          .insert({
-            id: authData.id,
-            email: formData.email,
             full_name: formData.full_name,
-            role: 'teacher',
-          })
-        if (profileErr && !profileErr.message.includes('duplicate key')) throw profileErr
-
-        const { error: teacherErr } = await supabase
-          .from('teachers')
-          .insert({
             employee_number: formData.employee_number,
-            profile_id: authData.id,
             qualification: formData.qualification || null,
             phone: formData.phone || null,
-            status: 'active',
-          })
-        if (teacherErr) throw teacherErr
+          }),
+        })
+
+        const text = await res.text()
+        let result
+        try {
+          result = JSON.parse(text)
+        } catch {
+          throw new Error(text || `Server returned ${res.status}`)
+        }
+
+        if (!res.ok) {
+          throw new Error(result.error || 'Failed to register teacher')
+        }
 
         await fetchTeachers()
         setFormOpen(false)
@@ -888,7 +797,7 @@ function Teachers() {
                         </p>
                       </div>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(subjectMap).map(([subjectId, entries]) => {
+                        {Object.entries(subjectMap).map(([subjectId]) => {
                           const sub = subjects.find(s => s.id === subjectId)
                           return (
                             <span
