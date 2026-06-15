@@ -164,16 +164,15 @@ function EnterMarks() {
             })
           setSubjectOptions([...subMap.values()])
         } else {
-          const { data: sa } = await supabase
-            .from('subject_assignments')
-            .select('subject_id')
-            .in('class_id', classIds)
-          const subjectIds = [...new Set((sa || []).map(s => s.subject_id))]
-          if (subjectIds.length === 0) return
+          const examLevels = [...new Set(classes
+            .filter(c => classIds.includes(c.id))
+            .map(c => c.level)
+            .filter(Boolean))]
+          if (examLevels.length === 0) return
           const { data: subs } = await supabase
             .from('subjects')
             .select('*')
-            .in('id', subjectIds)
+            .in('level', examLevels)
             .order('subject_name')
           setSubjectOptions(subs || [])
         }
@@ -182,7 +181,7 @@ function EnterMarks() {
       }
     }
     loadSubjects()
-  }, [selectedExamId, exams, examClassesMap, teacherAssignments, isAcademic])
+  }, [selectedExamId, exams, examClassesMap, teacherAssignments, isAcademic, classes])
 
   // ------- When subject changes, load streams -------
   useEffect(() => {
@@ -212,11 +211,17 @@ function EnterMarks() {
             })
           setStreamOptions([...streamSet.values()])
         } else {
-          const { data: cs } = await supabase
+          let streamQuery = supabase
             .from('class_streams')
             .select('*, classes(*), streams(*)')
             .in('class_id', classIds)
             .order('class_id')
+
+          if (sub?.level) {
+            streamQuery = streamQuery.eq('classes.level', sub.level)
+          }
+
+          const { data: cs } = await streamQuery
           setStreamOptions(cs || [])
         }
       } catch (err) {

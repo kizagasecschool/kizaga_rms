@@ -1,12 +1,25 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const { email, token, new_password } = await req.json()
 
     if (!email || !token) {
-      return new Response(JSON.stringify({ error: 'Email and token are required' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Email and token are required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
     }
 
     const supabase = createClient(
@@ -27,23 +40,45 @@ serve(async (req) => {
     if (fetchErr) throw fetchErr
 
     if (!rows || rows.length === 0) {
-      return new Response(JSON.stringify({ error: 'Invalid or expired reset code' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Invalid or expired reset code' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
     }
 
     if (!new_password) {
-      return new Response(JSON.stringify({ valid: true, message: 'Token is valid' }), { status: 200 })
+      return new Response(JSON.stringify({ valid: true, message: 'Token is valid' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
     }
 
     if (new_password.length < 6) {
-      return new Response(JSON.stringify({ error: 'Password must be at least 6 characters' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Password must be at least 6 characters' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
     }
 
-    const { data: userData, error: listErr } = await supabase.auth.admin.listUsers()
-    if (listErr) throw listErr
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 
-    const user = userData.users.find(u => u.email === email)
+    const authRes = await fetch(
+      `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
+      {
+        headers: {
+          apikey: serviceRoleKey,
+          Authorization: `Bearer ${serviceRoleKey}`,
+        },
+      }
+    )
+    const userData = await authRes.json()
+    const user = userData.users?.[0]
     if (!user) {
-      return new Response(JSON.stringify({ error: 'User not found' }), { status: 404 })
+      return new Response(JSON.stringify({ error: 'User not found' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      })
     }
 
     const { error: pwErr } = await supabase.auth.admin.updateUserById(
@@ -58,9 +93,15 @@ serve(async (req) => {
       .update({ used: true })
       .eq('id', rows[0].id)
 
-    return new Response(JSON.stringify({ message: 'Password reset successfully' }), { status: 200 })
+    return new Response(JSON.stringify({ message: 'Password reset successfully' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
   } catch (err) {
     console.error('verify-reset-token error:', err)
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 })
+    return new Response(JSON.stringify({ error: err.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    })
   }
 })

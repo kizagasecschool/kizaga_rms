@@ -1,6 +1,5 @@
 import { useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../../lib/supabase'
 import { useNotification } from '../../context/NotificationContext'
 
 const STEPS = { EMAIL: 1, TOKEN: 2, PASSWORD: 3, DONE: 4 }
@@ -20,14 +19,19 @@ function ForgotPassword() {
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
   async function callEdgeFunction(name, body) {
-    const res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${anonKey}`,
-      },
-      body: JSON.stringify(body),
-    })
+    let res
+    try {
+      res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${anonKey}`,
+        },
+        body: JSON.stringify(body),
+      })
+    } catch {
+      throw new Error('Network error - please check your connection or the edge function may not be deployed.')
+    }
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Something went wrong')
     return data
@@ -38,20 +42,6 @@ function ForgotPassword() {
     setError('')
     setIsLoading(true)
     try {
-      const { data: users } = await supabase.auth.admin.listUsers()
-      const userExists = users?.users?.find(u => u.email === email)
-      if (!userExists) {
-        const { data: existing } = await supabase
-          .from('password_reset_tokens')
-          .select('id')
-          .eq('email', email)
-          .maybeSingle()
-
-        if (!existing) {
-          throw new Error('No account found with that email')
-        }
-      }
-
       await callEdgeFunction('send-reset-token', { email })
       setStep(STEPS.TOKEN)
       showToast('Reset code sent to your email', 'success')

@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback } from 'react'
+import { useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
 import { supabase } from '../lib/supabase'
 import Modal from '../components/Modal'
 import { useNotification } from '../context/NotificationContext'
+import { useAuth } from '../context/AuthContext'
 
 const STATUSES = ['active', 'inactive', 'graduated', 'transferred', 'expelled']
 
@@ -44,6 +46,8 @@ function downloadTemplate() {
 
 function Students() {
   const { showToast } = useNotification()
+  const { profile } = useAuth()
+  const navigate = useNavigate()
   const [loading, setLoading] = useState(true)
 
   const [students, setStudents] = useState([])
@@ -65,7 +69,7 @@ function Students() {
   const [csvData, setCsvData] = useState([])
   const [csvErrors, setCsvErrors] = useState([])
   const [csvImporting, setCsvImporting] = useState(false)
-  const [csvFile, setCsvFile] = useState(null)
+  const [csvFile, setCsvFile] = useState(null) // eslint-disable-line no-unused-vars
 
   const [subjectsOpen, setSubjectsOpen] = useState(false)
   const [subjectsStudent, setSubjectsStudent] = useState(null)
@@ -97,17 +101,13 @@ function Students() {
   }, [])
 
   const [subjects, setSubjects] = useState([])
-  const [classCurricula, setClassCurricula] = useState([])
-  const [curricula, setCurricula] = useState([])
 
   const fetchLookups = useCallback(async () => {
-    const [cRes, sRes, csRes, subRes, ccRes, curRes, comboRes, csbjRes] = await Promise.all([
+    const [cRes, sRes, csRes, subRes, comboRes, csbjRes] = await Promise.all([
       supabase.from('classes').select('*').order('sort_order'),
       supabase.from('streams').select('*').order('stream_name'),
       supabase.from('class_streams').select('*, classes(*), streams(*)'),
       supabase.from('subjects').select('*').order('subject_name'),
-      supabase.from('class_curricula').select('*'),
-      supabase.from('curricula').select('*'),
       supabase.from('combinations').select('*').order('code'),
       supabase.from('combination_subjects').select('*'),
     ])
@@ -115,8 +115,6 @@ function Students() {
     if (sRes.data) setStreams(sRes.data)
     if (csRes.data) setClassStreams(csRes.data)
     if (subRes.data) setSubjects(subRes.data)
-    if (ccRes.data) setClassCurricula(ccRes.data)
-    if (curRes.data) setCurricula(curRes.data)
     if (comboRes.data) setCombinations(comboRes.data)
     if (csbjRes.data) setCombinationSubjects(csbjRes.data)
   }, [])
@@ -185,6 +183,37 @@ function Students() {
     setFormOpen(true)
   }
 
+  const getClassLevelFromIds = (classId, classStreamId) => {
+    if (classId) {
+      const cls = classes.find((c) => c.id === classId)
+      if (cls) return cls.level
+    }
+    const cs = classStreams.find((c) => c.id === classStreamId)
+    const cls = cs ? classes.find((c) => c.id === cs.class_id) : null
+    return cls?.level || null
+  }
+
+  const assignOLevelAllSubjects = async (studentIds) => {
+    const ids = Array.isArray(studentIds) ? studentIds.filter(Boolean) : [studentIds].filter(Boolean)
+    const oLevelIds = subjects
+      .filter((s) => s.level === 'O_LEVEL')
+      .map((s) => s.id)
+
+    if (ids.length === 0 || oLevelIds.length === 0) return
+
+    const rows = []
+    for (const studentId of ids) {
+      for (const subjectId of oLevelIds) {
+        rows.push({ student_id: studentId, subject_id: subjectId })
+      }
+    }
+
+    const { error } = await supabase
+      .from('student_subjects')
+      .upsert(rows, { onConflict: 'student_id,subject_id' })
+    if (error) throw error
+  }
+
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
@@ -200,9 +229,15 @@ function Students() {
       if (editing) {
         const { error } = await supabase.from('students').update(payload).eq('id', editing.id)
         if (error) throw error
+        if (getClassLevelFromIds(payload.class_id, editing.class_stream_id) === 'O_LEVEL') {
+          await assignOLevelAllSubjects(editing.id)
+        }
       } else {
-        const { error } = await supabase.from('students').insert(payload)
+        const { data: inserted, error } = await supabase.from('students').insert(payload).select('id').single()
         if (error) throw error
+        if (getClassLevelFromIds(payload.class_id, payload.class_stream_id) === 'O_LEVEL') {
+          await assignOLevelAllSubjects(inserted.id)
+        }
       }
       await fetchStudents()
       setFormOpen(false)
@@ -326,15 +361,7 @@ function Students() {
   // A-Level: get available combinations for student's class
   const getALevelCombinationsForStudent = () => {
     if (!subjectsStudent) return []
-    const cs = classStreams.find((c) => c.id === subjectsStudent.class_stream_id)
-    const classId = subjectsStudent.class_id || cs?.class_id
-    // Get combination IDs available for this class (from class_combinations)
-    // If class_combinations has data, filter; otherwise show all A-Level combinations
-    return combinations.filter((c) => {
-      // Filter: only combinations whose curriculum is A_LEVEL
-      // (curricula linked via combination.curriculum_id)
-      return true // all combinations are A-Level by design
-    })
+    return combinations.filter(() => true)
   }
 
   const handleSaveSubjects = async () => {
@@ -488,14 +515,24 @@ function Students() {
     setCsvImporting(true)
     let imported = 0
     let failed = 0
+    const oLevelStudentIds = []
     for (const row of csvData) {
-      const { error } = await supabase.from('students').insert(row)
+      const { data: inserted, error } = await supabase.from('students').insert(row).select('id').single()
       if (error) {
         console.error('CSV insert error:', error)
         failed++
       } else {
         imported++
+        if (getClassLevelFromIds(row.class_id, row.class_stream_id) === 'O_LEVEL') {
+          oLevelStudentIds.push(inserted.id)
+        }
       }
+    }
+    try {
+      await assignOLevelAllSubjects(oLevelStudentIds)
+    } catch (err) {
+      console.error('CSV subject assignment error:', err)
+      showToast('Some students were imported, but subjects were not fully assigned.', 'warning')
     }
     setCsvImporting(false)
     setCsvOpen(false)
@@ -520,24 +557,7 @@ function Students() {
         })()
     const studentClassLevel = studentClass?.level || ''
     
-    // Filter by level (O_LEVEL vs A_LEVEL)
-    let filtered = subjects.filter((s) => s.level === studentClassLevel)
-    
-    if (studentClassLevel === 'O_LEVEL') {
-      const studentClassCurriculumRel = studentClass ? classCurricula.find((cc) => cc.class_id === studentClass.id) : null
-      const studentClassCurriculum = studentClassCurriculumRel ? curricula.find((c) => c.id === studentClassCurriculumRel.curriculum_id) : null
-      
-      let tag = null
-      if (studentClassCurriculum?.name) {
-        const name = studentClassCurriculum.name.toLowerCase()
-        tag = (name.includes('new') || name.includes('mpya') || name.includes('cbc') || name.includes('competency')) ? 'NEW' : 'OLD'
-      }
-      
-      if (tag) {
-        filtered = filtered.filter((s) => !s.curriculum || s.curriculum === tag)
-      }
-    }
-    return filtered
+    return subjects.filter((s) => s.level === studentClassLevel)
   }
 
   if (loading) {
@@ -576,18 +596,15 @@ function Students() {
           </button>
           <button
             onClick={() => {
-              if (students.length === 0) {
-                showToast('No students available', 'info')
-                return
-              }
-              openSubjects(students[0])
+              const base = profile?.role === 'admin' ? '/admin' : '/academic'
+              navigate(`${base}/class-subjects`)
             }}
             className="px-4 py-2 bg-emerald-600 text-white text-sm font-medium rounded-lg hover:bg-emerald-700 transition flex items-center gap-2"
           >
             <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v6h4.5m4.5 0a9 9 0 11-18 0 9 9 0 0118 0z" />
             </svg>
-            Subject Assignments
+            Class Subject Assignments
           </button>
           <button
             onClick={() => setStreamAssignOpen(true)}
@@ -1397,6 +1414,9 @@ function Students() {
                   .update({ class_stream_id: streamAssignStreamId })
                   .in('id', streamAssignSelected)
                 if (error) throw error
+                if (getClassLevelFromIds(streamAssignClassId, streamAssignStreamId) === 'O_LEVEL') {
+                  await assignOLevelAllSubjects(streamAssignSelected)
+                }
                 await fetchStudents()
                 showToast(`Wanafunzi ${streamAssignSelected.length} wamepewa stream`, 'success')
                 setStreamAssignOpen(false)

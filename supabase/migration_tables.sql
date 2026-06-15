@@ -1450,49 +1450,21 @@ WHERE NOT EXISTS (SELECT 1 FROM combinations x WHERE x.code = v.code);
 -- FUNCTION: Register a teacher (creates auth user, profile, teacher record)
 -- Bypasses signup rate limits by using SECURITY DEFINER + auth.create_user()
 -- ============================================================
-CREATE OR REPLACE FUNCTION public.register_teacher(
-  p_email TEXT,
-  p_password TEXT,
-  p_full_name TEXT,
-  p_employee_number TEXT,
-  p_qualification TEXT DEFAULT NULL,
-  p_phone TEXT DEFAULT NULL
-) RETURNS JSONB
-SECURITY DEFINER
-SET search_path = public
-AS $$
-DECLARE
-  v_user_id UUID;
-  v_teacher_id UUID;
-BEGIN
-  -- Create auth user (bypasses rate limits via SECURITY DEFINER)
-  v_user_id := auth.create_user(
-    email := p_email,
-    password := p_password,
-    email_confirm := true,
-    user_metadata := jsonb_build_object('full_name', p_full_name, 'role', 'teacher')
-  );
+-- ============================================================
+-- NOTE: register_teacher was previously here as a plpgsql
+-- function using auth.create_user(). That approach caused
+-- "Unexpected token" HTML errors because auth.create_user()
+-- is unreliable in plpgsql context. It has been replaced by
+-- a Vercel serverless route at /api/register-teacher that
+-- uses supabase.auth.admin.createUser() server-side.
+-- See api/register-teacher.js
+-- ============================================================
+DROP FUNCTION IF EXISTS public.register_teacher;
 
-  -- Upsert profile (handles auto-created profiles by trigger)
-  INSERT INTO public.profiles (id, email, full_name, role)
-  VALUES (v_user_id, p_email, p_full_name, 'teacher')
-  ON CONFLICT (id) DO UPDATE SET
-    email = EXCLUDED.email,
-    full_name = EXCLUDED.full_name,
-    role = EXCLUDED.role;
-
-  -- Create teacher record
-  INSERT INTO public.teachers (employee_number, profile_id, qualification, phone, status)
-  VALUES (p_employee_number, v_user_id, p_qualification, p_phone, 'active')
-  RETURNING id INTO v_teacher_id;
-
-  RETURN jsonb_build_object(
-    'user_id', v_user_id,
-    'teacher_id', v_teacher_id,
-    'employee_number', p_employee_number
-  );
-END;
-$$ LANGUAGE plpgsql;
+-- ============================================================
+-- Make curriculum_id nullable in combinations (curriculum removed for A-Level)
+-- ============================================================
+ALTER TABLE combinations ALTER COLUMN curriculum_id DROP NOT NULL;
 
 -- ============================================================
 -- END OF SCHEMA

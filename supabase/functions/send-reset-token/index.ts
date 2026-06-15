@@ -4,25 +4,30 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY')
 const FROM_EMAIL = Deno.env.get('RESEND_FROM_EMAIL') || 'noreply@kizaga-school.ac.tz'
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+}
+
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders })
+  }
+
   try {
     const { email } = await req.json()
     if (!email) {
-      return new Response(JSON.stringify({ error: 'Email is required' }), { status: 400 })
+      return new Response(JSON.stringify({ error: 'Email is required' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400,
+      })
     }
 
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL')!,
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     )
-
-    const { data: users, error: userErr } = await supabase.auth.admin.listUsers()
-    if (userErr) throw userErr
-
-    const userExists = users.users.find(u => u.email === email)
-    if (!userExists) {
-      return new Response(JSON.stringify({ error: 'No account found with that email' }), { status: 404 })
-    }
 
     const token = Math.floor(100000 + Math.random() * 900000).toString()
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString()
@@ -35,7 +40,10 @@ serve(async (req) => {
 
     if (!RESEND_API_KEY) {
       console.warn('RESEND_API_KEY not set — returning token in response for development')
-      return new Response(JSON.stringify({ message: 'Reset code sent to your email', token }), { status: 200 })
+      return new Response(JSON.stringify({ message: 'Reset code sent to your email', token }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      })
     }
 
     const res = await fetch('https://api.resend.com/emails', {
@@ -74,12 +82,21 @@ serve(async (req) => {
     if (!res.ok) {
       const err = await res.text()
       console.error('Resend API error:', err)
-      return new Response(JSON.stringify({ error: 'Failed to send email' }), { status: 500 })
+      return new Response(JSON.stringify({ error: 'Failed to send email' }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      })
     }
 
-    return new Response(JSON.stringify({ message: 'Reset code sent to your email' }), { status: 200 })
+    return new Response(JSON.stringify({ message: 'Reset code sent to your email' }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 200,
+    })
   } catch (err) {
     console.error('send-reset-token error:', err)
-    return new Response(JSON.stringify({ error: err.message }), { status: 500 })
+    return new Response(JSON.stringify({ error: err.message }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500,
+    })
   }
 })

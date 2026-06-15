@@ -4,7 +4,6 @@ import Modal from '../../components/Modal'
 import { useNotification } from '../../context/NotificationContext'
 
 const LEVELS = ['O_LEVEL', 'A_LEVEL']
-const CURRICULUMS = ['OLD', 'NEW']
 const SUBJECT_TYPES = ['COMPULSORY', 'OPTIONAL']
 const ROLES = ['CORE', 'SUBSIDIARY', 'OPTIONAL']
 
@@ -16,7 +15,6 @@ function AcademicSubjects() {
   const [subjects, setSubjects] = useState([])
   const [combinations, setCombinations] = useState([])
   const [combinationSubjects, setCombinationSubjects] = useState([])
-  const [curriculumFilter, setCurriculumFilter] = useState('all')
 
   const [subjectModalOpen, setSubjectModalOpen] = useState(false)
   const [comboModalOpen, setComboModalOpen] = useState(false)
@@ -56,10 +54,6 @@ function AcademicSubjects() {
   const oLevelSubjects = subjects.filter((s) => s.level === 'O_LEVEL')
   const aLevelSubjects = subjects.filter((s) => s.level === 'A_LEVEL')
 
-  const filteredOLevel = curriculumFilter === 'all'
-    ? oLevelSubjects
-    : oLevelSubjects.filter((s) => s.curriculum === curriculumFilter)
-
   const openSubjectCreate = () => {
     setEditingSubject(null)
     setFormData({
@@ -67,7 +61,6 @@ function AcademicSubjects() {
       subject_name: '',
       level: activeLevel,
       subject_type: 'COMPULSORY',
-      curriculum: '',
     })
     setSubjectModalOpen(true)
   }
@@ -79,7 +72,6 @@ function AcademicSubjects() {
       subject_name: subject.subject_name,
       level: subject.level,
       subject_type: subject.subject_type,
-      curriculum: subject.curriculum ?? '',
     })
     setSubjectModalOpen(true)
   }
@@ -93,7 +85,7 @@ function AcademicSubjects() {
         subject_name: formData.subject_name,
         level: formData.level,
         subject_type: formData.subject_type,
-        curriculum: formData.level === 'O_LEVEL' ? (formData.curriculum || null) : null,
+        curriculum: null,
       }
       if (editingSubject) {
         const { error } = await supabase.from('subjects').update(payload).eq('id', editingSubject.id)
@@ -126,8 +118,8 @@ function AcademicSubjects() {
     }
   }
 
-  const comboName = (combo) => combo.name || combo.combination_name || ''
-  const comboDesc = (combo) => combo.description || ''
+  const comboName = (combo) => combo?.name || combo?.combination_name || ''
+  const comboDesc = (combo) => combo?.description || ''
 
   const openComboCreate = () => {
     setEditingCombo(null)
@@ -286,22 +278,7 @@ function AcademicSubjects() {
       {activeLevel === 'O_LEVEL' && (
         <div>
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              <span className="text-sm text-gray-500">Curriculum:</span>
-              {['all', ...CURRICULUMS].map((c) => (
-                <button
-                  key={c}
-                  onClick={() => setCurriculumFilter(c)}
-                  className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition ${
-                    curriculumFilter === c
-                      ? 'bg-maroon-50 border-maroon-200 text-maroon-700'
-                      : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-                  }`}
-                >
-                  {c === 'all' ? 'All' : c === 'OLD' ? 'Old Curriculum' : 'New Curriculum'}
-                </button>
-              ))}
-            </div>
+            <p className="text-sm text-gray-500">{oLevelSubjects.length} O-Level subject(s)</p>
             <button
               onClick={openSubjectCreate}
               className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
@@ -317,20 +294,19 @@ function AcademicSubjects() {
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject Name</th>
-                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Curriculum</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                   <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
-                {filteredOLevel.length === 0 && (
+                {oLevelSubjects.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-400">
+                    <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-400">
                       No O-Level subjects found. Click "+ Add Subject" to create one.
                     </td>
                   </tr>
                 )}
-                {filteredOLevel.map((s) => (
+                {oLevelSubjects.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50 transition">
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
@@ -338,15 +314,6 @@ function AcademicSubjects() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{s.subject_name}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        s.curriculum === 'NEW'
-                          ? 'bg-amber-50 text-amber-700'
-                          : 'bg-blue-50 text-blue-700'
-                      }`}>
-                        {s.curriculum === 'NEW' ? 'New Curriculum' : 'Old Curriculum'}
-                      </span>
-                    </td>
                     <td className="px-5 py-3.5">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                         s.subject_type === 'COMPULSORY'
@@ -535,32 +502,17 @@ function AcademicSubjects() {
               />
             </div>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
-              <select
-                value={formData.subject_type || 'COMPULSORY'}
-                onChange={(e) => setFormData({ ...formData, subject_type: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-              >
-                {SUBJECT_TYPES.map((t) => (
-                  <option key={t} value={t}>{t === 'COMPULSORY' ? 'Compulsory' : 'Optional'}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Curriculum</label>
-              <select
-                value={formData.curriculum}
-                onChange={(e) => setFormData({ ...formData, curriculum: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-              >
-                <option value="">Shared (Both)</option>
-                {CURRICULUMS.map((c) => (
-                  <option key={c} value={c}>{c === 'OLD' ? 'Old Curriculum' : 'New Curriculum'}</option>
-                ))}
-              </select>
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <select
+              value={formData.subject_type || 'COMPULSORY'}
+              onChange={(e) => setFormData({ ...formData, subject_type: e.target.value })}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+            >
+              {SUBJECT_TYPES.map((t) => (
+                <option key={t} value={t}>{t === 'COMPULSORY' ? 'Compulsory' : 'Optional'}</option>
+              ))}
+            </select>
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button

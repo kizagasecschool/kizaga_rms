@@ -71,15 +71,14 @@ function Results() {
     const loadData = async () => {
       setLoadingData(true)
       try {
-        const [saRes] = await Promise.all([
-          supabase
-            .from('subject_assignments')
-            .select('*, subjects!inner(*)')
-            .eq('class_id', selectedClassId)
-            .order('subject_id'),
-        ])
+        const selectedClass = classes.find(c => c.id === selectedClassId)
+        const { data: subjectData } = await supabase
+          .from('subjects')
+          .select('*')
+          .eq('level', selectedClass?.level || 'O_LEVEL')
+          .order('subject_name')
 
-        const assignedSubjects = (saRes.data || []).map(sa => sa.subjects).filter(Boolean)
+        const assignedSubjects = subjectData || []
         setSubjects(assignedSubjects)
 
         let allStudents = []
@@ -100,7 +99,7 @@ function Results() {
             .eq('class_streams.class_id', selectedClassId)
             .order('surname')
           if (byJoin?.length > 0) {
-            allStudents = byJoin.map(s => { const { class_streams, ...rest } = s; return rest })
+            allStudents = byJoin.map(s => { const { class_streams: _, ...rest } = s; return rest })
           }
         }
         setStudents(allStudents)
