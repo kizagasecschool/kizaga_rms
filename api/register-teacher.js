@@ -47,10 +47,10 @@ export default async function handler(req, res) {
 
     const userId = authData.user.id
 
-    // Step 2: Insert profile (clean up auth user on failure)
+    // Step 2: Upsert profile (handles trigger-created row)
     const { error: profileError } = await supabase
       .from('profiles')
-      .insert({ id: userId, email, full_name, role: 'teacher' })
+      .upsert({ id: userId, email, full_name, role: 'teacher' })
 
     if (profileError) {
       await supabase.auth.admin.deleteUser(userId).catch(() => {})
