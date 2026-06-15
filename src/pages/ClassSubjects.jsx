@@ -21,6 +21,7 @@ function ClassSubjects() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [savingStudentId, setSavingStudentId] = useState(null) // track which student is being saved
+  const [excludedSubjects, setExcludedSubjects] = useState(new Set())
 
   const fetchLookups = useCallback(async () => {
     const [cRes, csRes, subRes, combRes, csSubRes, ccombRes] = await Promise.all([
@@ -141,6 +142,14 @@ function ClassSubjects() {
     }
     setStudentSubjects(ssMap)
     setStudentCombinations(scMap)
+
+    // Load excluded subjects for this class
+    const { data: exclData } = await supabase
+      .from('class_excluded_subjects')
+      .select('subject_id')
+      .eq('class_id', classId)
+    setExcludedSubjects(new Set((exclData || []).map(r => r.subject_id)))
+
     setLoading(false)
   }, [classStreams, classes, subjects])
 
@@ -200,8 +209,33 @@ function ClassSubjects() {
       .filter(Boolean)
   }
 
-  // The actual subjects to display in the O-Level grid
-  const displaySubjects = classLevel === 'O_LEVEL' ? getClassSubjects() : []
+  // The actual subjects to display in the O-Level grid (excluded subjects hidden)
+  const displaySubjects = classLevel === 'O_LEVEL'
+    ? getClassSubjects().filter(s => !excludedSubjects.has(s.id))
+    : []
+
+  const handleToggleExcludeSubject = async (subjectId) => {
+    const isExcluded = excludedSubjects.has(subjectId)
+    try {
+      if (isExcluded) {
+        await supabase
+          .from('class_excluded_subjects')
+          .delete()
+          .eq('class_id', selectedClassId)
+          .eq('subject_id', subjectId)
+        setExcludedSubjects(prev => { const n = new Set(prev); n.delete(subjectId); return n })
+        showToast('Subject enabled for this class', 'success')
+      } else {
+        await supabase
+          .from('class_excluded_subjects')
+          .insert({ class_id: selectedClassId, subject_id: subjectId })
+        setExcludedSubjects(prev => { const n = new Set(prev); n.add(subjectId); return n })
+        showToast('Subject locked for this class', 'success')
+      }
+    } catch (err) {
+      showToast('Failed to update: ' + (err.message || ''), 'error')
+    }
+  }
 
   const handleToggleCombination = async (combinationId) => {
     setSaving(true)
@@ -310,8 +344,10 @@ function ClassSubjects() {
     }
   }
 
+  const allClassSubjects = classLevel === 'O_LEVEL' ? getClassSubjects() : []
   const compulsorySubjects = displaySubjects.filter((s) => s?.subject_type === 'COMPULSORY')
   const optionalSubjects = displaySubjects.filter((s) => s?.subject_type !== 'COMPULSORY')
+  const excludedCount = allClassSubjects.length - displaySubjects.length
 
   const classComboIds = getClassComboIds()
 
@@ -416,18 +452,19 @@ function ClassSubjects() {
         </div>
       )}
 
-      {/* O-Level: Subject summary */}
+      {/* O-Level: Subject summary with lock/unlock */}
       {selectedClassId && classLevel === 'O_LEVEL' && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
           <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
             <div>
               <h2 className="text-sm font-semibold text-gray-800">Subjects for this Class</h2>
               <p className="text-xs text-gray-500 mt-0.5">
-                All O-Level subjects are assigned to every student automatically. Optional subjects can be removed per student below.
+                Click the lock icon to exclude a subject from this class entirely. Excluded subjects won't appear in marks entry or results.
               </p>
             </div>
             <span className="text-xs text-gray-400">
               {students.length} student(s) &middot; {compulsorySubjects.length} compulsory &middot; {optionalSubjects.length} optional
+              {excludedCount > 0 && <span className="text-red-500 font-medium ml-1">&middot; {excludedCount} locked</span>}
             </span>
           </div>
           <div className="p-4">
@@ -437,23 +474,44 @@ function ClassSubjects() {
               </p>
             )}
             <div className="flex flex-wrap gap-2">
-              {getAvailableSubjects().map((sub) => (
-                  <span
+              {getAvailableSubjects().map((sub) => {
+                const isExcluded = excludedSubjects.has(sub.id)
+                return (
+                  <div
                     key={sub.id}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium ${
-                      sub.subject_type === 'COMPULSORY'
-                        ? 'border-blue-200 bg-blue-50 text-blue-700'
-                        : 'border-amber-200 bg-amber-50 text-amber-700'
+                    className={`group inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition ${
+                      isExcluded
+                        ? 'border-gray-200 bg-gray-50 text-gray-400'
+                        : sub.subject_type === 'COMPULSORY'
+                          ? 'border-blue-200 bg-blue-50 text-blue-700'
+                          : 'border-amber-200 bg-amber-50 text-amber-700'
                     }`}
                   >
-                    <span className={`w-4 h-4 rounded-full ${sub.subject_type === 'COMPULSORY' ? 'bg-blue-500' : 'bg-amber-500'}`} />
-                    {sub.subject_name}
-                    <span className="text-xs opacity-60">({sub.subject_code})</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-white/70">
-                      {sub.subject_type === 'COMPULSORY' ? 'Auto' : 'Optional'}
+                    <span className={`w-4 h-4 rounded-full shrink-0 ${isExcluded ? 'bg-gray-300' : sub.subject_type === 'COMPULSORY' ? 'bg-blue-500' : 'bg-amber-500'}`} />
+                    <span className={isExcluded ? 'line-through' : ''}>
+                      {sub.subject_name}
                     </span>
-                  </span>
-              ))}
+                    <span className="text-xs opacity-60">({sub.subject_code})</span>
+                    <button
+                      onClick={() => handleToggleExcludeSubject(sub.id)}
+                      title={isExcluded ? 'Enable this subject for the class' : 'Lock/exclude this subject for the class'}
+                      className={`ml-1 p-1 rounded transition ${
+                        isExcluded
+                          ? 'text-red-500 hover:bg-red-50'
+                          : 'text-gray-400 hover:text-red-500 hover:bg-red-50 opacity-0 group-hover:opacity-100'
+                      }`}
+                    >
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        {isExcluded ? (
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        ) : (
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                        )}
+                      </svg>
+                    </button>
+                  </div>
+                )
+              })}
             </div>
           </div>
         </div>
@@ -658,11 +716,11 @@ function ClassSubjects() {
             <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 min-w-[200px]">
+                  <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider sticky left-0 bg-gray-50 z-10 min-w-[140px]">
                     Student
                   </th>
                   {displaySubjects.map((sub) => (
-                    <th key={sub.id} className="text-center px-2 py-3 text-xs min-w-[100px]">
+                    <th key={sub.id} className="text-center px-1.5 py-3 text-xs min-w-[80px]">
                       <div className="font-semibold text-gray-700">{sub.subject_code}</div>
                       <div className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-medium mt-0.5 ${
                         sub.subject_type === 'COMPULSORY' ? 'bg-blue-50 text-blue-600' :
@@ -731,6 +789,7 @@ function ClassSubjects() {
               {students.length} student(s) across {streamIdsForClass.length} stream(s) &middot;
               <span className="text-blue-600 font-medium ml-1">{compulsorySubjects.length} compulsory</span> (locked) &middot;
               <span className="text-amber-600 font-medium ml-1">{optionalSubjects.length} optional</span> (add/remove per student)
+              {excludedCount > 0 && <span className="text-red-500 font-medium ml-1">&middot; {excludedCount} excluded</span>}
             </span>
           </div>
         </div>

@@ -4,8 +4,42 @@ import Modal from '../../components/Modal'
 import { useNotification } from '../../context/NotificationContext'
 
 const LEVELS = ['O_LEVEL', 'A_LEVEL']
-const SUBJECT_TYPES = ['COMPULSORY', 'OPTIONAL']
+const SUBJECT_TYPES = ['COMPULSORY', 'OPTIONAL', 'ELECTIVE']
 const ROLES = ['CORE', 'SUBSIDIARY', 'OPTIONAL']
+
+const subjectTypeLabel = (type, level) => {
+  if (level === 'A_LEVEL') {
+    switch (type) {
+      case 'COMPULSORY': return 'Principal'
+      case 'ELECTIVE':   return 'Subsidiary'
+      case 'OPTIONAL':   return 'Optional'
+      default: return type
+    }
+  }
+  switch (type) {
+    case 'COMPULSORY': return 'Compulsory'
+    case 'OPTIONAL':   return 'Optional'
+    case 'ELECTIVE':   return 'Elective'
+    default: return type
+  }
+}
+
+const subjectTypeColor = (type, level) => {
+  if (level === 'A_LEVEL') {
+    switch (type) {
+      case 'COMPULSORY': return 'bg-emerald-50 text-emerald-700'
+      case 'ELECTIVE':   return 'bg-violet-50 text-violet-700'
+      case 'OPTIONAL':   return 'bg-amber-50 text-amber-700'
+      default: return 'bg-gray-100 text-gray-600'
+    }
+  }
+  switch (type) {
+    case 'COMPULSORY': return 'bg-rose-50 text-rose-700'
+    case 'OPTIONAL':   return 'bg-teal-50 text-teal-700'
+    case 'ELECTIVE':   return 'bg-gray-100 text-gray-600'
+    default: return 'bg-gray-100 text-gray-600'
+  }
+}
 
 function AcademicSubjects() {
   const { showToast } = useNotification()
@@ -214,8 +248,11 @@ function AcademicSubjects() {
       await fetchCombinationSubjects()
       showToast(existing ? 'Subject removed from combination' : 'Subject added to combination', 'success')
     } catch (err) {
-      console.error('Toggle error:', err)
-      showToast('Failed to update subject.', 'error')
+      console.error('Save error:', err)
+      const msg = err?.code === '23505'
+        ? `Subject code "${formData.subject_code.toUpperCase()}" already exists`
+        : err.message || 'Unknown error'
+      showToast('Failed to save. ' + msg, 'error')
     } finally {
       setSaving(false)
     }
@@ -315,12 +352,8 @@ function AcademicSubjects() {
                     </td>
                     <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{s.subject_name}</td>
                     <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        s.subject_type === 'COMPULSORY'
-                          ? 'bg-rose-50 text-rose-700'
-                          : 'bg-teal-50 text-teal-700'
-                      }`}>
-                        {s.subject_type === 'COMPULSORY' ? 'Compulsory' : 'Optional'}
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${subjectTypeColor(s.subject_type, 'O_LEVEL')}`}>
+                        {subjectTypeLabel(s.subject_type, 'O_LEVEL')}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-right">
@@ -350,12 +383,20 @@ function AcademicSubjects() {
         <div>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <p className="text-sm text-gray-500">{combinations.length} combination(s)</p>
-            <button
-              onClick={openComboCreate}
-              className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
-            >
-              + Add Combination
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={openSubjectCreate}
+                className="px-4 py-2 bg-white text-maroon-700 text-sm font-medium rounded-lg border border-maroon-300 hover:bg-maroon-50 transition"
+              >
+                + Add A-Level Subject
+              </button>
+              <button
+                onClick={openComboCreate}
+                className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
+              >
+                + Add Combination
+              </button>
+            </div>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -510,7 +551,7 @@ function AcademicSubjects() {
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
               {SUBJECT_TYPES.map((t) => (
-                <option key={t} value={t}>{t === 'COMPULSORY' ? 'Compulsory' : 'Optional'}</option>
+                <option key={t} value={t}>{subjectTypeLabel(t, formData.level)}</option>
               ))}
             </select>
           </div>

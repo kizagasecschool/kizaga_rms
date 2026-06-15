@@ -9,12 +9,14 @@ import AdminDashboard from './pages/admin/Dashboard'
 import AdminClasses from './pages/admin/Classes'
 import AdminSubjects from './pages/admin/Subjects'
 import AdminUsers from './pages/admin/Users'
+import SchoolSettings from './pages/admin/SchoolSettings'
 import HeadmasterDashboard from './pages/headmaster/Dashboard'
 import AcademicDashboard from './pages/academic/Dashboard'
 import AcademicClasses from './pages/academic/Classes'
 import AcademicSubjects from './pages/academic/Subjects'
 import AcademicExams from './pages/academic/Exams'
 import AcademicResults from './pages/academic/Results'
+import ViewMarks from './pages/academic/ViewMarks'
 import AcademicYears from './pages/academic/AcademicYears'
 import EnterMarks from './pages/teacher/EnterMarks'
 import MyStudents from './pages/teacher/MyStudents'
@@ -53,6 +55,7 @@ function App() {
                   <Route path="students" element={<Students />} />
                   <Route path="class-subjects" element={<ClassSubjects />} />
                   <Route path="academic-years" element={<AcademicYears />} />
+                  <Route path="school-settings" element={<SchoolSettings />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -80,6 +83,7 @@ function App() {
                   <Route path="class-subjects" element={<ClassSubjects />} />
                   <Route path="exams" element={<AcademicExams />} />
                   <Route path="results" element={<AcademicResults />} />
+                  <Route path="view-marks" element={<ViewMarks />} />
                   <Route path="academic-years" element={<AcademicYears />} />
                   <Route path="enter-marks" element={<EnterMarks />} />
                 </Routes>

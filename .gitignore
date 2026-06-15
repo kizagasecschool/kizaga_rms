@@ -6,3 +6,5 @@ dist
 # Screenshots
 *.png
 *.PNG
+.vercel
+.env*

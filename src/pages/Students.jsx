@@ -1004,15 +1004,15 @@ function Students() {
           {csvData.length > 0 && (
             <div>
               <p className="text-sm font-medium text-gray-700 mb-2">{csvData.length} valid row(s) ready to import</p>
-              <div className="max-h-48 overflow-y-auto border border-gray-200 rounded-lg">
+              <div className="max-h-48 overflow-y-auto overflow-x-auto border border-gray-200 rounded-lg">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-3 py-2 font-medium text-gray-500">#</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-500">Admission</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-500">Name</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-500">Gender</th>
-                      <th className="text-left px-3 py-2 font-medium text-gray-500">Class</th>
+                      <th className="text-left px-2 py-2 font-medium text-gray-500 sticky left-0 bg-gray-50 z-10">#</th>
+                      <th className="text-left px-2 py-2 font-medium text-gray-500 sticky left-[2rem] bg-gray-50 z-10">Admission</th>
+                      <th className="text-left px-2 py-2 font-medium text-gray-500">Name</th>
+                      <th className="text-left px-2 py-2 font-medium text-gray-500">Gender</th>
+                      <th className="text-left px-2 py-2 font-medium text-gray-500">Class</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-100">
@@ -1022,11 +1022,11 @@ function Students() {
                       const displayName = cls ? cls.class_name : (cs ? `${cs.class_name} - ${cs.stream_name}` : '-')
                       return (
                         <tr key={i}>
-                          <td className="px-3 py-2 text-gray-500">{i + 1}</td>
-                          <td className="px-3 py-2 font-medium text-gray-700">{row.admission_number}</td>
-                          <td className="px-3 py-2 text-gray-600">{row.surname}, {row.first_name}</td>
-                          <td className="px-3 py-2 text-gray-600">{row.gender}</td>
-                          <td className="px-3 py-2 text-gray-600">{displayName}</td>
+                          <td className="px-2 py-2 text-gray-500 sticky left-0 bg-white z-10">{i + 1}</td>
+                          <td className="px-2 py-2 font-medium text-gray-700 sticky left-[2rem] bg-white z-10">{row.admission_number}</td>
+                          <td className="px-2 py-2 text-gray-600">{row.surname}, {row.first_name}</td>
+                          <td className="px-2 py-2 text-gray-600">{row.gender}</td>
+                          <td className="px-2 py-2 text-gray-600">{displayName}</td>
                         </tr>
                       )
                     })}
@@ -1355,20 +1355,20 @@ function Students() {
                   Wanafunzi wote wa darasa hili wameshapewa stream
                 </p>
               ) : (
-                <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-xl">
+                <div className="max-h-64 overflow-y-auto overflow-x-auto border border-gray-200 rounded-xl">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="bg-gray-50 border-b border-gray-200">
-                        <th className="w-10 px-3 py-2.5"></th>
-                        <th className="text-left px-3 py-2.5 font-medium text-gray-500">Admission</th>
-                        <th className="text-left px-3 py-2.5 font-medium text-gray-500">Jina</th>
-                        <th className="text-left px-3 py-2.5 font-medium text-gray-500">Gender</th>
+                        <th className="w-10 px-2 py-2.5 sticky left-0 bg-gray-50 z-10"></th>
+                        <th className="text-left px-2 py-2.5 font-medium text-gray-500">Admission</th>
+                        <th className="text-left px-2 py-2.5 font-medium text-gray-500">Jina</th>
+                        <th className="text-left px-2 py-2.5 font-medium text-gray-500">Gender</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {streamAssignStudents.map((s) => (
                         <tr key={s.id} className={`hover:bg-gray-50 transition ${streamAssignSelected.includes(s.id) ? 'bg-blue-50' : ''}`}>
-                          <td className="px-3 py-2.5">
+                          <td className="px-2 py-2.5 sticky left-0 bg-white z-10">
                             <input
                               type="checkbox"
                               checked={streamAssignSelected.includes(s.id)}

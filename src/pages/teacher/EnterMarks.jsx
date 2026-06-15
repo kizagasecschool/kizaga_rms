@@ -242,6 +242,28 @@ function EnterMarks() {
       setLoading(true)
       setNoAssignMsg('')
       try {
+        // Check if subject is excluded for this class
+        const { data: csRow } = await supabase
+          .from('class_streams')
+          .select('class_id')
+          .eq('id', selectedStreamId)
+          .single()
+        if (csRow?.class_id) {
+          const { data: excl } = await supabase
+            .from('class_excluded_subjects')
+            .select('id')
+            .eq('class_id', csRow.class_id)
+            .eq('subject_id', selectedSubjectId)
+            .maybeSingle()
+          if (excl) {
+            setNoAssignMsg('This subject is locked/excluded for this class. Enable it in Class Subjects.')
+            setStudents([])
+            setMarksData({})
+            setLoading(false)
+            return
+          }
+        }
+
         const [ssRes, mRes] = await Promise.all([
           supabase.from('student_subjects').select('student_id').eq('subject_id', selectedSubjectId),
           supabase.from('marks').select('*').eq('exam_id', selectedExamId).eq('subject_id', selectedSubjectId),
@@ -532,23 +554,23 @@ function EnterMarks() {
           ) : (
           /* Table: same on mobile & desktop */
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[500px]">
+            <table className="w-full">
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8 sm:w-10">#</th>
-                  <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[130px] sm:min-w-[160px]">Student Name</th>
-                  <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-20 sm:w-24">Adm No</th>
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24 sm:w-28">
-                    Theory (100)
+                  <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                  <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[120px]">Student Name</th>
+                  <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">Adm No</th>
+                  <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[80px]">
+                    Theory <span className="text-[10px] font-normal text-gray-400">(100)</span>
                     {showPractical && <span className="block text-[10px] font-normal text-gray-400">marks</span>}
                   </th>
                   {showPractical && (
-                    <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24 sm:w-28">
-                      Practical (50)
+                    <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[80px]">
+                      Pract <span className="text-[10px] font-normal text-gray-400">(50)</span>
                       <span className="block text-[10px] font-normal text-gray-400">prac</span>
                     </th>
                   )}
-                  <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-20 sm:w-24">Absent</th>
+                  <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-14">Absent</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
