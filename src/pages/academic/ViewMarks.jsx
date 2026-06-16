@@ -17,6 +17,9 @@ function ViewMarks() {
   const [selectedExamId, setSelectedExamId] = useState(examIdParam || '')
   const [selectedExam, setSelectedExam] = useState(null)
 
+  const [academicYears, setAcademicYears] = useState([])
+  const [selectedYearId, setSelectedYearId] = useState('')
+
   const [examClasses, setExamClasses] = useState([])
   const [classes, setClasses] = useState([])
   const [selectedClassId, setSelectedClassId] = useState('')
@@ -31,14 +34,16 @@ function ViewMarks() {
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      const [eRes, cRes, stRes] = await Promise.all([
+      const [eRes, cRes, stRes, yRes] = await Promise.all([
         supabase.from('exams').select('*').order('created_at', { ascending: false }),
         supabase.from('classes').select('*').order('sort_order'),
         supabase.from('exam_classes').select('*'),
+        supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
       ])
       if (eRes.data) setExams(eRes.data)
       if (cRes.data) setClasses(cRes.data)
       if (stRes.data) setExamClasses(stRes.data)
+      if (yRes.data) setAcademicYears(yRes.data)
       setLoading(false)
     }
     load()
@@ -83,38 +88,52 @@ function ViewMarks() {
         const assignedSubjects = (sRes.data || []).filter(s => !excludedIds.has(s.id))
         setSubjects(assignedSubjects)
 
-        let allStudents = []
-        const { data: byClassId } = await supabase
-          .from('students')
-          .select('*')
-          .eq('class_id', selectedClassId)
-          .order('surname')
-        if (byClassId?.length > 0) {
-          allStudents = byClassId
-        }
-        if (allStudents.length === 0) {
-          const { data: byJoin } = await supabase
-            .from('students')
-            .select('*, class_streams!inner(*)')
-            .eq('class_streams.class_id', selectedClassId)
-            .order('surname')
-          if (byJoin?.length > 0) {
-            allStudents = byJoin.map(s => { const { class_streams: _, ...rest } = s; return rest })
-          }
-        }
-        setStudents(allStudents)
+        let loadedStudents = []
+        let loadedMarks = []
 
-        if (assignedSubjects.length > 0 && allStudents.length > 0) {
-          const { data: mRes } = await supabase
+        if (assignedSubjects.length > 0) {
+          const { data: mData } = await supabase
             .from('marks')
             .select('*')
             .eq('exam_id', selectedExamId)
             .in('subject_id', assignedSubjects.map(s => s.id))
-            .in('student_id', allStudents.map(s => s.id))
-          setMarks(mRes || [])
-        } else {
-          setMarks([])
+          loadedMarks = mData || []
+
+          const studentIdsFromMarks = [...new Set(loadedMarks.map(m => m.student_id))]
+
+          if (studentIdsFromMarks.length > 0) {
+            const { data: sData } = await supabase
+              .from('students')
+              .select('*')
+              .in('id', studentIdsFromMarks)
+              .order('surname')
+            loadedStudents = sData || []
+          }
+
+          if (loadedStudents.length === 0) {
+            const { data: byClassId } = await supabase
+              .from('students')
+              .select('*')
+              .eq('class_id', selectedClassId)
+              .order('surname')
+            if (byClassId?.length > 0) {
+              loadedStudents = byClassId
+            }
+            if (loadedStudents.length === 0) {
+              const { data: byJoin } = await supabase
+                .from('students')
+                .select('*, class_streams!inner(*)')
+                .eq('class_streams.class_id', selectedClassId)
+                .order('surname')
+              if (byJoin?.length > 0) {
+                loadedStudents = byJoin.map(s => { const { class_streams: _, ...rest } = s; return rest })
+              }
+            }
+          }
         }
+
+        setStudents(loadedStudents)
+        setMarks(loadedMarks)
       } catch (err) {
         console.error('Load data error:', err)
       } finally {
@@ -150,7 +169,20 @@ function ViewMarks() {
       </div>
 
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
+            <select
+              value={selectedYearId}
+              onChange={(e) => { setSelectedYearId(e.target.value); setSelectedExamId('') }}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+            >
+              <option value="">All Years</option>
+              {academicYears.map((y) => (
+                <option key={y.id} value={y.id}>{y.year_name}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam</label>
             <select
@@ -159,7 +191,7 @@ function ViewMarks() {
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
               <option value="">Choose an exam...</option>
-              {exams.map((exam) => (
+              {(selectedYearId ? exams.filter(e => e.academic_year_id === selectedYearId) : exams).map((exam) => (
                 <option key={exam.id} value={exam.id}>
                   {exam.name} ({exam.exam_type})
                 </option>

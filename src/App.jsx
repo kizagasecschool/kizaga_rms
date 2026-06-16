@@ -22,6 +22,7 @@ import AcademicYears from './pages/academic/AcademicYears'
 import StudentReports from './pages/academic/StudentReports'
 import EnterMarks from './pages/teacher/EnterMarks'
 import MyStudents from './pages/teacher/MyStudents'
+import Analysis from './pages/teacher/Analysis'
 import Students from './pages/Students'
 import Teachers from './pages/Teachers'
 import ClassSubjects from './pages/ClassSubjects'
@@ -90,6 +91,7 @@ function App() {
                   <Route path="view-marks" element={<ViewMarks />} />
                   <Route path="academic-years" element={<AcademicYears />} />
                   <Route path="enter-marks" element={<EnterMarks />} />
+                  <Route path="class-upgrade" element={<ClassUpgrade />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -102,6 +104,7 @@ function App() {
                   <Route index element={<TeacherDashboard />} />
                   <Route path="enter-marks" element={<EnterMarks />} />
                   <Route path="students" element={<MyStudents />} />
+                  <Route path="analysis" element={<Analysis />} />
                 </Routes>
               </RoleBasedRoute>
             }

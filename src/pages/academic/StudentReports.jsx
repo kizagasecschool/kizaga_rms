@@ -140,6 +140,10 @@ function StudentReports() {
   const [selectedExam2Id, setSelectedExam2Id] = useState('')
   const [selectedExam2, setSelectedExam2] = useState(null)
 
+  const [academicYears, setAcademicYears] = useState([])
+  const [selectedYearId, setSelectedYearId] = useState('')
+  const [selectedYear2Id, setSelectedYear2Id] = useState('')
+
   const [examClasses, setExamClasses] = useState([])
   const [classes, setClasses] = useState([])
   const [selectedClassId, setSelectedClassId] = useState('')
@@ -164,16 +168,18 @@ function StudentReports() {
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      const [eRes, cRes, stRes, schRes] = await Promise.all([
+      const [eRes, cRes, stRes, schRes, yRes] = await Promise.all([
         supabase.from('exams').select('*').order('created_at', { ascending: false }),
         supabase.from('classes').select('*').order('sort_order'),
         supabase.from('exam_classes').select('*'),
         supabase.from('school_settings').select('*').maybeSingle(),
+        supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
       ])
       if (eRes.data) setExams(eRes.data)
       if (cRes.data) setClasses(cRes.data)
       if (stRes.data) setExamClasses(stRes.data)
       if (schRes.data) setSchoolInfo(schRes.data)
+      if (yRes.data) setAcademicYears(yRes.data)
       setLoading(false)
     }
     load()
@@ -254,38 +260,20 @@ function StudentReports() {
         const assignedSubjects = (sRes.data || []).filter(s => !excludedIds.has(s.id))
         setSubjects(assignedSubjects)
 
-        let allStudents = []
-        const { data: byClassId } = await supabase
-          .from('students')
-          .select('*')
-          .eq('class_id', selectedClassId)
-          .order('surname')
-        if (byClassId?.length > 0) {
-          allStudents = byClassId
-        }
-        if (allStudents.length === 0) {
-          const { data: byJoin } = await supabase
-            .from('students')
-            .select('*, class_streams!inner(*)')
-            .eq('class_streams.class_id', selectedClassId)
-            .order('surname')
-          if (byJoin?.length > 0) {
-            allStudents = byJoin.map(s => { const { class_streams, ...rest } = s; return rest })
-          }
-        }
-        setStudents(allStudents)
+        let loadedStudents = []
+        let loadedMarks = []
+        let loadedMarks2 = []
+        let loadedResults = []
 
-        if (assignedSubjects.length > 0 && allStudents.length > 0) {
-          const studentIds = allStudents.map(s => s.id)
+        if (assignedSubjects.length > 0) {
           const subjectIds = assignedSubjects.map(s => s.id)
-
           const queries = []
           for (const eid of activeExamIds) {
             queries.push(
-              supabase.from('marks').select('*').eq('exam_id', eid).in('subject_id', subjectIds).in('student_id', studentIds)
+              supabase.from('marks').select('*').eq('exam_id', eid).in('subject_id', subjectIds)
             )
             queries.push(
-              supabase.from('student_results').select('*').eq('exam_id', eid).in('student_id', studentIds)
+              supabase.from('student_results').select('*').eq('exam_id', eid)
             )
           }
 
@@ -298,14 +286,48 @@ function StudentReports() {
             if (res[marksIdx]?.data) mData.push(...res[marksIdx].data.map(m => ({ ...m, _exam_idx: i })))
             if (res[srIdx]?.data) srData.push(...res[srIdx].data)
           }
-          setMarks(mData.filter(m => m._exam_idx === 0))
-          setMarks2(activeExamIds.length > 1 ? mData.filter(m => m._exam_idx === 1) : [])
-          setStudentResults(srData)
-        } else {
-          setMarks([])
-          setMarks2([])
-          setStudentResults([])
+
+          loadedMarks = mData.filter(m => m._exam_idx === 0)
+          loadedMarks2 = activeExamIds.length > 1 ? mData.filter(m => m._exam_idx === 1) : []
+          loadedResults = srData
+
+          const studentIdsFromMarks = [...new Set(mData.map(m => m.student_id))]
+
+          if (studentIdsFromMarks.length > 0) {
+            const { data: sData } = await supabase
+              .from('students')
+              .select('*')
+              .in('id', studentIdsFromMarks)
+              .order('surname')
+            loadedStudents = sData || []
+          }
+
+          if (loadedStudents.length === 0) {
+            const { data: byClassId } = await supabase
+              .from('students')
+              .select('*')
+              .eq('class_id', selectedClassId)
+              .order('surname')
+            if (byClassId?.length > 0) {
+              loadedStudents = byClassId
+            }
+            if (loadedStudents.length === 0) {
+              const { data: byJoin } = await supabase
+                .from('students')
+                .select('*, class_streams!inner(*)')
+                .eq('class_streams.class_id', selectedClassId)
+                .order('surname')
+              if (byJoin?.length > 0) {
+                loadedStudents = byJoin.map(s => { const { class_streams, ...rest } = s; return rest })
+              }
+            }
+          }
         }
+
+        setStudents(loadedStudents)
+        setMarks(loadedMarks)
+        setMarks2(loadedMarks2)
+        setStudentResults(loadedResults)
       } catch (err) {
         console.error('Load data error:', err)
       } finally {
@@ -875,7 +897,22 @@ function StudentReports() {
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              {mode === 'single' ? 'Academic Year' : 'Exam 1 Year'}
+            </label>
+            <select
+              value={selectedYearId}
+              onChange={(e) => { setSelectedYearId(e.target.value); setSelectedExamId(''); resetSelections() }}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+            >
+              <option value="">All Years</option>
+              {academicYears.map((y) => (
+                <option key={y.id} value={y.id}>{y.year_name}</option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               {mode === 'single' ? 'Select Exam' : 'Select Exam 1'}
@@ -886,7 +923,7 @@ function StudentReports() {
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
               <option value="">Choose an exam...</option>
-              {exams.map((exam) => (
+              {(selectedYearId ? exams.filter(e => e.academic_year_id === selectedYearId) : exams).map((exam) => (
                 <option key={exam.id} value={exam.id}>
                   {exam.name} ({exam.exam_type?.replace('_', ' ')})
                 </option>
@@ -895,35 +932,68 @@ function StudentReports() {
           </div>
           {mode === 'combined' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam 2</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Exam 2 Year</label>
               <select
-                value={selectedExam2Id}
-                onChange={(e) => { setSelectedExam2Id(e.target.value); resetSelections() }}
+                value={selectedYear2Id}
+                onChange={(e) => { setSelectedYear2Id(e.target.value); setSelectedExam2Id(''); resetSelections() }}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
               >
-                <option value="">Choose an exam...</option>
-                {exams.filter(e => e.id !== selectedExamId).map((exam) => (
-                  <option key={exam.id} value={exam.id}>
-                    {exam.name} ({exam.exam_type?.replace('_', ' ')})
-                  </option>
+                <option value="">All Years</option>
+                {academicYears.map((y) => (
+                  <option key={y.id} value={y.id}>{y.year_name}</option>
                 ))}
               </select>
             </div>
           )}
-          <div className={mode === 'combined' ? '' : ''}>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
-            <select
-              value={selectedClassId}
-              onChange={(e) => setSelectedClassId(e.target.value)}
-              disabled={activeExamIds.length === 0 || filteredClasses.length === 0}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 disabled:bg-gray-50 disabled:text-gray-400"
-            >
-              <option value="">Choose a class...</option>
-              {filteredClasses.map((c) => (
-                <option key={c.id} value={c.id}>{c.class_name}</option>
-              ))}
-            </select>
-          </div>
+          {mode === 'single' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
+              <select
+                value={selectedClassId}
+                onChange={(e) => setSelectedClassId(e.target.value)}
+                disabled={activeExamIds.length === 0 || filteredClasses.length === 0}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 disabled:bg-gray-50 disabled:text-gray-400"
+              >
+                <option value="">Choose a class...</option>
+                {filteredClasses.map((c) => (
+                  <option key={c.id} value={c.id}>{c.class_name}</option>
+                ))}
+              </select>
+            </div>
+          )}
+          {mode === 'combined' && (
+            <>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam 2</label>
+                <select
+                  value={selectedExam2Id}
+                  onChange={(e) => { setSelectedExam2Id(e.target.value); resetSelections() }}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+                >
+                  <option value="">Choose an exam...</option>
+                  {(selectedYear2Id ? exams.filter(e => e.academic_year_id === selectedYear2Id && e.id !== selectedExamId) : exams.filter(e => e.id !== selectedExamId)).map((exam) => (
+                    <option key={exam.id} value={exam.id}>
+                      {exam.name} ({exam.exam_type?.replace('_', ' ')})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
+                <select
+                  value={selectedClassId}
+                  onChange={(e) => setSelectedClassId(e.target.value)}
+                  disabled={activeExamIds.length === 0 || filteredClasses.length === 0}
+                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 disabled:bg-gray-50 disabled:text-gray-400"
+                >
+                  <option value="">Choose a class...</option>
+                  {filteredClasses.map((c) => (
+                    <option key={c.id} value={c.id}>{c.class_name}</option>
+                  ))}
+                </select>
+              </div>
+            </>
+          )}
         </div>
         {mode === 'combined' && selectedExam && selectedExam2 && (
           <div className="mt-3 flex items-center gap-3 text-sm text-gray-500">

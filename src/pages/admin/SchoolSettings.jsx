@@ -23,6 +23,9 @@ export default function SchoolSettings() {
     district: '',
     logo_url: '',
     national_logo_url: '',
+    beem_api_key: '',
+    beem_secret_key: '',
+    beem_sender_id: '',
   })
 
   const schoolLogoInput = useRef(null)
@@ -51,6 +54,9 @@ export default function SchoolSettings() {
         district: data.district || '',
         logo_url: data.logo_url || '',
         national_logo_url: data.national_logo_url || '',
+        beem_api_key: data.beem_api_key || '',
+        beem_secret_key: data.beem_secret_key || '',
+        beem_sender_id: data.beem_sender_id || '',
       })
     }
     setLoading(false)
@@ -124,7 +130,7 @@ export default function SchoolSettings() {
     }
     setSaving(true)
     showMessage({ type: '', text: '' })
-    const { error } = await supabase
+      const { error } = await supabase
       .from('school_settings')
       .upsert({
         school_name: settings.school_name,
@@ -136,6 +142,9 @@ export default function SchoolSettings() {
         district: settings.district,
         logo_url: settings.logo_url || null,
         national_logo_url: settings.national_logo_url || null,
+        beem_api_key: settings.beem_api_key || null,
+        beem_secret_key: settings.beem_secret_key || null,
+        beem_sender_id: settings.beem_sender_id || null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' })
     if (error) {
@@ -357,6 +366,48 @@ export default function SchoolSettings() {
               />
               <p className="text-[10px] text-gray-400 mt-1">Tanzania Coat of Arms. PNG, JPG. Max 5MB</p>
             </div>
+          </div>
+        </div>
+
+        {/* BeemAfrica SMS */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-gray-800 uppercase tracking-wider">SMS Configuration (BeemAfrica)</h2>
+          <p className="text-xs text-gray-400">Configure BeemAfrica SMS gateway to send SMS to parents.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+              <input
+                type="text"
+                name="beem_api_key"
+                value={settings.beem_api_key}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 outline-none transition"
+                placeholder="BeemAfrica API Key"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
+              <input
+                type="password"
+                name="beem_secret_key"
+                value={settings.beem_secret_key}
+                onChange={handleChange}
+                className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 outline-none transition"
+                placeholder="BeemAfrica Secret Key"
+              />
+            </div>
+          </div>
+          <div className="sm:w-1/2">
+            <label className="block text-sm font-medium text-gray-700 mb-1">Sender ID</label>
+            <input
+              type="text"
+              name="beem_sender_id"
+              value={settings.beem_sender_id}
+              onChange={handleChange}
+              className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 outline-none transition"
+              placeholder="e.g. N-SMS"
+            />
+            <p className="text-xs text-gray-400 mt-1">Leave blank to use default (N-SMS). Must be approved by BeemAfrica.</p>
           </div>
         </div>
 
