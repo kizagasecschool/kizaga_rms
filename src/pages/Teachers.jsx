@@ -211,11 +211,23 @@ function Teachers() {
       const teacher = teachers.find((t) => t.id === id)
       if (!teacher) return
 
-      const { error: teacherErr } = await supabase.from('teachers').delete().eq('id', id)
-      if (teacherErr) throw teacherErr
+      const res = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: teacher.profile_id }),
+      })
 
-      const { error: profileErr } = await supabase.from('profiles').delete().eq('id', teacher.profile_id)
-      if (profileErr) throw profileErr
+      const text = await res.text()
+      let result
+      try {
+        result = JSON.parse(text)
+      } catch {
+        throw new Error(text || `Server returned ${res.status}`)
+      }
+
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to delete teacher')
+      }
 
       await fetchTeachers()
       setDeleteConfirm(null)

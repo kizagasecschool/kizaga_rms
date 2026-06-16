@@ -180,14 +180,23 @@ function Users() {
 
   const handleDelete = async (user) => {
     try {
-      const teacher = getTeacherData(user.id)
-      if (teacher) {
-        const { error: teacherErr } = await supabase.from('teachers').delete().eq('id', teacher.id)
-        if (teacherErr) throw teacherErr
+      const res = await fetch('/api/delete-user', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: user.id }),
+      })
+
+      const text = await res.text()
+      let result
+      try {
+        result = JSON.parse(text)
+      } catch {
+        throw new Error(text || `Server returned ${res.status}`)
       }
 
-      const { error: profileErr } = await supabase.from('profiles').delete().eq('id', user.id)
-      if (profileErr) throw profileErr
+      if (!res.ok) {
+        throw new Error(result.error || 'Failed to delete user')
+      }
 
       await fetchUsers()
       await fetchTeachers()
