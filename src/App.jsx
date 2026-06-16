@@ -10,6 +10,7 @@ import AdminClasses from './pages/admin/Classes'
 import AdminSubjects from './pages/admin/Subjects'
 import AdminUsers from './pages/admin/Users'
 import SchoolSettings from './pages/admin/SchoolSettings'
+import ClassUpgrade from './pages/admin/ClassUpgrade'
 import HeadmasterDashboard from './pages/headmaster/Dashboard'
 import AcademicDashboard from './pages/academic/Dashboard'
 import AcademicClasses from './pages/academic/Classes'
@@ -57,6 +58,7 @@ function App() {
                   <Route path="class-subjects" element={<ClassSubjects />} />
                   <Route path="academic-years" element={<AcademicYears />} />
                   <Route path="school-settings" element={<SchoolSettings />} />
+                  <Route path="class-upgrade" element={<ClassUpgrade />} />
                 </Routes>
               </RoleBasedRoute>
             }
