@@ -75,12 +75,12 @@ function ViewMarks() {
         const selectedClass = classes.find(c => c.id === selectedClassId)
         const classLevel = selectedClass?.level || 'O_LEVEL'
 
-        const { data: subjectData } = await supabase
-          .from('subjects')
-          .select('*')
-          .eq('level', classLevel)
-          .order('subject_name')
-        const assignedSubjects = subjectData || []
+        const [sRes, exclRes] = await Promise.all([
+          supabase.from('subjects').select('*').eq('level', classLevel).order('subject_name'),
+          supabase.from('class_excluded_subjects').select('subject_id').eq('class_id', selectedClassId),
+        ])
+        const excludedIds = new Set((exclRes.data || []).map(r => r.subject_id))
+        const assignedSubjects = (sRes.data || []).filter(s => !excludedIds.has(s.id))
         setSubjects(assignedSubjects)
 
         let allStudents = []
