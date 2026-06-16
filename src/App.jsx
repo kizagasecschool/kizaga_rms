@@ -18,6 +18,7 @@ import AcademicExams from './pages/academic/Exams'
 import AcademicResults from './pages/academic/Results'
 import ViewMarks from './pages/academic/ViewMarks'
 import AcademicYears from './pages/academic/AcademicYears'
+import StudentReports from './pages/academic/StudentReports'
 import EnterMarks from './pages/teacher/EnterMarks'
 import MyStudents from './pages/teacher/MyStudents'
 import Students from './pages/Students'
@@ -83,6 +84,7 @@ function App() {
                   <Route path="class-subjects" element={<ClassSubjects />} />
                   <Route path="exams" element={<AcademicExams />} />
                   <Route path="results" element={<AcademicResults />} />
+                  <Route path="reports" element={<StudentReports />} />
                   <Route path="view-marks" element={<ViewMarks />} />
                   <Route path="academic-years" element={<AcademicYears />} />
                   <Route path="enter-marks" element={<EnterMarks />} />
