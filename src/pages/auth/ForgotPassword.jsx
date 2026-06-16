@@ -1,11 +1,12 @@
-import { useState } from 'react'
-import { Link } from 'react-router-dom'
+import { useState, useEffect } from 'react'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useNotification } from '../../context/NotificationContext'
 
 const STEPS = { EMAIL: 1, TOKEN: 2, PASSWORD: 3, DONE: 4 }
 
 function ForgotPassword() {
   const { showToast } = useNotification()
+  const [searchParams] = useSearchParams()
   const [step, setStep] = useState(STEPS.EMAIL)
   const [email, setEmail] = useState('')
   const [token, setToken] = useState('')
@@ -18,19 +19,26 @@ function ForgotPassword() {
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/+$/, '')
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
 
+  useEffect(() => {
+    const emailParam = searchParams.get('email')
+    const tokenParam = searchParams.get('token')
+    if (emailParam) setEmail(emailParam)
+    if (emailParam && tokenParam) {
+      setToken(tokenParam)
+      setStep(STEPS.TOKEN)
+    }
+  }, [])
+
   async function callEdgeFunction(name, body) {
     let res
     try {
-      res = await fetch(`${supabaseUrl}/functions/v1/${name}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${anonKey}`,
-        },
-        body: JSON.stringify(body),
-      })
+      const isSendToken = name === 'send-reset-token'
+      const url = isSendToken ? '/api/send-reset-token' : `${supabaseUrl}/functions/v1/${name}`
+      const headers = { 'Content-Type': 'application/json' }
+      if (!isSendToken) headers['Authorization'] = `Bearer ${anonKey}`
+      res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) })
     } catch {
-      throw new Error('Network error - please check your connection or the edge function may not be deployed.')
+      throw new Error('Network error - please check your connection or the server may not be running.')
     }
     const data = await res.json()
     if (!res.ok) throw new Error(data.error || 'Something went wrong')

@@ -1,6 +1,6 @@
 -- ============================================================
 -- Migration: Password reset tokens table
--- Stores tokens sent via Resend API for password recovery
+-- Stores tokens for password recovery email flow
 -- ============================================================
 
 CREATE TABLE IF NOT EXISTS password_reset_tokens (
