@@ -26,7 +26,7 @@ const facilities = [
 ]
 
 function Landing() {
-  const { user, profile } = useAuth()
+  const { user, profile, loading } = useAuth()
 
   return (
     <div className="min-h-screen bg-white">
@@ -116,7 +116,7 @@ function Landing() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" />
                 </svg>
               </a>
-              {!user && (
+              {!user && !loading && (
                 <Link
                   to="/login"
                   className="inline-flex items-center gap-2 px-6 py-3 border border-white/30 text-white font-semibold rounded-xl hover:bg-white/10 transition text-sm"
@@ -364,9 +364,9 @@ function Landing() {
           </div>
 
           <div className="text-center">
-            {user ? (
+            {user && profile ? (
               <Link
-                to={profile?.role === 'teacher' ? '/teacher' : '/academic'}
+                to={profile.role === 'teacher' ? '/teacher' : '/academic'}
                 className="inline-flex items-center gap-2 px-6 py-3 bg-maroon-600 text-white font-semibold rounded-xl hover:bg-maroon-700 transition text-sm"
               >
                 Go to Dashboard

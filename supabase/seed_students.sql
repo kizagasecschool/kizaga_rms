@@ -21,14 +21,6 @@ WHERE NOT EXISTS (
 -- 2. Students per class_stream (10 each)
 -- ============================================================
 
--- Helper function to generate admission number
-CREATE OR REPLACE FUNCTION generate_admission_number(p_class TEXT, p_stream TEXT, p_seq INTEGER)
-RETURNS TEXT AS $$
-BEGIN
-  RETURN upper(translate(p_class, ' ', '')) || '/' || p_stream || '/' || LPAD(p_seq::TEXT, 3, '0');
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
-
 -- Helper function to assign gender deterministically from sequence number
 CREATE OR REPLACE FUNCTION assign_gender(p_seq INTEGER)
 RETURNS TEXT AS $$
@@ -44,6 +36,7 @@ DECLARE
   v_stream RECORD;
   v_csid UUID;
   v_seq INTEGER;
+  v_global_seq INTEGER;
   v_first TEXT;
   v_middle TEXT;
   v_surname TEXT;
@@ -53,7 +46,17 @@ DECLARE
   v_adm_date DATE := '2025-01-15'::DATE;
   v_parent TEXT;
   v_phone TEXT;
+  v_year TEXT := '2025';
+  v_prefix TEXT;
 BEGIN
+  v_prefix := v_year || 'K';
+
+  -- Find max existing sequence for this year
+  SELECT COALESCE(MAX(NULLIF(regexp_replace(admission_number, '^\d{4}K', '', 'g'), '')::INTEGER), 0)
+  INTO v_global_seq
+  FROM students
+  WHERE admission_number ~ '^\d{4}K\d{3}$';
+
   FOR v_class IN SELECT * FROM classes ORDER BY sort_order LOOP
     FOR v_stream IN SELECT * FROM streams ORDER BY stream_name LOOP
       -- Get class_stream id
@@ -68,11 +71,14 @@ BEGIN
 
       -- Determine how many more students we need
       FOR v_seq IN 1..10 LOOP
-        -- Skip if student already exists for this slot
-        v_adm := generate_admission_number(v_class.class_name, v_stream.stream_name, v_seq);
-        IF EXISTS (SELECT 1 FROM students WHERE admission_number = v_adm) THEN
-          CONTINUE;
-        END IF;
+        v_global_seq := v_global_seq + 1;
+        v_adm := v_prefix || LPAD(v_global_seq::TEXT, 3, '0');
+
+        -- Handle unlikely duplicate
+        WHILE EXISTS (SELECT 1 FROM students WHERE admission_number = v_adm) LOOP
+          v_global_seq := v_global_seq + 1;
+          v_adm := v_prefix || LPAD(v_global_seq::TEXT, 3, '0');
+        END LOOP;
 
         -- Generate names based on sequence
         v_gender := assign_gender(v_seq);

@@ -362,16 +362,28 @@ function Results() {
   const studentsWithResults = useMemo(() => {
     return students.map(student => {
       const result = resultsMap[student.id] || null
-      const pts = result ? getPointsForAverage(result.average_marks, grades) : null
-      return { ...student, result, points: pts }
+      let totalPoints = 0, ptCount = 0
+      subjects.forEach(subject => {
+        const mark = markMap[`${student.id}_${subject.id}`]
+        const hasPrac = subjectHasPractical(subject, selectedExam)
+        const pct = getMarkPercentage(mark, hasPrac)
+        if (pct !== null) {
+          const gradeObj = getGradeForPercentage(pct, grades)
+          if (gradeObj?.points != null) {
+            totalPoints += gradeObj.points
+            ptCount++
+          }
+        }
+      })
+      return { ...student, result, points: ptCount > 0 ? totalPoints : null }
     })
-  }, [students, resultsMap, grades])
+  }, [students, resultsMap, grades, subjects, markMap, selectedExam])
 
   const divisionSummary = useMemo(() => {
     const rows = DIVS.map(d => ({ division: d.key, boys: 0, girls: 0, total: 0 }))
     let totalBoys = 0, totalGirls = 0
     studentsWithResults.forEach(s => {
-      const div = s.result?.division || '0'
+      const div = (s.result?.division || 'Division 0').replace('Division ', '')
       const row = rows.find(r => r.division === div)
       if (s.gender === 'Male') { if (row) row.boys++; totalBoys++ }
       else if (s.gender === 'Female') { if (row) row.girls++; totalGirls++ }

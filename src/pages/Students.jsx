@@ -57,7 +57,12 @@ function Students() {
 
   const [search, setSearch] = useState('')
   const [filterClass, setFilterClass] = useState('')
-  const [filterStatus, setFilterStatus] = useState('')
+  const [filterStatus, setFilterStatus] = useState('active')
+  const [deleteAllConfirm, setDeleteAllConfirm] = useState(false)
+  const [deletingAll, setDeletingAll] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -145,16 +150,34 @@ function Students() {
     return true
   })
 
-  const openCreate = () => {
+  const generateAdmissionNumber = useCallback(async () => {
+    const year = new Date().getFullYear().toString()
+    const prefix = year + 'K'
+    const { data } = await supabase
+      .from('students')
+      .select('admission_number')
+      .like('admission_number', prefix + '%')
+      .order('admission_number', { ascending: false })
+      .limit(1)
+    if (data && data.length > 0) {
+      const lastNum = parseInt(data[0].admission_number.replace(prefix, ''), 10) || 0
+      return prefix + String(lastNum + 1).padStart(3, '0')
+    }
+    return prefix + '001'
+  }, [])
+
+  const openCreate = async () => {
     setEditing(null)
+    const adm = await generateAdmissionNumber()
     setFormData({
-      admission_number: '',
+      admission_number: adm,
       first_name: '',
       middle_name: '',
       surname: '',
       gender: 'Male',
       date_of_birth: '',
       class_id: '',
+      class_stream_id: '',
       admission_date: new Date().toISOString().slice(0, 10),
       status: 'active',
       parent_name: '',
@@ -174,6 +197,7 @@ function Students() {
       gender: student.gender,
       date_of_birth: student.date_of_birth,
       class_id: student.class_id || '',
+      class_stream_id: student.class_stream_id || '',
       admission_date: student.admission_date,
       status: student.status,
       parent_name: student.parent_name || '',
@@ -221,6 +245,7 @@ function Students() {
       const payload = {
         ...formData,
         class_id: formData.class_id || null,
+        class_stream_id: formData.class_stream_id || null,
         middle_name: formData.middle_name || null,
         parent_name: formData.parent_name || null,
         parent_phone: formData.parent_phone || null,
@@ -229,7 +254,7 @@ function Students() {
       if (editing) {
         const { error } = await supabase.from('students').update(payload).eq('id', editing.id)
         if (error) throw error
-        if (getClassLevelFromIds(payload.class_id, editing.class_stream_id) === 'O_LEVEL') {
+        if (getClassLevelFromIds(payload.class_id, payload.class_stream_id) === 'O_LEVEL') {
           await assignOLevelAllSubjects(editing.id)
         }
       } else {
@@ -260,6 +285,46 @@ function Students() {
     } catch (err) {
       console.error('Delete error:', err)
       showToast('Failed to delete. ' + (err.message || ''), 'error')
+    }
+  }
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true)
+    try {
+      const ids = [...selectedIds]
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .in('id', ids)
+      if (error) throw error
+      await fetchStudents()
+      setSelectedIds(new Set())
+      setBulkDeleteConfirm(false)
+      showToast(`${ids.length} student(s) deleted successfully`, 'success')
+    } catch (err) {
+      console.error('Bulk delete error:', err)
+      showToast('Failed to delete. ' + (err.message || ''), 'error')
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  const handleDeleteAllGraduates = async () => {
+    setDeletingAll(true)
+    try {
+      const { error } = await supabase
+        .from('students')
+        .delete()
+        .eq('status', 'graduated')
+      if (error) throw error
+      await fetchStudents()
+      setDeleteAllConfirm(false)
+      showToast('All graduated students deleted successfully', 'success')
+    } catch (err) {
+      console.error('Delete all graduates error:', err)
+      showToast('Failed to delete graduates. ' + (err.message || ''), 'error')
+    } finally {
+      setDeletingAll(false)
     }
   }
 
@@ -464,8 +529,8 @@ function Students() {
         const errors = []
         const valid = []
         results.data.forEach((row, i) => {
-          if (!row.admission_number || !row.first_name || !row.surname || !row.gender || !row.date_of_birth) {
-            errors.push(`Row ${i + 2}: missing required fields (admission_number, first_name, surname, gender, date_of_birth)`)
+          if (!row.first_name || !row.surname || !row.gender || !row.date_of_birth) {
+            errors.push(`Row ${i + 2}: missing required fields (first_name, surname, gender, date_of_birth)`)
             return
           }
           if (!['Male', 'Female'].includes(row.gender)) {
@@ -515,8 +580,27 @@ function Students() {
     setCsvImporting(true)
     let imported = 0
     let failed = 0
+    let admSeq = 0
+    let admPrefix = ''
     const oLevelStudentIds = []
     for (const row of csvData) {
+      if (!row.admission_number) {
+        if (!admPrefix) {
+          const year = new Date().getFullYear().toString()
+          admPrefix = year + 'K'
+          const { data: last } = await supabase
+            .from('students')
+            .select('admission_number')
+            .like('admission_number', admPrefix + '%')
+            .order('admission_number', { ascending: false })
+            .limit(1)
+          if (last && last.length > 0) {
+            admSeq = parseInt(last[0].admission_number.replace(admPrefix, ''), 10) || 0
+          }
+        }
+        admSeq++
+        row.admission_number = admPrefix + String(admSeq).padStart(3, '0')
+      }
       const { data: inserted, error } = await supabase.from('students').insert(row).select('id').single()
       if (error) {
         console.error('CSV insert error:', error)
@@ -659,12 +743,46 @@ function Students() {
               <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>
             ))}
           </select>
+          {filterStatus === 'graduated' && filtered.length > 0 && (
+            <button
+              onClick={() => setDeleteAllConfirm(true)}
+              className="px-3 py-2 text-sm font-medium text-red-600 bg-red-50 border border-red-200 rounded-lg hover:bg-red-100 transition whitespace-nowrap"
+            >
+              Delete All Graduates
+            </button>
+          )}
         </div>
+
+        {selectedIds.size > 0 && (
+          <div className="px-4 py-2 bg-maroon-50 border-b border-maroon-100 flex items-center justify-between">
+            <span className="text-sm text-maroon-800 font-medium">{selectedIds.size} student(s) selected</span>
+            <button
+              onClick={() => setBulkDeleteConfirm(true)}
+              className="px-3 py-1.5 text-sm font-medium text-red-600 bg-white border border-red-200 rounded-lg hover:bg-red-50 transition"
+            >
+              Delete Selected
+            </button>
+          </div>
+        )}
 
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
+                <th className="px-5 py-3 w-10">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && selectedIds.size === filtered.length}
+                    onChange={() => {
+                      if (selectedIds.size === filtered.length) {
+                        setSelectedIds(new Set())
+                      } else {
+                        setSelectedIds(new Set(filtered.map(s => s.id)))
+                      }
+                    }}
+                    className="w-4 h-4 rounded border-gray-300 text-maroon-600 focus:ring-maroon-500 cursor-pointer"
+                  />
+                </th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Admission #</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Full Name</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Gender</th>
@@ -676,7 +794,7 @@ function Students() {
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-400">
+                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-gray-400">
                     {search || filterClass || filterStatus ? 'No matching students found.' : 'No students registered yet. Click "+ Add Student" to begin.'}
                   </td>
                 </tr>
@@ -687,7 +805,20 @@ function Students() {
                 const displayClass = cls?.class_name || cs?.class_name || null
                 const displayStream = cs?.stream_name || null
                 return (
-                  <tr key={s.id} className="hover:bg-gray-50 transition">
+                  <tr key={s.id} className={`hover:bg-gray-50 transition ${selectedIds.has(s.id) ? 'bg-maroon-50/30' : ''}`}>
+                    <td className="px-5 py-3.5">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(s.id)}
+                        onChange={() => {
+                          const next = new Set(selectedIds)
+                          if (next.has(s.id)) next.delete(s.id)
+                          else next.add(s.id)
+                          setSelectedIds(next)
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-maroon-600 focus:ring-maroon-500 cursor-pointer"
+                      />
+                    </td>
                     <td className="px-5 py-3.5">
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
                         {s.admission_number}
@@ -821,10 +952,11 @@ function Students() {
                 <input
                   type="text"
                   required
+                  readOnly={!editing}
                   value={formData.admission_number || ''}
                   onChange={(e) => setFormData({ ...formData, admission_number: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400"
-                  placeholder="e.g. S001"
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400 read-only:bg-gray-50 read-only:cursor-not-allowed"
+                  placeholder="Auto-generated"
                 />
               </div>
               <div>
@@ -865,13 +997,43 @@ function Students() {
                 <select
                   required
                   value={formData.class_id || ''}
-                  onChange={(e) => setFormData({ ...formData, class_id: e.target.value })}
+                  onChange={(e) => {
+                    const newClassId = e.target.value
+                    const validStream = classStreams.find(
+                      cs => cs.class_id === newClassId && cs.id === formData.class_stream_id
+                    )
+                    setFormData({
+                      ...formData,
+                      class_id: newClassId,
+                      class_stream_id: validStream ? formData.class_stream_id : '',
+                    })
+                  }}
                   className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
                 >
                   <option value="">-- Select Class --</option>
                   {classes.map((c) => (
                     <option key={c.id} value={c.id}>{c.class_name}</option>
                   ))}
+                </select>
+              </div>
+              <div className="col-span-1">
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">Stream</label>
+                <select
+                  value={formData.class_stream_id || ''}
+                  onChange={(e) => setFormData({ ...formData, class_stream_id: e.target.value })}
+                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
+                >
+                  <option value="">-- No Stream --</option>
+                  {classStreams
+                    .filter(cs => cs.class_id === formData.class_id)
+                    .map(cs => {
+                      const str = streams.find(s => s.id === cs.stream_id)
+                      return (
+                        <option key={cs.id} value={cs.id}>
+                          {str ? `Stream ${str.stream_name}` : cs.id}
+                        </option>
+                      )
+                    })}
                 </select>
               </div>
               <div>
@@ -1271,7 +1433,7 @@ function Students() {
             </div>
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Bulk Stream Assignment</h2>
-              <p className="text-sm text-gray-500">Wanafunzi walio darasani pasipo stream wanaweza kupewa stream</p>
+              <p className="text-sm text-gray-500">Wanafunzi wote wa darasa wanaweza kupewa au kubadilishiwa stream</p>
             </div>
           </div>
         </div>
@@ -1288,7 +1450,7 @@ function Students() {
                 setStreamAssignSelected([])
                 const cid = e.target.value
                 if (cid) {
-                  const unassigned = students.filter(s => s.class_id === cid && !s.class_stream_id)
+                  const unassigned = students.filter(s => s.class_id === cid)
                   setStreamAssignStudents(unassigned)
                 } else {
                   setStreamAssignStudents([])
@@ -1332,7 +1494,7 @@ function Students() {
             <div>
               <div className="flex items-center justify-between mb-2">
                 <label className="block text-sm font-medium text-gray-700">
-                  3. Chagua Wanafunzi ({streamAssignStudents.length} hawana stream)
+                  3. Chagua Wanafunzi ({streamAssignStudents.length})
                 </label>
                 {streamAssignStudents.length > 0 && (
                   <button
@@ -1352,7 +1514,7 @@ function Students() {
               </div>
               {streamAssignStudents.length === 0 ? (
                 <p className="text-sm text-gray-400 text-center py-6 bg-gray-50 rounded-xl border border-gray-100">
-                  Wanafunzi wote wa darasa hili wameshapewa stream
+                  Hakuna wanafunzi darasani
                 </p>
               ) : (
                 <div className="max-h-64 overflow-y-auto overflow-x-auto border border-gray-200 rounded-xl">
@@ -1459,6 +1621,62 @@ function Students() {
             className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition"
           >
             Delete
+          </button>
+        </div>
+      </Modal>
+
+      {/* Bulk Delete Confirmation */}
+      <Modal isOpen={bulkDeleteConfirm} onClose={() => setBulkDeleteConfirm(false)} title="Delete Selected Students">
+        <p className="text-sm text-gray-600 mb-2">
+          Are you sure you want to delete <strong>{selectedIds.size} student(s)</strong>?
+        </p>
+        <p className="text-sm text-red-600 mb-6">
+          This will permanently remove all their marks, attendance, and results. This action cannot be undone.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => setBulkDeleteConfirm(false)}
+            disabled={bulkDeleting}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleBulkDelete}
+            disabled={bulkDeleting}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {bulkDeleting ? (
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
+            ) : `Delete ${selectedIds.size} Student(s)`}
+          </button>
+        </div>
+      </Modal>
+
+      {/* Delete All Graduates Confirmation */}
+      <Modal isOpen={deleteAllConfirm} onClose={() => setDeleteAllConfirm(false)} title="Delete All Graduates">
+        <p className="text-sm text-gray-600 mb-2">
+          Are you sure you want to delete <strong>all {filtered.length} graduated student(s)</strong>?
+        </p>
+        <p className="text-sm text-red-600 mb-6">
+          This will permanently remove all their marks, attendance, and results. This action cannot be undone.
+        </p>
+        <div className="flex justify-end gap-3">
+          <button
+            onClick={() => setDeleteAllConfirm(false)}
+            disabled={deletingAll}
+            className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition disabled:opacity-50"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleDeleteAllGraduates}
+            disabled={deletingAll}
+            className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition disabled:opacity-50 flex items-center gap-2"
+          >
+            {deletingAll ? (
+              <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Deleting...</>
+            ) : 'Delete All'}
           </button>
         </div>
       </Modal>
