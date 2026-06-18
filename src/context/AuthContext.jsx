@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useCallback } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
@@ -84,16 +84,46 @@ export function AuthProvider({ children }) {
     return () => subscription.unsubscribe()
   }, [])
 
+  // Inactivity timer
+  useEffect(() => {
+    let timeout;
+    const inactivityTime = 30 * 60 * 1000; // 30 minutes
+
+    const signOutUser = async () => {
+      await supabase.auth.signOut();
+      setUser(null);
+      setProfile(null);
+      window.location.reload();
+    };
+
+    const resetTimer = () => {
+      clearTimeout(timeout);
+      timeout = setTimeout(signOutUser, inactivityTime);
+    };
+
+    // Events to watch
+    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
+    events.forEach(event => window.addEventListener(event, resetTimer));
+
+    // Initial start
+    resetTimer();
+
+    return () => {
+      clearTimeout(timeout);
+      events.forEach(event => window.removeEventListener(event, resetTimer));
+    };
+  }, []);
+
   const signIn = async (email, password) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) throw error
   }
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
-  }
+  }, [])
 
   const getRedirectPath = () => {
     if (!profile) return '/login'

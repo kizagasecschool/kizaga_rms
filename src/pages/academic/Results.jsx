@@ -2,6 +2,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import * as XLSX from 'xlsx'
+import Modal from '../../components/Modal'
+import { useNotification } from '../../context/NotificationContext'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
@@ -21,25 +23,25 @@ function getMarkPercentage(mark, hasPractical) {
 function getGradeForPercentage(pct, grades) {
   if (pct === null || pct === undefined) return null
   for (const g of grades) {
-    if (pct >= g.min_mark && pct <= g.max_mark) return g
+    if (pct >= g.min_mark) return g
   }
-  return null
+  return grades[grades.length - 1] || null
 }
 
 function getPointsForAverage(avg, grades) {
   if (avg === null || avg === undefined) return null
   for (const g of grades) {
-    if (avg >= g.min_mark && avg <= g.max_mark) return g.points
+    if (avg >= g.min_mark) return g.points
   }
-  return null
+  return grades[grades.length - 1]?.points ?? null
 }
 
 const DIVS = [
-  { key: 'I', label: 'Division I' },
-  { key: 'II', label: 'Division II' },
-  { key: 'III', label: 'Division III' },
-  { key: 'IV', label: 'Division IV' },
-  { key: '0', label: 'Division 0' },
+  { key: 'I', label: 'I' },
+  { key: 'II', label: 'II' },
+  { key: 'III', label: 'III' },
+  { key: 'IV', label: 'IV' },
+  { key: '0', label: '0' },
 ]
 
 function DivisionSummary({ summary, title }) {
@@ -63,7 +65,7 @@ function DivisionSummary({ summary, title }) {
             {rows.map(r => (
               <tr key={r.division} className="hover:bg-gray-50 transition">
                 <td className="px-4 py-2 text-gray-700 font-medium">
-                  {DIVS.find(d => d.key === r.division)?.label || `Division ${r.division}`}
+                  {DIVS.find(d => d.key === r.division)?.label || r.division}
                 </td>
                 <td className="px-4 py-2 text-center text-gray-900">{r.boys}</td>
                 <td className="px-4 py-2 text-center text-gray-900">{r.girls}</td>
@@ -109,8 +111,10 @@ function SubjectGradeMatrix({ subjects, matrix, grades, subjectAverages }) {
                   {g}
                 </th>
               ))}
+              <th className="text-center px-1.5 py-2 text-[10px] font-semibold text-gray-500 uppercase" style={{ minWidth: 24 }}>PSN</th>
               <th className="text-center px-1.5 py-2 text-[10px] font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>GPA</th>
               <th className="text-center px-1.5 py-2 text-[10px] font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Grade</th>
+              <th className="text-center px-1.5 py-2 text-[10px] font-semibold text-gray-500 uppercase" style={{ minWidth: 80 }}>Remarks</th>
             </tr>
             <tr className="border-b border-gray-100 bg-gray-50/50">
               <th className="px-1.5 py-0.5 sticky left-0 bg-gray-50/50 z-10" />
@@ -120,7 +124,7 @@ function SubjectGradeMatrix({ subjects, matrix, grades, subjectAverages }) {
                   <th className="text-center px-0.5 py-0.5 text-[9px] font-medium text-gray-400 uppercase">G</th>
                 </React.Fragment>
               ))}
-              <th className="px-1.5 py-0.5" colSpan={2} />
+              <th className="px-1.5 py-0.5" colSpan={4} />
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -140,11 +144,17 @@ function SubjectGradeMatrix({ subjects, matrix, grades, subjectAverages }) {
                       </React.Fragment>
                     )
                   })}
+                  <td className="px-1.5 py-1.5 text-center text-xs text-gray-500 font-medium">
+                    {sa?.position || '-'}
+                  </td>
                   <td className="px-1.5 py-1.5 text-center text-xs font-semibold text-gray-800">
                     {sa ? sa.avgPoints.toFixed(1) : '-'}
                   </td>
                   <td className="px-1.5 py-1.5 text-center text-xs font-semibold text-gray-800">
                     {sa?.grade || '-'}
+                  </td>
+                  <td className="px-1.5 py-1.5 text-center text-xs text-gray-600">
+                    {sa?.remarks || '-'}
                   </td>
                 </tr>
               )
@@ -178,6 +188,7 @@ function SubjectGradeMatrix({ subjects, matrix, grades, subjectAverages }) {
 }
 
 function Results() {
+  const { showToast } = useNotification()
   const [searchParams] = useSearchParams()
   const examIdParam = searchParams.get('examId')
 
@@ -201,6 +212,9 @@ function Results() {
 
   const [loading, setLoading] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
+  const [reprocessConfirm, setReprocessConfirm] = useState(false)
+  const [reprocessing, setReprocessing] = useState(false)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     const load = async () => {
@@ -209,15 +223,15 @@ function Results() {
         supabase.from('exams').select('*').order('created_at', { ascending: false }),
         supabase.from('classes').select('*').order('sort_order'),
         supabase.from('exam_classes').select('*'),
-        supabase.from('school_settings').select('*').maybeSingle(),
+        supabase.from('school_settings').select('*').limit(1),
         supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
       ])
       if (eRes.data) setExams(eRes.data)
       if (cRes.data) setClasses(cRes.data)
       if (stRes.data) setExamClasses(stRes.data)
-      if (schRes.data) {
-        setSchoolInfo(schRes.data)
-        document.title = schRes.data.school_name || 'Kizaga RMS'
+      if (schRes.data && schRes.data.length > 0) {
+        setSchoolInfo(schRes.data[0])
+        document.title = schRes.data[0].school_name || 'Kizaga RMS'
       }
       if (yRes.data) setAcademicYears(yRes.data)
       setLoading(false)
@@ -287,49 +301,54 @@ function Results() {
 
         if (assignedSubjects.length > 0) {
           const subjectIds = assignedSubjects.map(s => s.id)
-          const { data: mData } = await supabase
-            .from('marks')
-            .select('*')
-            .eq('exam_id', selectedExamId)
-            .in('subject_id', subjectIds)
-          loadedMarks = mData || []
 
-          const studentIdsFromMarks = [...new Set(loadedMarks.map(m => m.student_id))]
+          // First, find students in the selected class (handling streams)
+          const { data: byJoin } = await supabase
+            .from('students')
+            .select('*, class_streams!inner(*)')
+            .eq('class_streams.class_id', selectedClassId)
+            .order('surname')
+          
+          let classStudents = []
+          if (byJoin?.length > 0) {
+            classStudents = byJoin.map(s => { const { class_streams: _, ...rest } = s; return rest })
+          }
 
-          if (studentIdsFromMarks.length > 0) {
-            const [sRes, srRes] = await Promise.all([
-              supabase.from('students').select('*').in('id', studentIdsFromMarks).order('surname'),
-              supabase.from('student_results').select('*').eq('exam_id', selectedExamId).in('student_id', studentIdsFromMarks),
-            ])
-            loadedStudents = sRes.data || []
+          if (classStudents.length > 0) {
+            const classStudentIds = classStudents.map(s => s.id)
+            const { data: mData } = await supabase
+              .from('marks')
+              .select('*')
+              .eq('exam_id', selectedExamId)
+              .in('subject_id', subjectIds)
+              .in('student_id', classStudentIds)
+            loadedMarks = mData || []
+            loadedStudents = classStudents
+
+            const srRes = await supabase
+              .from('student_results')
+              .select('*')
+              .eq('exam_id', selectedExamId)
+              .in('student_id', classStudentIds)
             loadedResults = srRes.data || []
           }
 
+          // Fallback: no students found via class — pull from marks directly
           if (loadedStudents.length === 0) {
-            const { data: byClassId } = await supabase
-              .from('students')
+            const { data: mData } = await supabase
+              .from('marks')
               .select('*')
-              .eq('class_id', selectedClassId)
-              .order('surname')
-            if (byClassId?.length > 0) {
-              loadedStudents = byClassId
-            }
-            if (loadedStudents.length === 0) {
-              const { data: byJoin } = await supabase
-                .from('students')
-                .select('*, class_streams!inner(*)')
-                .eq('class_streams.class_id', selectedClassId)
-                .order('surname')
-              if (byJoin?.length > 0) {
-                loadedStudents = byJoin.map(s => { const { class_streams: _, ...rest } = s; return rest })
-              }
-            }
-            if (loadedStudents.length > 0) {
-              const { data: srRes } = await supabase
-                .from('student_results')
-                .select('*')
-                .eq('exam_id', selectedExamId)
-                .in('student_id', loadedStudents.map(s => s.id))
+              .eq('exam_id', selectedExamId)
+              .in('subject_id', subjectIds)
+            loadedMarks = mData || []
+
+            const studentIdsFromMarks = [...new Set(loadedMarks.map(m => m.student_id))]
+            if (studentIdsFromMarks.length > 0) {
+              const [sRes, srRes] = await Promise.all([
+                supabase.from('students').select('*').in('id', studentIdsFromMarks).order('surname'),
+                supabase.from('student_results').select('*').eq('exam_id', selectedExamId).in('student_id', studentIdsFromMarks),
+              ])
+              loadedStudents = sRes.data || []
               loadedResults = srRes.data || []
             }
           }
@@ -345,7 +364,7 @@ function Results() {
       }
     }
     loadData()
-  }, [selectedExamId, selectedClassId, classes])
+  }, [selectedExamId, selectedClassId, classes, reloadToken])
 
   const markMap = useMemo(() => {
     const map = {}
@@ -360,9 +379,10 @@ function Results() {
   }, [studentResults])
 
   const studentsWithResults = useMemo(() => {
+    const BEST_N = 7
     return students.map(student => {
       const result = resultsMap[student.id] || null
-      let totalPoints = 0, ptCount = 0
+      const allPoints = []
       subjects.forEach(subject => {
         const mark = markMap[`${student.id}_${subject.id}`]
         const hasPrac = subjectHasPractical(subject, selectedExam)
@@ -370,12 +390,14 @@ function Results() {
         if (pct !== null) {
           const gradeObj = getGradeForPercentage(pct, grades)
           if (gradeObj?.points != null) {
-            totalPoints += gradeObj.points
-            ptCount++
+            allPoints.push(gradeObj.points)
           }
         }
       })
-      return { ...student, result, points: ptCount > 0 ? totalPoints : null }
+      allPoints.sort((a, b) => a - b)
+      const bestPoints = allPoints.slice(0, BEST_N)
+      const totalPoints = bestPoints.reduce((s, p) => s + p, 0)
+      return { ...student, result, points: bestPoints.length > 0 ? totalPoints : null }
     })
   }, [students, resultsMap, grades, subjects, markMap, selectedExam])
 
@@ -413,7 +435,7 @@ function Results() {
 
   const subjectAverages = useMemo(() => {
     if (!grades.length) return []
-    return subjects.map(subject => {
+    const withAvg = subjects.map(subject => {
       let totalPct = 0, count = 0, totalPoints = 0, ptCount = 0
       studentsWithResults.forEach(student => {
         const mark = markMap[`${student.id}_${subject.id}`]
@@ -432,8 +454,11 @@ function Results() {
       const avgPct = count > 0 ? totalPct / count : 0
       const avgPts = ptCount > 0 ? totalPoints / ptCount : 0
       const gradeObj = getGradeForPercentage(avgPct, grades)
-      return { subject, avgPercentage: avgPct, avgPoints: avgPts, grade: gradeObj?.grade || '-' }
+      return { subject, avgPercentage: avgPct, avgPoints: avgPts, grade: gradeObj?.grade || '-', remarks: gradeObj?.remarks || '-' }
     })
+    const sorted = [...withAvg].sort((a, b) => a.avgPoints - b.avgPoints || b.avgPercentage - a.avgPercentage)
+    sorted.forEach((s, i) => s.position = i + 1)
+    return withAvg
   }, [subjects, studentsWithResults, markMap, grades, selectedExam])
 
   const sortedStudents = useMemo(() => {
@@ -459,6 +484,24 @@ function Results() {
   }, [subjects, selectedExam])
 
   const isProcessed = selectedExam && ['processed', 'published', 'locked'].includes(selectedExam.status)
+  const canReprocess = selectedExam && ['processed', 'published'].includes(selectedExam.status)
+
+  const handleReprocess = useCallback(async () => {
+    if (!selectedExam) return
+    setReprocessing(true)
+    try {
+      const { error } = await supabase.rpc('process_exam', { p_exam_id: selectedExam.id })
+      if (error) throw error
+      setReprocessConfirm(false)
+      setReloadToken(t => t + 1)
+      showToast('Results reprocessed successfully', 'success')
+    } catch (err) {
+      console.error('Reprocess error:', err)
+      showToast('Failed to reprocess. ' + (err.message || ''), 'error')
+    } finally {
+      setReprocessing(false)
+    }
+  }, [selectedExam, showToast])
 
   const handlePrint = useCallback(() => {
     window.print()
@@ -480,7 +523,7 @@ function Results() {
     const rows = sortedStudents.map(student => {
       const row = [
         student.result?.position || '-',
-        `${student.first_name} ${student.surname}`,
+        `${student.first_name} ${student.middle_name || ''} ${student.surname}`.replace(/\s+/g, ' ').trim(),
       ]
       subjects.forEach(subject => {
         const mark = markMap[`${student.id}_${subject.id}`]
@@ -497,7 +540,7 @@ function Results() {
       row.push(student.result?.average_marks ?? '-')
       row.push(student.result?.grade ?? '-')
       row.push(student.result?.position ?? '-')
-      row.push(student.result?.division ?? '-')
+      row.push((student.result?.division || '').replace('Division ', '') || '-')
       row.push(student.points ?? '-')
       return row
     })
@@ -526,6 +569,10 @@ function Results() {
     XLSX.writeFile(wb, `${examName.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`)
   }, [sortedStudents, subjects, selectedExam, markMap, selectedClassId, classes])
 
+  const handleDownloadPDF = useCallback(() => {
+    window.print()
+  }, [])
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -537,7 +584,7 @@ function Results() {
   return (
     <div>
       <div className="no-print mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">View Results</h1>
+        <h1 className="text-3xl font-bold text-gray-900">View Results</h1>
         <p className="text-gray-500 mt-1">View entered marks by exam and class</p>
       </div>
 
@@ -587,13 +634,25 @@ function Results() {
           </div>
         </div>
         {selectedExam && (
-          <div className="mt-3 flex items-center gap-3 text-sm text-gray-500">
-            <span>Status: <span className="font-medium text-gray-700">{selectedExam.status?.replace('_', ' ')}</span></span>
-            {selectedExam.has_practical && (
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium">Has Practical</span>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 text-sm text-gray-500">
+              <span>Status: <span className="font-medium text-gray-700">{selectedExam.status?.replace('_', ' ')}</span></span>
+              {selectedExam.has_practical && (
+                <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium">Has Practical</span>
+              )}
+              <span className="text-gray-300">|</span>
+              <span>{students.length} students, {subjects.length} subjects</span>
+            </div>
+            {canReprocess && selectedClassId && (
+              <button
+                type="button"
+                disabled={reprocessing || loadingData}
+                onClick={() => setReprocessConfirm(true)}
+                className="px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg transition disabled:opacity-50"
+              >
+                {reprocessing ? 'Reprocessing...' : 'Reprocess Results'}
+              </button>
             )}
-            <span className="text-gray-300">|</span>
-            <span>{students.length} students, {subjects.length} subjects</span>
           </div>
         )}
       </div>
@@ -637,32 +696,81 @@ function Results() {
 
       <style>{`
         @media print {
-          @page { size: A4 landscape; margin: 8mm; }
+          @page { size: A4 landscape; margin: 12mm 8mm 16mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body, html, #root, .h-screen, main, .overflow-y-auto, .overflow-x-auto { height: auto !important; min-height: 0 !important; overflow: visible !important; }
           aside, nav, header, .no-print, .no-print * { display: none !important; }
           .print-area { margin: 0 !important; padding: 0 !important; width: 100% !important; }
-          .print-area .overflow-x-auto { overflow: visible !important; }
-          .print-area table { font-size: 7pt !important; width: 100% !important; border-collapse: collapse !important; }
-          .print-area th, .print-area td { padding: 1.5pt 2.5pt !important; border: 1px solid #ccc !important; }
+          .print-area .overflow-x-auto { overflow: visible !important; display: block !important; }
+          .print-area .overflow-hidden { overflow: visible !important; }
+          .print-area .grid-cols-1 > div { overflow: visible !important; }
+          .print-area .grid-cols-1 > div > div { overflow: visible !important; }
+          .print-area table { font-size: 5.5pt !important; width: 100% !important; border-collapse: collapse !important; page-break-inside: auto !important; }
+          .print-area thead { display: table-header-group !important; }
+          .print-area tbody { display: table-row-group !important; }
+          .print-area tr { page-break-inside: avoid !important; }
+          .print-area th, .print-area td { padding: 0.5pt 1.5pt !important; border: 1px solid #ccc !important; min-width: 0 !important; }
           .print-area th { background: #f3f4f6 !important; font-weight: 600 !important; }
           .print-area [class*="sticky"] { position: static !important; }
           .print-area .rounded-xl { border: 1px solid #e5e7eb !important; border-radius: 0 !important; box-shadow: none !important; }
           .print-area .bg-green-50\\/40, .print-area .bg-red-50\\/40 { background: transparent !important; }
-          .print-area h3 { font-size: 9pt !important; }
-          .print-area h2 { font-size: 11pt !important; }
-          .print-area .school-header { border-bottom: 2px solid #000 !important; margin-bottom: 6mm !important; }
-          .print-area .school-header h1 { font-size: 14pt !important; }
-          .print-area .school-header img { width: 32pt !important; height: 32pt !important; }
-          .print-area .school-header .flex { display: flex !important; justify-content: center !important; align-items: center !important; gap: 8pt !important; }
-          .print-area .stats-grid { display: flex !important; gap: 4pt !important; }
-          .print-area .stats-grid > div { flex: 1 !important; text-align: center !important; padding: 3pt !important; border: 1px solid #ddd !important; }
-          .print-area .stats-grid > div div:first-child { font-size: 12pt !important; font-weight: 700 !important; }
-          .print-area .stats-grid > div div:last-child { font-size: 7pt !important; }
+          .print-area h3 { font-size: 8pt !important; }
+          .print-area h2 { font-size: 10pt !important; }
+          .print-area .school-header { border-bottom: 2px solid #000 !important; margin-bottom: 3mm !important; }
+          .print-area .school-header h1 { font-size: 16pt !important; }
+          .print-area .school-header p { font-size: 9pt !important; }
+          .print-area .school-header img { width: 20pt !important; height: 20pt !important; }
+          .print-area .school-header .flex { display: flex !important; justify-content: center !important; align-items: center !important; gap: 4pt !important; }
+          .print-area .school-header > div:last-child { margin-top: 2pt !important; padding-top: 2pt !important; }
+          .print-area .stats-grid { display: flex !important; gap: 2pt !important; }
+          .print-area .stats-grid > div { flex: 1 !important; text-align: center !important; padding: 1.5pt !important; border: 1px solid #ddd !important; }
+          .print-area .stats-grid > div div:first-child { font-size: 9pt !important; font-weight: 700 !important; }
+          .print-area .stats-grid > div div:last-child { font-size: 5.5pt !important; }
           .print-area .div-summary-wrap { display: flex !important; justify-content: center !important; }
           .print-area .div-summary-wrap > div { width: 100% !important; max-width: 400px !important; }
           .print-area .no-break { break-inside: avoid !important; page-break-inside: avoid !important; }
+
+          .print-area .grid-cols-1 { display: block !important; }
+          .print-area .grid-cols-1 > div { display: inline-block !important; width: calc(50% - 6pt) !important; vertical-align: top !important; }
+          .print-area .grid-cols-1 > div:first-child { margin-right: 12pt !important; }
         }
       `}</style>
+
+      <Modal
+        isOpen={reprocessConfirm}
+        onClose={reprocessing ? null : () => setReprocessConfirm(false)}
+        title={reprocessing ? 'Reprocessing...' : 'Reprocess Results'}
+      >
+        {reprocessing ? (
+          <div className="text-center py-6">
+            <div className="w-10 h-10 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-gray-600">Recalculating grades, divisions, and rankings...</p>
+          </div>
+        ) : (
+          <>
+            <p className="text-sm text-gray-600 mb-6">
+              This will recalculate grades, divisions, and rankings for all students in{' '}
+              <strong>{selectedExam?.name}</strong>. Use this if divisions or points look incorrect.
+            </p>
+            <div className="flex justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setReprocessConfirm(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleReprocess}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition"
+              >
+                Reprocess Now
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
 
       {!loadingData && selectedClassId && subjects.length > 0 && students.length > 0 && isProcessed && (
         <div className="print-area">
@@ -688,6 +796,15 @@ function Results() {
                   </svg>
                   Export Excel
                 </button>
+                <button
+                  onClick={handleDownloadPDF}
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition flex items-center gap-1.5"
+                >
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  Download PDF
+                </button>
               </div>
             </div>
           )}
@@ -703,45 +820,54 @@ function Results() {
             const classAvg = avg.length ? avg.reduce((s, st) => s + st.result.average_marks, 0) / avg.length : 0
             const classGradeObj = getGradeForPercentage(classAvg, grades)
             const pts = studentsWithResults.filter(s => s.points != null)
-            const classGpa = pts.length ? pts.reduce((s, st) => s + st.points, 0) / pts.length : 0
+            const classGpa = pts.length ? pts.reduce((s, st) => s + (st.points / 7), 0) / pts.length : 0
 
             return (
               <>
 
                 {/* School Header */}
-                <div className="school-header mb-6 pb-4 border-b-2 border-gray-800">
-                  <div className="flex items-center justify-center gap-4">
-                    {schoolInfo?.national_logo_url && (
-                      <img src={schoolInfo.national_logo_url} alt="National Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0" />
-                    )}
-                    <div className="text-center">
-                      <h1 className="text-lg sm:text-xl font-bold uppercase text-gray-900">
+                <div className="school-header mb-6 border-b-2 border-gray-800 pb-4">
+                  <div className="flex items-start justify-between">
+                    <div className="w-16 shrink-0 pt-1">
+                      {schoolInfo?.national_logo_url && (
+                        <img src={schoolInfo.national_logo_url} alt="" className="w-14 h-14 object-contain" />
+                      )}
+                    </div>
+                    <div className="text-center flex-1 px-4">
+                      <h1 className="text-xl font-bold uppercase text-gray-900 tracking-wide">
                         {schoolInfo?.school_name || 'School Name'}
                       </h1>
-                      <p className="text-xs sm:text-sm text-gray-600">{schoolInfo?.address || ''}</p>
+                      <p className="text-sm font-semibold text-gray-800 mt-1">
+                        {selectedExam?.name?.toUpperCase() || '...'} EXAMINATION RESULTS
+                      </p>
+                      <p className="text-xs text-gray-600 mt-0.5">{schoolInfo?.address || ''}</p>
                       {(schoolInfo?.region || schoolInfo?.district) && (
-                        <p className="text-xs sm:text-sm text-gray-600">
+                        <p className="text-xs text-gray-600">
                           {[schoolInfo?.region, schoolInfo?.district].filter(Boolean).join(' - ')}
                         </p>
                       )}
-                      <p className="text-xs sm:text-sm text-gray-600">
-                        {schoolInfo?.phone ? `Tel: ${schoolInfo.phone}` : ''}
-                        {schoolInfo?.phone && schoolInfo?.email ? ' | ' : ''}
-                        {schoolInfo?.email || ''}
-                      </p>
+                      <div className="flex items-center justify-center gap-3 text-xs text-gray-600 mt-0.5">
+                        {schoolInfo?.phone && <span>Tel: {schoolInfo.phone}</span>}
+                        {schoolInfo?.phone && schoolInfo?.email && <span className="text-gray-300">|</span>}
+                        {schoolInfo?.email && <span>{schoolInfo.email}</span>}
+                      </div>
                     </div>
-                    {schoolInfo?.logo_url && (
-                      <img src={schoolInfo.logo_url} alt="School Logo" className="w-12 h-12 sm:w-14 sm:h-14 object-contain shrink-0" />
-                    )}
+                    <div className="w-16 shrink-0 pt-1 flex justify-end">
+                      {schoolInfo?.logo_url && (
+                        <img src={schoolInfo.logo_url} alt="" className="w-14 h-14 object-contain" />
+                      )}
+                    </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 mt-3 text-left max-w-lg mx-auto">
-                    <div>
-                      <p className="text-sm"><span className="font-semibold">Exam:</span> {selectedExam?.name}</p>
-                      <p className="text-sm"><span className="font-semibold">Class:</span> {className}</p>
-                    </div>
-                    <div>
-                      <p className="text-sm"><span className="font-semibold">Date:</span> {today}</p>
-                      <p className="text-sm"><span className="font-semibold">Type:</span> {selectedExam?.exam_type?.replace('_', ' ')}</p>
+                  <div className="mt-3 pt-3 border-t border-gray-300">
+                    <div className="flex items-center justify-center gap-8 text-sm">
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-700">Class:</span>
+                        <span className="text-gray-900">{className}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="font-semibold text-gray-700">Date:</span>
+                        <span className="text-gray-900">{today}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -812,7 +938,7 @@ function Results() {
                             <tr key={student.id} className={`${rowBg} hover:bg-gray-50 transition`}>
                               <td className="px-2 py-2 text-center text-sm text-gray-500 font-medium">{student.result?.position || '-'}</td>
                               <td className={`px-2 py-2 text-sm text-gray-900 sticky left-0 z-10 ${isTop ? 'bg-green-50/60' : isBottom ? 'bg-red-50/60' : 'bg-white/95'}`}>
-                                <span className="font-medium whitespace-nowrap">{student.first_name} {student.surname}</span>
+                                <span className="font-medium whitespace-nowrap">{student.first_name} {student.middle_name} {student.surname}</span>
                               </td>
                               {subjects.map((subject) => {
                                 const mark = markMap[`${student.id}_${subject.id}`]
@@ -863,7 +989,7 @@ function Results() {
                                 {student.result?.position != null ? student.result.position : '-'}
                               </td>
                               <td className="px-2 py-2 text-center text-sm font-medium text-gray-800">
-                                {student.result?.division || '-'}
+                                {(student.result?.division || '').replace('Division ', '') || '-'}
                               </td>
                               <td className="px-2 py-2 text-center text-sm font-semibold text-gray-800">
                                 {student.points != null ? student.points : '-'}
@@ -958,10 +1084,10 @@ function Results() {
                           {sortedStudents.filter(s => s.result?.position != null).slice(0, 10).map(s => (
                             <tr key={s.id} className="hover:bg-gray-50 transition">
                               <td className="px-2 py-1.5 text-center text-xs text-gray-500 font-medium">{s.result.position}</td>
-                              <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{s.first_name} {s.surname}</td>
+                              <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{s.first_name} {s.middle_name} {s.surname}</td>
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.result.average_marks}</td>
                               <td className="px-2 py-1.5 text-center text-xs font-semibold text-gray-800">{s.result.grade}</td>
-                              <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.result.division}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-gray-800">{(s.result.division || '').replace('Division ', '') || '-'}</td>
                             </tr>
                           ))}
                           {sortedStudents.filter(s => s.result?.position != null).length === 0 && (
@@ -991,10 +1117,10 @@ function Results() {
                           {sortedStudents.filter(s => s.result?.position != null).slice(-10).reverse().map(s => (
                             <tr key={s.id} className="hover:bg-gray-50 transition">
                               <td className="px-2 py-1.5 text-center text-xs text-gray-500 font-medium">{s.result.position}</td>
-                              <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{s.first_name} {s.surname}</td>
+                              <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{s.first_name} {s.middle_name} {s.surname}</td>
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.result.average_marks}</td>
                               <td className="px-2 py-1.5 text-center text-xs font-semibold text-gray-800">{s.result.grade}</td>
-                              <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.result.division}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-gray-800">{(s.result.division || '').replace('Division ', '') || '-'}</td>
                             </tr>
                           ))}
                           {sortedStudents.filter(s => s.result?.position != null).length === 0 && (

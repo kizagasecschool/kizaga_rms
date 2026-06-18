@@ -227,36 +227,41 @@ function AcademicExams() {
     }
   }
 
-  const executeProcess = async (exam) => {
+  const executeProcess = async (exam, reprocess = false) => {
     setProcessing(true)
-    setProcessProgress('Processing exam results...')
+    setProcessProgress(reprocess ? 'Reprocessing exam results...' : 'Processing exam results...')
     try {
       const { error: processError } = await supabase.rpc('process_exam', { p_exam_id: exam.id })
       if (processError) throw processError
 
-      const { error: transitionError } = await supabase.rpc('transition_exam_status', {
-        p_exam_id: exam.id,
-        p_new_status: 'processed',
-      })
-      if (transitionError) throw transitionError
+      if (!reprocess) {
+        const { error: transitionError } = await supabase.rpc('transition_exam_status', {
+          p_exam_id: exam.id,
+          p_new_status: 'processed',
+        })
+        if (transitionError) throw transitionError
 
-      supabase.rpc('notify_exam_teachers', {
-        p_exam_id: exam.id,
-        p_sender_id: profile.id,
-        p_title: `Results Processed: ${exam.name}`,
-        p_message: `Results for "${exam.name}" have been processed and are available.`,
-        p_type: 'results_processed',
-        p_link: '/academic/exams',
-      }).then(({ error: notifErr }) => {
-        if (notifErr) console.error('Notification error:', notifErr)
-      })
+        supabase.rpc('notify_exam_teachers', {
+          p_exam_id: exam.id,
+          p_sender_id: profile.id,
+          p_title: `Results Processed: ${exam.name}`,
+          p_message: `Results for "${exam.name}" have been processed and are available.`,
+          p_type: 'results_processed',
+          p_link: '/academic/exams',
+        }).then(({ error: notifErr }) => {
+          if (notifErr) console.error('Notification error:', notifErr)
+        })
+      }
 
       await fetchExams()
       setProcessConfirm(null)
-      showToast(`"${exam.name}" processed successfully`, 'success')
+      showToast(
+        reprocess ? `"${exam.name}" reprocessed successfully` : `"${exam.name}" processed successfully`,
+        'success'
+      )
     } catch (err) {
       console.error('Process error:', err)
-      showToast('Failed to process. ' + (err.message || ''), 'error')
+      showToast(`Failed to ${reprocess ? 'reprocess' : 'process'}. ` + (err.message || ''), 'error')
     } finally {
       setProcessing(false)
       setProcessProgress('')
@@ -359,7 +364,7 @@ function AcademicExams() {
                         disabled={saving || (processing && action.status === 'processed')}
                         onClick={() => {
                           if (action.status === 'processed') {
-                            setProcessConfirm(exam)
+                            setProcessConfirm({ exam, reprocess: false })
                           } else {
                             handleTransition(exam.id, action.status)
                           }
@@ -369,6 +374,16 @@ function AcademicExams() {
                         {action.label}
                       </button>
                     ))}
+                    {['processed', 'published'].includes(exam.status) && (
+                      <button
+                        disabled={saving || processing}
+                        onClick={() => setProcessConfirm({ exam, reprocess: true })}
+                        className="px-2.5 py-1 text-xs font-medium text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-md transition disabled:opacity-50"
+                        title="Recalculate grades, divisions, and rankings"
+                      >
+                        Reprocess
+                      </button>
+                    )}
                     {exam.status !== 'locked' && (
                       <>
                         <button
@@ -586,7 +601,11 @@ function AcademicExams() {
       <Modal
         isOpen={!!processConfirm}
         onClose={processing ? null : () => setProcessConfirm(null)}
-        title={processing ? 'Processing...' : 'Process Exam Results'}
+        title={
+          processing
+            ? (processConfirm?.reprocess ? 'Reprocessing...' : 'Processing...')
+            : (processConfirm?.reprocess ? 'Reprocess Exam Results' : 'Process Exam Results')
+        }
       >
         {processing ? (
           <div className="text-center py-6">
@@ -602,21 +621,23 @@ function AcademicExams() {
                   <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
                 </svg>
                 <p className="text-sm text-amber-800">
-                  Processing will calculate grades, divisions, and rankings. This action can be undone by reprocessing.
+                  {processConfirm?.reprocess
+                    ? 'This will recalculate grades, divisions, and rankings for all students. The exam status will not change.'
+                    : 'Processing will calculate grades, divisions, and rankings. You can run this again later using Reprocess.'}
                 </p>
               </div>
               <div className="bg-gray-50 rounded-lg p-4 space-y-2">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Exam</span>
-                  <span className="font-medium text-gray-900">{processConfirm?.name}</span>
+                  <span className="font-medium text-gray-900">{processConfirm?.exam?.name}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Type</span>
-                  <span className="font-medium text-gray-900">{processConfirm?.exam_type?.replace('_', ' ')}</span>
+                  <span className="font-medium text-gray-900">{processConfirm?.exam?.exam_type?.replace('_', ' ')}</span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Classes</span>
-                  <span className="font-medium text-gray-900">{getExamClassNames(processConfirm?.id || '') || '-'}</span>
+                  <span className="font-medium text-gray-900">{getExamClassNames(processConfirm?.exam?.id || '') || '-'}</span>
                 </div>
               </div>
             </div>
@@ -628,10 +649,10 @@ function AcademicExams() {
                 Cancel
               </button>
               <button
-                onClick={() => executeProcess(processConfirm)}
+                onClick={() => executeProcess(processConfirm.exam, processConfirm.reprocess)}
                 className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition"
               >
-                Process Now
+                {processConfirm?.reprocess ? 'Reprocess Now' : 'Process Now'}
               </button>
             </div>
           </>

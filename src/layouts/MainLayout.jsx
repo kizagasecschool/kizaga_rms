@@ -165,8 +165,8 @@ function MainLayout() {
   }, [notifOpen, fetchNotifications])
 
   useEffect(() => {
-    supabase.from('school_settings').select('school_name').maybeSingle().then(({ data }) => {
-      if (data?.school_name) document.title = data.school_name
+    supabase.from('school_settings').select('school_name').limit(1).then(({ data }) => {
+      if (data && data.length > 0 && data[0]?.school_name) document.title = data[0].school_name
     })
   }, [])
 

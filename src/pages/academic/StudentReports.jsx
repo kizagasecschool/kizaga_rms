@@ -1,7 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
-import { jsPDF } from 'jspdf'
-import html2canvas from 'html2canvas'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
@@ -13,17 +11,17 @@ function subjectHasPractical(subject, exam) {
 function getGradeForPercentage(pct, grades) {
   if (pct === null || pct === undefined) return null
   for (const g of grades) {
-    if (pct >= g.min_mark && pct <= g.max_mark) return g
+    if (pct >= g.min_mark) return g
   }
-  return null
+  return grades[grades.length - 1] || null
 }
 
 function getPointsForAverage(avg, grades) {
   if (avg === null || avg === undefined) return null
   for (const g of grades) {
-    if (avg >= g.min_mark && avg <= g.max_mark) return g.points
+    if (avg >= g.min_mark) return g.points
   }
-  return null
+  return grades[grades.length - 1]?.points ?? null
 }
 
 function getMarkTotal(mark, hp) {
@@ -40,93 +38,18 @@ function computeCombinedMark(mark, hp) {
   return { ...t, max, pct }
 }
 
-function injectHexColors(doc) {
-  const s = doc.createElement('style')
-  s.textContent = `
-    :root {
-      --color-gray-50: #f9fafb; --color-gray-100: #f3f4f6;
-      --color-gray-200: #e5e7eb; --color-gray-300: #d1d5db;
-      --color-gray-400: #9ca3af; --color-gray-500: #6b7280;
-      --color-gray-600: #4b5563; --color-gray-700: #374151;
-      --color-gray-800: #1f2937; --color-gray-900: #111827;
-      --color-green-50: #f0fdf4; --color-green-100: #dcfce7;
-      --color-green-200: #bbf7d0; --color-green-300: #86efac;
-      --color-green-400: #4ade80; --color-green-500: #22c55e;
-      --color-green-600: #16a34a; --color-green-700: #15803d;
-      --color-green-800: #166534; --color-green-900: #14532d;
-      --color-blue-50: #eff6ff; --color-blue-100: #dbeafe;
-      --color-blue-200: #bfdbfe; --color-blue-300: #93c5fd;
-      --color-blue-400: #60a5fa; --color-blue-500: #3b82f6;
-      --color-blue-600: #2563eb; --color-blue-700: #1d4ed8;
-      --color-blue-800: #1e40af; --color-blue-900: #1e3a8a;
-      --color-red-50: #fef2f2; --color-red-100: #fee2e2;
-      --color-red-200: #fecaca; --color-red-300: #fca5a5;
-      --color-red-400: #f87171; --color-red-500: #ef4444;
-      --color-red-600: #dc2626; --color-red-700: #b91c1c;
-      --color-red-800: #991b1b; --color-red-900: #7f1d1d;
-      --color-amber-50: #fffbeb; --color-amber-100: #fef3c7;
-      --color-amber-200: #fde68a; --color-amber-300: #fcd34d;
-      --color-amber-400: #fbbf24; --color-amber-500: #f59e0b;
-      --color-amber-600: #d97706; --color-amber-700: #b45309;
-      --color-amber-800: #92400e; --color-amber-900: #78350f;
-      --color-indigo-50: #eef2ff; --color-indigo-100: #e0e7ff;
-      --color-indigo-200: #c7d2fe; --color-indigo-300: #a5b4fc;
-      --color-indigo-400: #818cf8; --color-indigo-500: #6366f1;
-      --color-indigo-600: #4f46e5; --color-indigo-700: #4338ca;
-      --color-indigo-800: #3730a3; --color-indigo-900: #312e81;
-      --color-purple-50: #faf5ff; --color-purple-100: #f3e8ff;
-      --color-purple-200: #e9d5ff; --color-purple-300: #d8b4fe;
-      --color-purple-400: #c084fc; --color-purple-500: #a855f7;
-      --color-purple-600: #9333ea; --color-purple-700: #7e22ce;
-      --color-purple-800: #6b21a8; --color-purple-900: #581c87;
-      --color-emerald-50: #ecfdf5; --color-emerald-100: #d1fae5;
-      --color-emerald-200: #a7f3d0; --color-emerald-300: #6ee7b7;
-      --color-emerald-400: #34d399; --color-emerald-500: #10b981;
-      --color-emerald-600: #059669; --color-emerald-700: #047857;
-      --color-emerald-800: #065f46; --color-emerald-900: #064e3b;
-      --color-maroon-50: #fdf2f3; --color-maroon-100: #fde8e9;
-      --color-maroon-200: #fbd0d4; --color-maroon-300: #f7a9b0;
-      --color-maroon-400: #f27a86; --color-maroon-500: #e84c5c;
-      --color-maroon-600: #b91c3b; --color-maroon-700: #99152e;
-      --color-maroon-800: #7a1224; --color-maroon-900: #3f0d12;
-    }
-  `
-  doc.head.appendChild(s)
-}
-
-async function generatePDF(element, filename) {
-  const canvas = await html2canvas(element, {
-    scale: 2,
-    useCORS: true,
-    allowTaint: true,
-    logging: false,
-    backgroundColor: '#ffffff',
-    onclone: (doc) => {
-      injectHexColors(doc)
-      const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { img.crossOrigin = 'anonymous' })
-    },
-  })
-  const imgData = canvas.toDataURL('image/jpeg', 0.95)
-  const pdf = new jsPDF('p', 'mm', 'a4')
-  const pdfWidth = pdf.internal.pageSize.getWidth()
-  const pdfHeight = (canvas.height * pdfWidth) / canvas.width
-  const pageHeight = pdf.internal.pageSize.getHeight()
-  let heightLeft = pdfHeight
-  let position = 0
-
-  pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight)
-  heightLeft -= pageHeight
-
-  while (heightLeft > 0) {
-    position = heightLeft - pdfHeight
-    pdf.addPage()
-    pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, pdfHeight)
-    heightLeft -= pageHeight
+const printStyles = `
+  @media print {
+    @page { margin: 12mm 8mm 16mm; }
+    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+    html, body { overflow: visible !important; height: auto !important; }
+    .no-print { display: none !important; }
+    .print-only { display: block !important; }
+    .print-area { overflow: visible !important; height: auto !important; }
+    .print-area table { font-size: 9pt !important; }
+    .print-area th, .print-area td { padding: 3pt 4pt !important; }
   }
-
-  pdf.save(filename)
-}
+`
 
 function StudentReports() {
   const reportRef = useRef(null)
@@ -157,9 +80,7 @@ function StudentReports() {
   const [schoolInfo, setSchoolInfo] = useState(null)
 
   const [selectedStudent, setSelectedStudent] = useState(null)
-  const [generating, setGenerating] = useState(false)
-  const [bulkGenerating, setBulkGenerating] = useState(false)
-  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0 })
+  const [bulkStudents, setBulkStudents] = useState([])
   const [activeTab, setActiveTab] = useState('list')
 
   const [loading, setLoading] = useState(true)
@@ -172,13 +93,13 @@ function StudentReports() {
         supabase.from('exams').select('*').order('created_at', { ascending: false }),
         supabase.from('classes').select('*').order('sort_order'),
         supabase.from('exam_classes').select('*'),
-        supabase.from('school_settings').select('*').maybeSingle(),
+        supabase.from('school_settings').select('*').limit(1),
         supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
       ])
       if (eRes.data) setExams(eRes.data)
       if (cRes.data) setClasses(cRes.data)
       if (stRes.data) setExamClasses(stRes.data)
-      if (schRes.data) setSchoolInfo(schRes.data)
+      if (schRes.data && schRes.data.length > 0) setSchoolInfo(schRes.data[0])
       if (yRes.data) setAcademicYears(yRes.data)
       setLoading(false)
     }
@@ -377,34 +298,11 @@ function StudentReports() {
     setActiveTab('list')
   }, [])
 
-  const prepareImages = useCallback((container) => {
-    if (!container) return
-    const imgs = container.querySelectorAll('img')
-    imgs.forEach(img => { img.crossOrigin = 'anonymous' })
+  const handleDownloadPDF = useCallback(() => {
+    window.print()
   }, [])
 
-  const handleDownloadPDF = useCallback(async () => {
-    if (!reportRef.current) return
-    prepareImages(reportRef.current)
-    setGenerating(true)
-    try {
-      const studentName = selectedStudent
-        ? `${selectedStudent.first_name}_${selectedStudent.surname}`.replace(/[^a-zA-Z0-9]/g, '_')
-        : 'student'
-      const examName = mode === 'single'
-        ? (selectedExam?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'report')
-        : 'combined_report'
-      await generatePDF(reportRef.current, `${studentName}_${examName}.pdf`)
-    } catch (err) {
-      console.error('PDF generation error:', err)
-      alert('Failed to generate PDF. Please check the console for details.')
-    } finally {
-      setGenerating(false)
-    }
-  }, [selectedStudent, selectedExam, selectedExam2, mode, prepareImages])
-
-  const handleDownloadClassPDF = useCallback(async () => {
-    if (!bulkContainerRef.current) return
+  const handleDownloadClassPDF = useCallback(() => {
     const studentList = mode === 'single'
       ? sortedStudents.filter(s => s.result?.position != null)
       : sortedStudents
@@ -412,71 +310,17 @@ function StudentReports() {
       alert('No students with results found for this class.')
       return
     }
+    setBulkStudents(studentList)
+  }, [sortedStudents, mode])
 
-    setBulkGenerating(true)
-    setBulkProgress({ current: 0, total: studentList.length })
-
-    const className = classes.find(c => c.id === selectedClassId)?.class_name?.replace(/[^a-zA-Z0-9]/g, '_') || 'class'
-    const examPart = mode === 'single'
-      ? (selectedExam?.name?.replace(/[^a-zA-Z0-9]/g, '_') || 'exam')
-      : 'combined'
-
-    try {
-      const pdf = new jsPDF('p', 'mm', 'a4')
-      const pdfWidth = pdf.internal.pageSize.getWidth()
-      const pageHeight = pdf.internal.pageSize.getHeight()
-      let isFirstStudent = true
-
-      for (let i = 0; i < studentList.length; i++) {
-        setSelectedStudent(studentList[i])
-        setBulkProgress({ current: i + 1, total: studentList.length })
-        await new Promise(r => setTimeout(r, 100))
-        const el = bulkContainerRef.current
-        prepareImages(el)
-        const canvas = await html2canvas(el, {
-          scale: 2,
-          useCORS: true,
-          allowTaint: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          onclone: (doc) => {
-            injectHexColors(doc)
-            const imgs = doc.querySelectorAll('img')
-            imgs.forEach(img => { img.crossOrigin = 'anonymous' })
-          },
-        })
-        const imgData = canvas.toDataURL('image/jpeg', 0.95)
-        const imgHeight = (canvas.height * pdfWidth) / canvas.width
-        let heightLeft = imgHeight
-        let position = 0
-
-        if (isFirstStudent) {
-          isFirstStudent = false
-        } else {
-          pdf.addPage()
-        }
-
-        pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight)
-        heightLeft -= pageHeight
-
-        while (heightLeft > 0) {
-          position = heightLeft - imgHeight
-          pdf.addPage()
-          pdf.addImage(imgData, 'JPEG', 0, position, pdfWidth, imgHeight)
-          heightLeft -= pageHeight
-        }
-      }
-
-      setSelectedStudent(null)
-      pdf.save(`${className}_${examPart}_reports.pdf`)
-    } catch (err) {
-      console.error('Bulk PDF error:', err)
-      alert('Bulk download failed. Check console for details.')
-    } finally {
-      setBulkGenerating(false)
-      setBulkProgress({ current: 0, total: 0 })
-    }
-  }, [sortedStudents, mode, selectedExam, selectedExam2, selectedClassId, classes, prepareImages])
+  useEffect(() => {
+    if (bulkStudents.length === 0) return
+    const timer = setTimeout(() => {
+      window.print()
+      setBulkStudents([])
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [bulkStudents])
 
   const combinedStudentData = useMemo(() => {
     if (mode !== 'combined' || !selectedStudent) return null
@@ -510,20 +354,24 @@ function StudentReports() {
     const overallGrade = getGradeForPercentage(avgPct, grades)
     const totalMarks = entries.reduce((s, e) => s + (e.combinedTotal || 0), 0)
 
-    const totalPoints = valid.reduce((s, e) => s + (e.gradeObj?.points || 0), 0)
+    const allPoints = valid.map(e => e.gradeObj?.points || 0).filter(p => p > 0)
+    allPoints.sort((a, b) => a - b)
+    const bestN = classLevel === 'A_LEVEL' ? 3 : 7
+    const bestPoints = allPoints.slice(0, bestN)
+    const totalPoints = bestPoints.reduce((s, p) => s + p, 0)
 
     let division = '0'
     if (totalPoints > 0) {
       if (classLevel === 'A_LEVEL') {
-        if (totalPoints <= 9) division = 'I'
-        else if (totalPoints <= 12) division = 'II'
-        else if (totalPoints <= 17) division = 'III'
-        else if (totalPoints <= 19) division = 'IV'
+        if (totalPoints >= 3 && totalPoints <= 9) division = 'I'
+        else if (totalPoints >= 10 && totalPoints <= 12) division = 'II'
+        else if (totalPoints >= 13 && totalPoints <= 17) division = 'III'
+        else if (totalPoints >= 18 && totalPoints <= 19) division = 'IV'
       } else {
-        if (totalPoints <= 17) division = 'I'
-        else if (totalPoints <= 21) division = 'II'
-        else if (totalPoints <= 25) division = 'III'
-        else if (totalPoints <= 33) division = 'IV'
+        if (totalPoints >= 7 && totalPoints <= 17) division = 'I'
+        else if (totalPoints >= 18 && totalPoints <= 21) division = 'II'
+        else if (totalPoints >= 22 && totalPoints <= 25) division = 'III'
+        else if (totalPoints >= 26 && totalPoints <= 33) division = 'IV'
       }
     }
 
@@ -760,7 +608,7 @@ function StudentReports() {
                 <div className="text-[9px] text-gray-500 uppercase">Grade</div>
               </div>
               <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-purple-600">{sr.division || '-'}</div>
+                <div className="text-sm font-bold text-purple-600">{(sr.division || '').replace('Division ', '') || '-'}</div>
                 <div className="text-[9px] text-gray-500 uppercase">Division</div>
               </div>
                 <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
@@ -798,7 +646,7 @@ function StudentReports() {
                 <div className="text-[9px] text-gray-500 uppercase">Grade</div>
               </div>
               <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-purple-600">Division {combinedStudentData.division}</div>
+                <div className="text-sm font-bold text-purple-600">{combinedStudentData.division || '-'}</div>
                 <div className="text-[9px] text-gray-500 uppercase">Division</div>
               </div>
               <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
@@ -858,7 +706,7 @@ function StudentReports() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="no-print flex items-center justify-center py-20">
         <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
       </div>
     )
@@ -866,12 +714,13 @@ function StudentReports() {
 
   return (
     <div>
-      <div className="mb-6">
+      <style>{printStyles}</style>
+      <div className="no-print mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Student Report Cards</h1>
         <p className="text-gray-500 mt-1">Generate and download individual PDF report cards for students</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+      <div className="no-print bg-white rounded-xl border border-gray-200 p-5 mb-6">
         <div className="flex items-center gap-4 mb-4">
           <span className="text-sm font-medium text-gray-700">Report Type:</span>
           <div className="flex gap-2">
@@ -1013,13 +862,13 @@ function StudentReports() {
       </div>
 
       {loadingData && (
-        <div className="flex items-center justify-center py-12">
+        <div className="no-print flex items-center justify-center py-12">
           <div className="w-6 h-6 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
         </div>
       )}
 
       {!loadingData && selectedClassId && subjects.length > 0 && students.length > 0 && !isProcessed && (
-        <div className="bg-white rounded-xl border border-amber-200 p-10 text-center">
+        <div className="no-print bg-white rounded-xl border border-amber-200 p-10 text-center">
           <div className="w-14 h-14 mx-auto bg-amber-50 rounded-full flex items-center justify-center mb-4">
             <svg className="w-7 h-7 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
@@ -1035,7 +884,7 @@ function StudentReports() {
       {!loadingData && selectedClassId && isProcessed && (
         <div>
           {activeTab === 'list' && (
-            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="no-print bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-800">
                   Students - {students.length} total
@@ -1043,22 +892,13 @@ function StudentReports() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleDownloadClassPDF}
-                    disabled={bulkGenerating || sortedStudents.length === 0}
+                    disabled={sortedStudents.length === 0}
                     className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    {bulkGenerating ? (
-                      <>
-                        <div className="w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                        {bulkProgress.current}/{bulkProgress.total}
-                      </>
-                    ) : (
-                      <>
-                        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                        </svg>
-                        Download All ({sortedStudents.length})
-                      </>
-                    )}
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                    Download All ({sortedStudents.length})
                   </button>
                 </div>
               </div>
@@ -1106,7 +946,7 @@ function StudentReports() {
 
           {activeTab === 'report' && selectedStudent && (
             <div>
-              <div className="flex items-center justify-between mb-4">
+              <div className="no-print flex items-center justify-between mb-4">
                 <button
                   onClick={handleBack}
                   className="px-3 py-1.5 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition flex items-center gap-1.5"
@@ -1118,56 +958,53 @@ function StudentReports() {
                 </button>
                 <button
                   onClick={handleDownloadPDF}
-                  disabled={generating}
-                  className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition flex items-center gap-2 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition flex items-center gap-2"
                 >
-                  {generating ? (
-                    <>
-                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      Generating...
-                    </>
-                  ) : (
-                    <>
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                      </svg>
-                      Download PDF
-                    </>
-                  )}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                  </svg>
+                  Download PDF
                 </button>
               </div>
 
-              <div ref={reportRef}>
+              <div className="print-area" ref={reportRef}>
                 <ReportCard student={selectedStudent} />
               </div>
             </div>
           )}
 
-          {/* Hidden bulk render container */}
-          <div className="hidden">
-            {bulkGenerating && selectedStudent && (
-              <div ref={bulkContainerRef}>
-                <ReportCard student={selectedStudent} isBulk />
-              </div>
-            )}
+          {/* Bulk print container — hidden on screen, visible during print */}
+          <div className="print-only" style={{ display: 'none' }} ref={bulkContainerRef}>
+            {bulkStudents.map((student, idx) => (
+              <ReportCard key={student.id} student={student} isBulk />
+            ))}
           </div>
+          {bulkStudents.length > 0 && (
+            <style>{`
+              .print-only { display: none !important; }
+              @media print {
+                .print-only { display: block !important; }
+                .no-print { display: none !important; }
+              }
+            `}</style>
+          )}
         </div>
       )}
 
       {!loadingData && selectedClassId && subjects.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+        <div className="no-print bg-white rounded-xl border border-gray-200 p-10 text-center">
           <p className="text-sm text-gray-500">No subjects found for this class.</p>
         </div>
       )}
 
       {!loadingData && selectedClassId && subjects.length > 0 && students.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+        <div className="no-print bg-white rounded-xl border border-gray-200 p-10 text-center">
           <p className="text-sm text-gray-500">No students found for this class.</p>
         </div>
       )}
 
       {!selectedClassId && !loading && (
-        <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+        <div className="no-print bg-white rounded-xl border border-gray-200 p-10 text-center">
           <p className="text-sm text-gray-500">Select exam(s) and class to view students.</p>
         </div>
       )}

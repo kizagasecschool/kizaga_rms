@@ -306,15 +306,18 @@ CREATE TRIGGER trg_marks_check_exam_status
 CREATE OR REPLACE FUNCTION process_exam(p_exam_id UUID)
 RETURNS VOID AS $$
 DECLARE
-  rec RECORD;
+  student_rec RECORD;
 BEGIN
-  -- Compute result for every student who has marks in this exam
-  FOR rec IN
-    SELECT DISTINCT m.student_id
-    FROM marks m
-    WHERE m.exam_id = p_exam_id
+  -- Compute result for every student associated with a class in this exam
+  FOR student_rec IN
+    SELECT DISTINCT s.id AS student_id
+    FROM students s
+    JOIN class_streams cs ON s.class_stream_id = cs.id
+    JOIN classes c ON cs.class_id = c.id
+    JOIN exam_classes ec ON c.id = ec.class_id
+    WHERE ec.exam_id = p_exam_id
   LOOP
-    PERFORM compute_student_result(rec.student_id, p_exam_id);
+    PERFORM compute_student_result(student_rec.student_id, p_exam_id);
   END LOOP;
 
   -- Update class rankings

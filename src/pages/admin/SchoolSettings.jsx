@@ -14,6 +14,7 @@ export default function SchoolSettings() {
     timerRef.current = setTimeout(() => setMessage({ type: '', text: '' }), 3000)
   }, [])
   const [settings, setSettings] = useState({
+    id: '',
     school_name: '',
     school_code: '',
     address: '',
@@ -40,23 +41,26 @@ export default function SchoolSettings() {
     const { data, error } = await supabase
       .from('school_settings')
       .select('*')
-      .maybeSingle()
+      .limit(1)
     if (error) {
-      showMessage({ type: 'error', text: 'Failed to load settings' })
-    } else if (data) {
+      console.error('Load settings error:', error)
+      showMessage({ type: 'error', text: 'Failed to load settings: ' + (error.message || 'Unknown error') })
+    } else if (data && data.length > 0) {
+      const row = data[0]
       setSettings({
-        school_name: data.school_name || '',
-        school_code: data.school_code || '',
-        address: data.address || '',
-        phone: data.phone || '',
-        email: data.email || '',
-        region: data.region || '',
-        district: data.district || '',
-        logo_url: data.logo_url || '',
-        national_logo_url: data.national_logo_url || '',
-        beem_api_key: data.beem_api_key || '',
-        beem_secret_key: data.beem_secret_key || '',
-        beem_sender_id: data.beem_sender_id || '',
+        id: row.id || '',
+        school_name: row.school_name || '',
+        school_code: row.school_code || '',
+        address: row.address || '',
+        phone: row.phone || '',
+        email: row.email || '',
+        region: row.region || '',
+        district: row.district || '',
+        logo_url: row.logo_url || '',
+        national_logo_url: row.national_logo_url || '',
+        beem_api_key: row.beem_api_key || '',
+        beem_secret_key: row.beem_secret_key || '',
+        beem_sender_id: row.beem_sender_id || '',
       })
     }
     setLoading(false)
@@ -133,6 +137,7 @@ export default function SchoolSettings() {
       const { error } = await supabase
       .from('school_settings')
       .upsert({
+        id: settings.id || undefined,
         school_name: settings.school_name,
         school_code: settings.school_code,
         address: settings.address,

@@ -28,11 +28,11 @@ export default async function handler(req, res) {
     const { data: settings } = await supabase
       .from('school_settings')
       .select('beem_api_key, beem_secret_key, beem_sender_id')
-      .maybeSingle()
+      .limit(1)
 
-    const apiKey = settings?.beem_api_key
-    const secretKey = settings?.beem_secret_key
-    const senderId = settings?.beem_sender_id || 'N-SMS'
+    const apiKey = settings?.[0]?.beem_api_key
+    const secretKey = settings?.[0]?.beem_secret_key
+    const senderId = settings?.[0]?.beem_sender_id || 'N-SMS'
 
     if (!apiKey || !secretKey) {
       return res.status(400).json({ error: 'BeemAfrica API not configured. Add API keys in School Settings.' })

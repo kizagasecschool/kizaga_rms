@@ -43,7 +43,7 @@ export function getPointsForMark(marks, level) {
 export function calculateDivision(totalPoints, level) {
   const divisions = level === 'A_LEVEL' ? A_LEVEL_DIVISIONS : O_LEVEL_DIVISIONS
   const found = divisions.find(d => totalPoints >= d.min && totalPoints <= d.max)
-  return found ? `Division ${found.division}` : 'Division 0'
+  return found ? found.division : '0'
 }
 
 export function calculateBestSubjects(markEntries, subjectCount, compulsorySubjectIds = []) {
