@@ -6,6 +6,13 @@ function AdminDashboard() {
   const { profile } = useAuth()
   const [stats, setStats] = useState({ students: 0, teachers: 0, classes: 0, subjects: 0 })
   const [loading, setLoading] = useState(true)
+  const [schoolInfo, setSchoolInfo] = useState(null)
+
+  useEffect(() => {
+    supabase.from('school_settings').select('logo_url, school_name').limit(1).then(({ data }) => {
+      if (data?.[0]) setSchoolInfo(data[0])
+    })
+  }, [])
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -35,9 +42,11 @@ function AdminDashboard() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
-        <p className="text-gray-500 mt-1">Welcome, {profile?.full_name}. You have full system access.</p>
+      <div className="mb-8 flex items-center gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Admin Dashboard</h1>
+          <p className="text-gray-500 mt-1">Welcome, {profile?.full_name}. You have full system access.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

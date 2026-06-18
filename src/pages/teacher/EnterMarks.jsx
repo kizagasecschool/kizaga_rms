@@ -378,7 +378,7 @@ function EnterMarks() {
               return isNaN(p) ? null : Math.min(Math.max(p, 0), 50)
             })()
           } : {}),
-          ...(m.id ? { id: m.id } : {}),
+          id: m.id || crypto.randomUUID(),
         }
       })
 

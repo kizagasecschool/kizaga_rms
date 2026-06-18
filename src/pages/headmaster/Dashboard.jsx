@@ -6,6 +6,13 @@ function HeadmasterDashboard() {
   const { profile } = useAuth()
   const [stats, setStats] = useState({ students: 0, passRate: 0, activeExams: 0, avgPerformance: 0 })
   const [loading, setLoading] = useState(true)
+  const [schoolInfo, setSchoolInfo] = useState(null)
+
+  useEffect(() => {
+    supabase.from('school_settings').select('logo_url, school_name').limit(1).then(({ data }) => {
+      if (data?.[0]) setSchoolInfo(data[0])
+    })
+  }, [])
 
   useEffect(() => {
     const fetchStats = async () => {
@@ -41,9 +48,14 @@ function HeadmasterDashboard() {
 
   return (
     <div>
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-gray-900">Headmaster Dashboard</h1>
-        <p className="text-gray-500 mt-1">Welcome, {profile?.full_name}. View school performance and reports.</p>
+      <div className="mb-8 flex items-center gap-4">
+        {schoolInfo?.logo_url && (
+          <img src={schoolInfo.logo_url} alt="" className="w-14 h-14 object-contain shrink-0" crossOrigin="anonymous" />
+        )}
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Headmaster Dashboard</h1>
+          <p className="text-gray-500 mt-1">Welcome, {profile?.full_name}. View school performance and reports.</p>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">

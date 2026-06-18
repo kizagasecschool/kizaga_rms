@@ -14,8 +14,15 @@ function Login() {
   const [isLoading, setIsLoading] = useState(false)
   const [resetMode, setResetMode] = useState(false)
   const [resetSent, setResetSent] = useState(false)
+  const [schoolInfo, setSchoolInfo] = useState(null)
   const { signIn, user, profile, loading: authLoading } = useAuth()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    supabase.from('school_settings').select('logo_url, national_logo_url, school_name').limit(1).then(({ data }) => {
+      if (data?.[0]) setSchoolInfo(data[0])
+    })
+  }, [])
 
   useEffect(() => {
     if (!authLoading && user && profile) {
@@ -79,9 +86,15 @@ function Login() {
         <div className="hidden lg:flex bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 items-center justify-center text-white relative overflow-hidden">
           <div className="absolute inset-0 bg-neutral-950/20" />
           <div className="relative z-10 text-center">
-            <div className="w-24 h-24 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-              <span className="text-3xl font-bold text-white">K</span>
-            </div>
+            {schoolInfo?.logo_url ? (
+              <div className="w-32 h-32 mx-auto mb-6 bg-white rounded-2xl flex items-center justify-center p-3">
+                <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
+              </div>
+            ) : (
+              <div className="w-24 h-24 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
+                <span className="text-3xl font-bold text-white">K</span>
+              </div>
+            )}
             <h2 className="text-2xl font-bold mb-2">Kizaga Secondary School</h2>
             <p className="text-maroon-100 text-sm">Staff Portal</p>
           </div>
@@ -179,9 +192,15 @@ function Login() {
       <div className="hidden lg:flex bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 items-center justify-center text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-neutral-950/20" />
         <div className="relative z-10 text-center max-w-md">
-          <div className="w-28 h-28 mx-auto mb-8 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20">
-            <span className="text-4xl font-bold text-white">K</span>
-          </div>
+          {schoolInfo?.logo_url ? (
+            <div className="w-36 h-36 mx-auto mb-8 bg-white rounded-3xl flex items-center justify-center p-3">
+              <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
+            </div>
+          ) : (
+            <div className="w-28 h-28 mx-auto mb-8 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20">
+              <span className="text-4xl font-bold text-white">K</span>
+            </div>
+          )}
           <h2 className="text-3xl font-bold mb-3">Kizaga Secondary School</h2>
           <p className="text-maroon-100 text-base">Staff Portal</p>
           <div className="mt-12 space-y-4">
@@ -215,9 +234,15 @@ function Login() {
             <div className="bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 rounded-2xl p-8 text-white text-center relative overflow-hidden">
               <div className="absolute inset-0 bg-neutral-950/20" />
               <div className="relative z-10">
-                <div className="w-16 h-16 mx-auto mb-4 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center border border-white/20">
-                  <span className="text-xl font-bold text-white">K</span>
-                </div>
+                {schoolInfo?.logo_url ? (
+                  <div className="w-20 h-20 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center p-2">
+                    <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
+                  </div>
+                ) : (
+                  <div className="w-16 h-16 mx-auto mb-4 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center border border-white/20">
+                    <span className="text-xl font-bold text-white">K</span>
+                  </div>
+                )}
                 <h2 className="text-lg font-bold">Kizaga Secondary School</h2>
                 <p className="text-maroon-100 text-xs">Staff Portal</p>
                 <div className="flex items-center justify-center gap-4 mt-4 text-maroon-100 text-xs">
@@ -342,6 +367,9 @@ function Login() {
 
             <p className="text-center text-xs text-slate-400 mt-6">
               &copy; {new Date().getFullYear()} Kizaga Secondary School
+            </p>
+            <p className="text-center text-[10px] text-slate-300 mt-1">
+              Designed and composed by Academic Office@KizagaSS
             </p>
           </div>
         </div>

@@ -280,26 +280,24 @@ function ClassSubjects() {
           .in('subject_id', aLevelSubjectIds)
       }
 
-      // 3. Insert all COMPULSORY subjects from new combination
-      const compulsoryIds = combinationSubjects
+      // 3. Insert ALL subjects from new combination (CORE, SUBSIDIARY, OPTIONAL)
+      const allSubjectIds = combinationSubjects
         .filter((cs) => cs.combination_id === newCombinationId)
-        .map((cs) => subjects.find((s) => s.id === cs.subject_id))
-        .filter((s) => s && s.subject_type === 'COMPULSORY')
-        .map((s) => s.id)
+        .map((cs) => cs.subject_id)
 
-      if (compulsoryIds.length > 0) {
+      if (allSubjectIds.length > 0) {
         await supabase.from('student_subjects').upsert(
-          compulsoryIds.map((subject_id) => ({ student_id: studentId, subject_id })),
+          allSubjectIds.map((subject_id) => ({ student_id: studentId, subject_id })),
           { onConflict: 'student_id,subject_id' }
         )
       }
 
       // Update local state
       setStudentCombinations((prev) => ({ ...prev, [studentId]: newCombinationId }))
-      setStudentSubjects((prev) => ({ ...prev, [studentId]: compulsoryIds }))
+      setStudentSubjects((prev) => ({ ...prev, [studentId]: allSubjectIds }))
 
       const combo = combinations.find((c) => c.id === newCombinationId)
-      showToast(`Combination ${combo?.code || ''} set — compulsory subjects assigned`, 'success')
+      showToast(`Combination ${combo?.code || ''} imewekwa — masomo yote yamepelekwa`, 'success')
     } catch (err) {
       showToast('Failed to set combination: ' + (err.message || ''), 'error')
     } finally {

@@ -39,9 +39,62 @@ Not a bug — the data filter `sortedStudents.filter(s => s.result?.position != 
 ### Print issues (single-page print)
 Root cause: `MainLayout.jsx:184` — `<div className="h-screen bg-gray-50 flex overflow-hidden">` constrains viewport height. Fix: CSS `@media print` overrides in `src/index.css` set `html, body { overflow: visible !important; height: auto !important }` and hide sidebar/header.
 
+## A-Level Combination → Subjects Assignment
+
+### Problem
+When an A-Level student was assigned a combination, SUBSIDIARY and OPTIONAL subjects were not auto-populated into `student_subjects`, causing "No students assigned to this subject" in EnterMarks.
+
+### Fixes
+
+**1. ClassSubjects.jsx bug** (`src/pages/ClassSubjects.jsx:283-299`)
+- **Before**: `handleSetStudentCombination` only inserted COMPULSORY subjects
+- **After**: Inserts ALL subjects (CORE + SUBSIDIARY + OPTIONAL) from the combination
+
+**2. Database seed for combination_subjects**
+- Ran `scripts/seed-combination-subjects.js` (deleted afterward) to populate `combination_subjects` with all 30 subject-combination mappings using existing A-Level subjects (CHEM, GEOG, PHY, BIOS, A/COMM, ECO) and combinations (PCM, PCB, CBG, EGM, HGL, PAM) in the database.
+
+## A-Level Points Calculation
+
+### Problem
+A-Level points and division were calculated using ALL subjects (including ELECTIVE/SUBSIDIARY) instead of only the 3 PRINCIPAL subjects. Also, `BEST_N = 7` was hardcoded even for A-Level (should be 3).
+
+### Fixes
+
+**1. Results.jsx** (`src/pages/academic/Results.jsx:501-525`)
+- **Best N**: Changed from hardcoded `BEST_N = 7` to `classLevel === 'A_LEVEL' ? 3 : 7`
+- **Subject filter**: Added `if (classLevel === 'A_LEVEL' && subject.subject_type === 'ELECTIVE') return` to exclude SUBSIDIARY subjects from points
+- **Division**: Added `calcDivision()` helper and `division` field to `studentsWithResults` so the division summary uses frontend-calculated division (not the SQL function's all-subjects division)
+
+**2. StudentReports.jsx** (`src/pages/academic/StudentReports.jsx:480-506`)
+- Added `principalValid` that filters out ELECTIVE subjects for A-Level
+- Points and division now calculated from PRINCIPAL subjects only
+- `avgPct` and `overallGrade` still include all subjects for display
+
 ### Key file locations
-- `src/pages/academic/Results.jsx` — Main results page with PDF generation, Top/Bottom tables
-- `src/pages/academic/StudentReports.jsx` — Report cards with PDF generation  
+- `src/pages/academic/Results.jsx:41-58` — `calcDivision()` helper function
+- `src/pages/academic/Results.jsx:501-525` — Fixed `studentsWithResults` with BEST_N=3 and subject filter
+- `src/pages/academic/StudentReports.jsx:480-506` — Fixed `principalValid` filter for A-Level
+- `src/pages/ClassSubjects.jsx:283-299` — A-Level combination assignment (fixed: now inserts all subjects)
+- `src/pages/Students.jsx:432-480` — A-Level combo assignment via Subjects modal (already correct)
 - `node_modules/html2canvas/dist/html2canvas.esm.js:1831-1860` — Patched `oklch()` color function handler
 - `src/layouts/MainLayout.jsx:184` — `h-screen overflow-hidden` layout container
 - `src/index.css` — `@media print` overrides, custom `@theme` colors
+
+## School Logo Integration
+
+Uploaded school logo (`school_settings.logo_url`) now displayed in:
+- **Login.jsx** — desktop left panel, mobile banner, and reset password mode
+- **ForgotPassword.jsx** — desktop left panel and mobile banner  
+- **Landing.jsx** — nav header and footer (falls back to inline SVG shield logo)
+- **MainLayout.jsx** — sidebar header and topbar (replaces graduate-cap icon)
+- **All 4 dashboards** (Admin, Headmaster, Academic, Teacher) — left of the page title
+- **Results.jsx & StudentReports.jsx** — `logo_url` right + `national_logo_url` left (already done)
+- Falls back to the original inline SVG logo if no logo_url is set in school_settings
+- Uses `crossOrigin="anonymous"` for html2canvas PDF compatibility
+- Fetched from `school_settings` table via useEffect on mount
+- Logo wrapped in `bg-white/10 backdrop-blur-sm border border-white/20` glass container on dark backgrounds (Login left panel, Landing footer) for visibility
+- **Required**: Run `migration_fix_public_read_school_settings.sql` to add public SELECT policy, otherwise logo won't load on Login/Landing/ForgotPassword pages
+
+## Known DB issues
+- `compute_student_result()` in `migration_grading_update.sql` still sums ALL subjects for A-Level division — fix in `migration_fix_alevel_points_db.sql` (not yet applied to DB)
+- A-Level division on Results page now uses frontend calculation (`calcDivision`) so the page displays correctly regardless of DB state

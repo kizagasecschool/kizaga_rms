@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 import { useNotification } from '../../context/NotificationContext'
 
 const STEPS = { EMAIL: 1, TOKEN: 2, PASSWORD: 3, DONE: 4 }
@@ -15,6 +16,13 @@ function ForgotPassword() {
   const [error, setError] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [verifiedToken, setVerifiedToken] = useState('')
+  const [schoolInfo, setSchoolInfo] = useState(null)
+
+  useEffect(() => {
+    supabase.from('school_settings').select('logo_url').limit(1).then(({ data }) => {
+      if (data?.[0]) setSchoolInfo(data[0])
+    })
+  }, [])
 
   const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.replace(/\/+$/, '')
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY
@@ -131,9 +139,15 @@ function ForgotPassword() {
       <div className="hidden lg:flex bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 items-center justify-center text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-neutral-950/20" />
         <div className="relative z-10 text-center">
-          <div className="w-24 h-24 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-            <span className="text-3xl font-bold text-white">K</span>
-          </div>
+          {schoolInfo?.logo_url ? (
+            <div className="w-24 h-24 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20 p-3">
+              <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
+            </div>
+          ) : (
+            <div className="w-24 h-24 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
+              <span className="text-3xl font-bold text-white">K</span>
+            </div>
+          )}
           <h2 className="text-2xl font-bold mb-2">Kizaga Secondary School</h2>
           <p className="text-maroon-100 text-sm">Staff Portal</p>
         </div>
@@ -141,10 +155,14 @@ function ForgotPassword() {
 
       <div className="flex items-center justify-center p-6">
         <div className="w-full max-w-md">
-          <div className="lg:hidden text-center mb-8">
-            <div className="w-16 h-16 mx-auto mb-4 bg-maroon-100 rounded-2xl flex items-center justify-center">
-              <span className="text-xl font-bold text-maroon-600">K</span>
-            </div>
+            <div className="lg:hidden text-center mb-8">
+              {schoolInfo?.logo_url ? (
+                <img src={schoolInfo.logo_url} alt="" className="w-16 h-16 mx-auto mb-4 object-contain" crossOrigin="anonymous" />
+              ) : (
+                <div className="w-16 h-16 mx-auto mb-4 bg-maroon-100 rounded-2xl flex items-center justify-center">
+                  <span className="text-xl font-bold text-maroon-600">K</span>
+                </div>
+              )}
             <h1 className="text-xl font-bold text-slate-900">Reset Password</h1>
             <p className="text-sm text-slate-500 mt-1">
               {step === STEPS.EMAIL && 'Enter your email to receive a reset code'}

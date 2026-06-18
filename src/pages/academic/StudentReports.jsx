@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import domtoimage from 'dom-to-image-more'
+import jsPDF from 'jspdf'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
@@ -38,6 +40,100 @@ function computeCombinedMark(mark, hp) {
   return { ...t, max, pct }
 }
 
+function injectHexColors(doc) {
+  const s = doc.createElement('style')
+  s.textContent = `
+    :root {
+      --color-gray-50: #f9fafb; --color-gray-100: #f3f4f6;
+      --color-gray-200: #e5e7eb; --color-gray-300: #d1d5db;
+      --color-gray-400: #9ca3af; --color-gray-500: #6b7280;
+      --color-gray-600: #4b5563; --color-gray-700: #374151;
+      --color-gray-800: #1f2937; --color-gray-900: #111827;
+      --color-green-50: #f0fdf4; --color-green-100: #dcfce7;
+      --color-green-200: #bbf7d0; --color-green-300: #86efac;
+      --color-green-400: #4ade80; --color-green-500: #22c55e;
+      --color-green-600: #16a34a; --color-green-700: #15803d;
+      --color-green-800: #166534; --color-green-900: #14532d;
+      --color-blue-50: #eff6ff; --color-blue-100: #dbeafe;
+      --color-blue-200: #bfdbfe; --color-blue-300: #93c5fd;
+      --color-blue-400: #60a5fa; --color-blue-500: #3b82f6;
+      --color-blue-600: #2563eb; --color-blue-700: #1d4ed8;
+      --color-blue-800: #1e40af; --color-blue-900: #1e3a8a;
+      --color-red-50: #fef2f2; --color-red-100: #fee2e2;
+      --color-red-200: #fecaca; --color-red-300: #fca5a5;
+      --color-red-400: #f87171; --color-red-500: #ef4444;
+      --color-red-600: #dc2626; --color-red-700: #b91c1c;
+      --color-red-800: #991b1b; --color-red-900: #7f1d1d;
+      --color-amber-50: #fffbeb; --color-amber-100: #fef3c7;
+      --color-amber-200: #fde68a; --color-amber-300: #fcd34d;
+      --color-amber-400: #fbbf24; --color-amber-500: #f59e0b;
+      --color-amber-600: #d97706; --color-amber-700: #b45309;
+      --color-amber-800: #92400e; --color-amber-900: #78350f;
+      --color-indigo-50: #eef2ff; --color-indigo-100: #e0e7ff;
+      --color-indigo-200: #c7d2fe; --color-indigo-300: #a5b4fc;
+      --color-indigo-400: #818cf8; --color-indigo-500: #6366f1;
+      --color-indigo-600: #4f46e5; --color-indigo-700: #4338ca;
+      --color-indigo-800: #3730a3; --color-indigo-900: #312e81;
+      --color-purple-50: #faf5ff; --color-purple-100: #f3e8ff;
+      --color-purple-200: #e9d5ff; --color-purple-300: #d8b4fe;
+      --color-purple-400: #c084fc; --color-purple-500: #a855f7;
+      --color-purple-600: #9333ea; --color-purple-700: #7e22ce;
+      --color-purple-800: #6b21a8; --color-purple-900: #581c87;
+      --color-emerald-50: #ecfdf5; --color-emerald-100: #d1fae5;
+      --color-emerald-200: #a7f3d0; --color-emerald-300: #6ee7b7;
+      --color-emerald-400: #34d399; --color-emerald-500: #10b981;
+      --color-emerald-600: #059669; --color-emerald-700: #047857;
+      --color-emerald-800: #065f46; --color-emerald-900: #064e3b;
+      --color-maroon-50: #fdf2f3; --color-maroon-100: #fde8e9;
+      --color-maroon-200: #fbd0d4; --color-maroon-300: #f7a9b0;
+      --color-maroon-400: #f27a86; --color-maroon-500: #e84c5c;
+      --color-maroon-600: #b91c3b; --color-maroon-700: #99152e;
+      --color-maroon-800: #7a1224; --color-maroon-900: #3f0d12;
+    }
+  `
+  doc.head.appendChild(s)
+}
+
+async function generatePDF(element, filename, orientation = 'p') {
+  const canvas = await domtoimage.toCanvas(element, {
+    scale: 2,
+    bgcolor: '#ffffff',
+    style: {
+      overflow: 'visible',
+      height: 'auto',
+      width: element.scrollWidth + 'px',
+    },
+    onclone: (node) => {
+      const doc = node.ownerDocument
+      injectHexColors(doc)
+      const imgs = doc.querySelectorAll('img')
+      imgs.forEach(img => { img.crossOrigin = 'anonymous' })
+    },
+  })
+  const imgData = canvas.toDataURL('image/jpeg', 0.95)
+  const pdf = new jsPDF(orientation, 'mm', 'a4')
+  const pdfWidth = pdf.internal.pageSize.getWidth()
+  const pdfHeight = pdf.internal.pageSize.getHeight()
+  const margin = 8
+  const usableWidth = pdfWidth - margin * 2
+  const usableHeight = pdfHeight - margin * 2
+  const canvasWidth = canvas.width
+  const canvasHeight = canvas.height
+  const ratio = usableWidth / canvasWidth
+  const scaledHeight = canvasHeight * ratio
+  let heightLeft = scaledHeight
+  let position = margin
+  pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, scaledHeight)
+  heightLeft -= usableHeight
+  while (heightLeft > 0) {
+    position = margin - (usableHeight * Math.ceil((scaledHeight - heightLeft) / usableHeight))
+    pdf.addPage()
+    pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, scaledHeight)
+    heightLeft -= usableHeight
+  }
+  pdf.save(`${filename}.pdf`)
+}
+
 const printStyles = `
   @media print {
     @page { margin: 12mm 8mm 16mm; }
@@ -54,6 +150,9 @@ const printStyles = `
 function StudentReports() {
   const reportRef = useRef(null)
   const bulkContainerRef = useRef(null)
+
+  const [generatingPDF, setGeneratingPDF] = useState(false)
+  const [generatingBulkPDF, setGeneratingBulkPDF] = useState(false)
 
   const [mode, setMode] = useState('single')
 
@@ -298,9 +397,19 @@ function StudentReports() {
     setActiveTab('list')
   }, [])
 
-  const handleDownloadPDF = useCallback(() => {
-    window.print()
-  }, [])
+  const handleDownloadPDF = useCallback(async () => {
+    if (!selectedStudent) return
+    setGeneratingPDF(true)
+    try {
+      const name = `${selectedStudent.first_name} ${selectedStudent.middle_name || ''} ${selectedStudent.surname}`.replace(/\s+/g, ' ').trim()
+      const filename = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_report`
+      await generatePDF(reportRef.current, filename)
+    } catch (err) {
+      console.error('PDF generation error:', err)
+    } finally {
+      setGeneratingPDF(false)
+    }
+  }, [selectedStudent])
 
   const handleDownloadClassPDF = useCallback(() => {
     const studentList = mode === 'single'
@@ -310,17 +419,31 @@ function StudentReports() {
       alert('No students with results found for this class.')
       return
     }
+    setGeneratingBulkPDF('Preparing...')
     setBulkStudents(studentList)
   }, [sortedStudents, mode])
 
   useEffect(() => {
-    if (bulkStudents.length === 0) return
-    const timer = setTimeout(() => {
-      window.print()
-      setBulkStudents([])
-    }, 300)
+    if (bulkStudents.length === 0 || generatingBulkPDF === false) return
+    const run = async () => {
+      try {
+        for (let i = 0; i < bulkStudents.length; i++) {
+          const student = bulkStudents[i]
+          const name = `${student.first_name} ${student.middle_name || ''} ${student.surname}`.replace(/\s+/g, ' ').trim()
+          const filename = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_report`
+          setGeneratingBulkPDF(`Generating ${i + 1} of ${bulkStudents.length}...`)
+          await generatePDF(bulkContainerRef.current.children[i], filename)
+        }
+      } catch (err) {
+        console.error('Bulk PDF generation error:', err)
+      } finally {
+        setGeneratingBulkPDF(false)
+        setBulkStudents([])
+      }
+    }
+    const timer = setTimeout(run, 500)
     return () => clearTimeout(timer)
-  }, [bulkStudents])
+  }, [bulkStudents, generatingBulkPDF])
 
   const combinedStudentData = useMemo(() => {
     if (mode !== 'combined' || !selectedStudent) return null
@@ -354,7 +477,12 @@ function StudentReports() {
     const overallGrade = getGradeForPercentage(avgPct, grades)
     const totalMarks = entries.reduce((s, e) => s + (e.combinedTotal || 0), 0)
 
-    const allPoints = valid.map(e => e.gradeObj?.points || 0).filter(p => p > 0)
+    // For A-Level: only COMPULSORY/PRINCIPAL subjects count toward division points
+    const principalValid = classLevel === 'A_LEVEL'
+      ? valid.filter(e => e.subject.subject_type !== 'ELECTIVE')
+      : valid
+
+    const allPoints = principalValid.map(e => e.gradeObj?.points || 0).filter(p => p > 0)
     allPoints.sort((a, b) => a - b)
     const bestN = classLevel === 'A_LEVEL' ? 3 : 7
     const bestPoints = allPoints.slice(0, bestN)
@@ -375,7 +503,7 @@ function StudentReports() {
       }
     }
 
-    return { entries, avgPct, gradeObj: overallGrade, pts: totalPoints, totalMarks, division, validCount: valid.length }
+    return { entries, avgPct, gradeObj: overallGrade, pts: totalPoints, totalMarks, division, validCount: principalValid.length }
   }, [mode, selectedStudent, subjects, markMap, markMap2, selectedExam, selectedExam2, grades, classes, selectedClassId])
 
   const ReportCard = useCallback(({ student, isBulk }) => {
@@ -892,13 +1020,20 @@ function StudentReports() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleDownloadClassPDF}
-                    disabled={sortedStudents.length === 0}
+                    disabled={sortedStudents.length === 0 || generatingBulkPDF !== false}
                     className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                    </svg>
-                    Download All ({sortedStudents.length})
+                    {generatingBulkPDF !== false ? (
+                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                      </svg>
+                    ) : (
+                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                      </svg>
+                    )}
+                    {generatingBulkPDF !== false ? generatingBulkPDF : `Download All (${sortedStudents.length})`}
                   </button>
                 </div>
               </div>
@@ -958,12 +1093,20 @@ function StudentReports() {
                 </button>
                 <button
                   onClick={handleDownloadPDF}
-                  className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition flex items-center gap-2"
+                  disabled={generatingPDF}
+                  className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                  </svg>
-                  Download PDF
+                  {generatingPDF ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  ) : (
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
+                    </svg>
+                  )}
+                  {generatingPDF ? 'Generating...' : 'Download PDF'}
                 </button>
               </div>
 

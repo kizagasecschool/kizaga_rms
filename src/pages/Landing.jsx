@@ -1,20 +1,20 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
 const subjectsOLevel = [
   'Mathematics', 'English Language', 'Kiswahili', 'Physics',
   'Chemistry', 'Biology', 'History', 'Geography',
-  'Civics', 'Information Technology', 'Bible Knowledge',
+  'Civics', 'Business Studies', 'Historia ya Tanzania', 'Maadili',
 ]
 
 const aLevelCombinations = [
-  { name: 'PCB', subjects: 'Physics, Chemistry, Biology', career: 'Medicine, Pharmacy, Biotechnology' },
-  { name: 'PCM', subjects: 'Physics, Chemistry, Mathematics', career: 'Engineering, Computer Science, Architecture' },
-  { name: 'PGM', subjects: 'Physics, Geography, Mathematics', career: 'Geology, Surveying, Meteorology' },
-  { name: 'HGL', subjects: 'History, Geography, English', career: 'Law, Journalism, Education' },
-  { name: 'ECA', subjects: 'Economics, Commerce, Accounting', career: 'Finance, Business, Economics' },
-  { name: 'CBG', subjects: 'Chemistry, Biology, Geography', career: 'Agriculture, Environmental Science, Food Tech' },
+  { name: 'CBG', subjects: 'Chemistry, Biology, Geography', career: 'Medicine, Agriculture, Environmental Science' },
+  { name: 'HKL', subjects: 'History, Kiswahili, Literature', career: 'Law, Journalism, Education' },
 ]
+
+const heroImages = Array.from({ length: 6 }, (_, i) => `/images/${i + 1}.jpg`)
 
 const facilities = [
   { name: 'Science Laboratories', desc: 'Fully equipped physics, chemistry and biology laboratories for practical learning.', image: 'https://placehold.co/600x400/801818/ffffff?text=Science+Labs', icon: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.113.443-.276.857-.486 1.25M9.75 3.104c.53-.32 1.128-.512 1.759-.58M5 14.5l-.424 2.5A1.5 1.5 0 006.06 19h2.88a1.5 1.5 0 001.485-2l-.423-2.5M18 8.584V4.5a1.5 1.5 0 00-1.5-1.5h-3A1.5 1.5 0 0012 4.5v4.084M18 8.584a3 3 0 01-3 3h-1.5a3 3 0 01-3-3' },
@@ -27,6 +27,21 @@ const facilities = [
 
 function Landing() {
   const { user, profile, loading } = useAuth()
+  const [schoolInfo, setSchoolInfo] = useState(null)
+  const [currentSlide, setCurrentSlide] = useState(0)
+
+  useEffect(() => {
+    supabase.from('school_settings').select('logo_url, school_name').limit(1).then(({ data }) => {
+      if (data?.[0]) setSchoolInfo(data[0])
+    })
+  }, [])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentSlide(prev => (prev + 1) % heroImages.length)
+    }, 10000)
+    return () => clearInterval(timer)
+  }, [])
 
   return (
     <div className="min-h-screen bg-white">
@@ -35,11 +50,15 @@ function Landing() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link to="/" className="flex items-center gap-3">
-              <svg viewBox="0 0 36 36" className="w-9 h-9 shrink-0">
-                <rect width="36" height="36" rx="8" fill="#801818"/>
-                <path d="M18 5l11 7v7c0 5.5-11 11-11 11S7 24.5 7 19v-7l11-7z" fill="#a51d1d" stroke="#fff" strokeWidth="0.8"/>
-                <text x="18" y="22" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="700" fontFamily="Inter">K</text>
-              </svg>
+              {schoolInfo?.logo_url ? (
+                <img src={schoolInfo.logo_url} alt="" className="w-10 h-10 object-contain shrink-0" crossOrigin="anonymous" />
+              ) : (
+                <svg viewBox="0 0 36 36" className="w-9 h-9 shrink-0">
+                  <rect width="36" height="36" rx="8" fill="#801818"/>
+                  <path d="M18 5l11 7v7c0 5.5-11 11-11 11S7 24.5 7 19v-7l11-7z" fill="#a51d1d" stroke="#fff" strokeWidth="0.8"/>
+                  <text x="18" y="22" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="700" fontFamily="Inter">K</text>
+                </svg>
+              )}
               <div className="hidden sm:block">
                 <p className="text-sm font-bold text-gray-900 leading-tight">Kizaga Secondary School</p>
                 <p className="text-[10px] text-gray-500 leading-tight">Official Website</p>
@@ -84,24 +103,35 @@ function Landing() {
       </header>
 
       {/* ========== HERO ========== */}
-      <section className="relative bg-gradient-to-br from-maroon-900 via-maroon-800 to-neutral-900 text-white overflow-hidden">
-        <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,rgba(255,255,255,0.08)_0%,transparent_60%)]" />
+      <section className="relative bg-black text-white overflow-hidden">
+        {/* Slideshow images */}
+        <div className="absolute inset-0">
+          {heroImages.map((src, i) => (
+            <img
+              key={i}
+              src={src}
+              alt=""
+              className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${i === currentSlide ? 'opacity-100' : 'opacity-0'}`}
+              loading="lazy"
+            />
+          ))}
+        </div>
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20 sm:py-28 lg:py-36">
           <div className="max-w-3xl">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-white/10 backdrop-blur rounded-full text-xs font-medium text-maroon-100 border border-white/10 mb-6">
               <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
               Karibu | Official Website
             </div>
-            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-2">
+            <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold leading-tight mb-2 drop-shadow-lg">
               Kizaga Secondary School
             </h1>
-            <p className="text-lg sm:text-xl text-maroon-200/80 font-medium mb-4">
+            <p className="text-lg sm:text-xl text-white/80 font-medium mb-4 drop-shadow-md">
               Shule ya Sekondari Kizaga
             </p>
-            <p className="text-xl sm:text-2xl text-maroon-100/90 font-medium italic mb-4">
+            <p className="text-xl sm:text-2xl text-white/90 font-medium italic mb-4 drop-shadow-md">
               &ldquo;Elimu ni Mwangaza wa Maisha&rdquo; &mdash; Education is a Life Enlightener
             </p>
-            <p className="text-base sm:text-lg text-gray-300 max-w-2xl leading-relaxed mb-8">
+            <p className="text-base sm:text-lg text-white/70 max-w-2xl leading-relaxed mb-8 drop-shadow-md">
               Karibu Kizaga Secondary School &mdash; a leading secondary school in Tanzania offering quality
               O-Level and A-Level education. We nurture disciplined, knowledgeable, and skilled leaders
               through modern facilities, dedicated teachers, and a comprehensive school management system.
@@ -129,6 +159,18 @@ function Landing() {
               )}
             </div>
           </div>
+        </div>
+        {/* Dots */}
+        <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
+          {heroImages.map((_, i) => (
+            <button
+              key={i}
+              onClick={() => setCurrentSlide(i)}
+              className={`w-2.5 h-2.5 rounded-full transition-all duration-300 ${
+                i === currentSlide ? 'bg-white w-6' : 'bg-white/40 hover:bg-white/60'
+              }`}
+            />
+          ))}
         </div>
       </section>
 
@@ -424,36 +466,68 @@ function Landing() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl mx-auto">
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
-              <div className="w-10 h-10 bg-maroon-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <svg className="w-5 h-5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 max-w-3xl mx-auto">
+            <a href="https://maps.google.com/?q=Kizaga+ya+Ulemo+Tanzania" target="_blank" rel="noopener noreferrer" className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-center hover:border-maroon-300 hover:bg-maroon-50/30 transition block">
+              <div className="w-7 h-7 bg-maroon-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <svg className="w-3.5 h-3.5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z" />
                   <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z" />
                 </svg>
               </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">School Location</h3>
-              <p className="text-sm text-gray-500">Kizaga, Tanzania</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
-              <div className="w-10 h-10 bg-maroon-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <svg className="w-5 h-5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Phone</h3>
-              <p className="text-sm text-gray-500">+255 712 345 678</p>
-              <p className="text-sm text-gray-500">+255 765 432 100</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
-              <div className="w-10 h-10 bg-maroon-100 rounded-lg flex items-center justify-center mx-auto mb-3">
-                <svg className="w-5 h-5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+              <h3 className="text-xs font-semibold text-gray-900">Location</h3>
+            </a>
+            <a href="mailto:kizagasec2024@gmail.com" className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-center hover:border-maroon-300 hover:bg-maroon-50/30 transition block">
+              <div className="w-7 h-7 bg-maroon-100 rounded-lg flex items-center justify-center mx-auto mb-2">
+                <svg className="w-3.5 h-3.5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
                 </svg>
               </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Email</h3>
-              <p className="text-sm text-gray-500">info@kizaga-school.ac.tz</p>
-              <p className="text-sm text-gray-500">admin@kizaga-school.ac.tz</p>
+              <h3 className="text-xs font-semibold text-gray-900">Email</h3>
+            </a>
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-center">
+              <h3 className="text-xs font-semibold text-gray-900 mb-2">Headmistress</h3>
+              <div className="flex items-center justify-center gap-2">
+                <a href="tel:+255713834401" className="w-7 h-7 bg-maroon-100 rounded-lg flex items-center justify-center hover:bg-maroon-200 transition">
+                  <svg className="w-3.5 h-3.5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                  </svg>
+                </a>
+                <a href="https://wa.me/255713834401" target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center hover:bg-green-200 transition">
+                  <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-center">
+              <h3 className="text-xs font-semibold text-gray-900 mb-2">Second Master</h3>
+              <div className="flex items-center justify-center gap-2">
+                <a href="tel:+255710496118" className="w-7 h-7 bg-maroon-100 rounded-lg flex items-center justify-center hover:bg-maroon-200 transition">
+                  <svg className="w-3.5 h-3.5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                  </svg>
+                </a>
+                <a href="https://wa.me/255710496118" target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center hover:bg-green-200 transition">
+                  <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                </a>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-xl border border-gray-200 p-4 text-center">
+              <h3 className="text-xs font-semibold text-gray-900 mb-2">Academic Master</h3>
+              <div className="flex items-center justify-center gap-2">
+                <a href="tel:+255676155601" className="w-7 h-7 bg-maroon-100 rounded-lg flex items-center justify-center hover:bg-maroon-200 transition">
+                  <svg className="w-3.5 h-3.5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 6.75c0 8.284 6.716 15 15 15h2.25a2.25 2.25 0 002.25-2.25v-1.372c0-.516-.351-.966-.852-1.091l-4.423-1.106c-.44-.11-.902.055-1.173.417l-.97 1.293c-.282.376-.769.542-1.21.38a12.035 12.035 0 01-7.143-7.143c-.162-.441.004-.928.38-1.21l1.293-.97c.363-.271.527-.734.417-1.173L6.963 3.102a1.125 1.125 0 00-1.091-.852H4.5A2.25 2.25 0 002.25 4.5v2.25z" />
+                  </svg>
+                </a>
+                <a href="https://wa.me/255676155601" target="_blank" rel="noopener noreferrer" className="w-7 h-7 bg-green-100 rounded-lg flex items-center justify-center hover:bg-green-200 transition">
+                  <svg className="w-3.5 h-3.5 text-green-600" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z" />
+                  </svg>
+                </a>
+              </div>
             </div>
           </div>
         </div>
@@ -465,11 +539,17 @@ function Landing() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8">
             <div>
               <div className="flex items-center gap-3 mb-4">
-                <svg viewBox="0 0 36 36" className="w-9 h-9 shrink-0">
-                  <rect width="36" height="36" rx="8" fill="#801818"/>
-                  <path d="M18 5l11 7v7c0 5.5-11 11-11 11S7 24.5 7 19v-7l11-7z" fill="#a51d1d" stroke="#fff" strokeWidth="0.8"/>
-                  <text x="18" y="22" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="700" fontFamily="Inter">K</text>
-                </svg>
+                {schoolInfo?.logo_url ? (
+                  <div className="w-10 h-10 bg-white/10 backdrop-blur-sm rounded-lg flex items-center justify-center border border-white/20 p-1.5 shrink-0">
+                    <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
+                  </div>
+                ) : (
+                  <svg viewBox="0 0 36 36" className="w-9 h-9 shrink-0">
+                    <rect width="36" height="36" rx="8" fill="#801818"/>
+                    <path d="M18 5l11 7v7c0 5.5-11 11-11 11S7 24.5 7 19v-7l11-7z" fill="#a51d1d" stroke="#fff" strokeWidth="0.8"/>
+                    <text x="18" y="22" textAnchor="middle" fill="#fff" fontSize="14" fontWeight="700" fontFamily="Inter">K</text>
+                  </svg>
+                )}
                 <div>
                   <p className="text-sm font-bold text-white leading-tight">Kizaga Secondary School</p>
                   <p className="text-xs text-gray-500">Official Website</p>
