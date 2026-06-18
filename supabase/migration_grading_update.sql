@@ -46,15 +46,19 @@ $$ LANGUAGE plpgsql IMMUTABLE;
 CREATE OR REPLACE FUNCTION compute_student_result(p_student_id UUID, p_exam_id UUID)
 RETURNS VOID AS $$
 DECLARE
-  v_total       NUMERIC := 0;
-  v_count       INTEGER := 0;
-  v_average     NUMERIC := 0;
-  v_grade       TEXT;
-  v_division    TEXT;
-  v_level       TEXT;
-  v_points_sum  INTEGER := 0;
-  v_points      INTEGER;
-  rec           RECORD;
+  v_total             NUMERIC := 0;
+  v_count             INTEGER := 0;
+  v_average           NUMERIC := 0;
+  v_grade             TEXT;
+  v_division          TEXT;
+  v_level             TEXT;
+  v_points_sum        INTEGER := 0;
+  v_points            INTEGER;
+  v_principal_points  INTEGER[] := '{}';
+  v_filtered          INTEGER[];
+  v_i                 INTEGER;
+  v_best3_sum         INTEGER := 0;
+  rec                 RECORD;
 BEGIN
   SELECT c.level INTO v_level
   FROM students s
@@ -68,6 +72,7 @@ BEGIN
       COALESCE(m.practical_marks, 0) AS practical_marks,
       sub.level AS sub_level,
       sub.has_practical,
+      sub.subject_type,
       m.is_absent
     FROM marks m
     JOIN subjects sub ON sub.id = m.subject_id
@@ -83,7 +88,12 @@ BEGIN
       AND rec.marks_obtained >= g.min_mark
       AND rec.marks_obtained <= g.max_mark
     LIMIT 1;
-    v_points_sum := v_points_sum + COALESCE(v_points, 0);
+    v_points := COALESCE(v_points, 0);
+    v_points_sum := v_points_sum + v_points;
+    -- Collect principal/compulsory subject points for A-Level division
+    IF COALESCE(v_level, 'O_LEVEL') = 'A_LEVEL' AND rec.subject_type != 'ELECTIVE' AND v_points > 0 THEN
+      v_principal_points := array_append(v_principal_points, v_points);
+    END IF;
   END LOOP;
 
   IF v_count > 0 THEN
@@ -100,7 +110,17 @@ BEGIN
   IF COALESCE(v_level, 'O_LEVEL') = 'O_LEVEL' THEN
     v_division := calculate_o_level_division(v_points_sum);
   ELSE
-    v_division := calculate_a_level_division(v_points_sum);
+    -- A-Level: sort principal points ascending, take best 3 (lowest points)
+    IF array_length(v_principal_points, 1) IS NOT NULL THEN
+      v_filtered := (SELECT ARRAY(SELECT unnest(v_principal_points) AS p ORDER BY p LIMIT 3));
+      v_best3_sum := 0;
+      FOREACH v_i IN ARRAY v_filtered LOOP
+        v_best3_sum := v_best3_sum + v_i;
+      END LOOP;
+      v_division := calculate_a_level_division(v_best3_sum);
+    ELSE
+      v_division := 'Division 0';
+    END IF;
   END IF;
 
   INSERT INTO student_results (student_id, exam_id, total_marks, average_marks, grade, division)
