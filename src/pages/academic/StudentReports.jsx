@@ -94,56 +94,127 @@ function injectHexColors(doc) {
   doc.head.appendChild(s)
 }
 
-async function generatePDF(element, filename, orientation = 'p') {
-  const canvas = await domtoimage.toCanvas(element, {
-    scale: 2,
-    bgcolor: '#ffffff',
-    style: {
-      overflow: 'visible',
-      height: 'auto',
-      width: element.scrollWidth + 'px',
-    },
-    onclone: (node) => {
-      const doc = node.ownerDocument
-      injectHexColors(doc)
-      const imgs = doc.querySelectorAll('img')
-      imgs.forEach(img => { img.crossOrigin = 'anonymous' })
-    },
+function stripUIElements(doc) {
+  const selectors = [
+    'aside', 'header', 'nav', 'footer',
+    '.no-print', '[class*="sidebar"]', '[class*="topbar"]',
+    '[class*="navbar"]', '[class*="profile-dropdown"]',
+    '[class*="notif"]',
+  ]
+  selectors.forEach(sel => {
+    try {
+      const els = doc.querySelectorAll(sel)
+      els.forEach(el => { if (el) el.style.display = 'none' })
+    } catch {
+      // selector may not match, skip
+    }
   })
-  const imgData = canvas.toDataURL('image/jpeg', 0.95)
-  const pdf = new jsPDF(orientation, 'mm', 'a4')
-  const pdfWidth = pdf.internal.pageSize.getWidth()
+  const root = doc.documentElement
+  if (root) {
+    root.style.overflow = 'hidden'
+    root.style.height = 'auto'
+  }
+  const body = doc.body
+  if (body) {
+    body.style.overflow = 'hidden'
+    body.style.height = 'auto'
+  }
+  const style = doc.createElement('style')
+  style.textContent = '::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }'
+  doc.head.appendChild(style)
+}
+
+async function captureElementWithRetry(element, retries = 2) {
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      return await domtoimage.toCanvas(element, {
+        scale: 2,
+        bgcolor: '#ffffff',
+        style: {
+          overflow: 'visible',
+          height: 'auto',
+          width: element.scrollWidth + 'px',
+        },
+        onclone: (node) => {
+          const doc = node.ownerDocument
+          injectHexColors(doc)
+          const imgs = doc.querySelectorAll('img')
+          imgs.forEach(img => { img.crossOrigin = 'anonymous' })
+          stripUIElements(doc)
+        },
+      })
+    } catch (err) {
+      if (attempt < retries) {
+        await new Promise(r => setTimeout(r, 300))
+      } else {
+        throw err
+      }
+    }
+  }
+}
+
+function addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight) {
   const pdfHeight = pdf.internal.pageSize.getHeight()
-  const margin = 8
-  const usableWidth = pdfWidth - margin * 2
   const usableHeight = pdfHeight - margin * 2
-  const canvasWidth = canvas.width
-  const canvasHeight = canvas.height
-  const ratio = usableWidth / canvasWidth
-  const scaledHeight = canvasHeight * ratio
   let heightLeft = scaledHeight
   let position = margin
   pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, scaledHeight)
   heightLeft -= usableHeight
-  while (heightLeft > 0) {
-    position = margin - (usableHeight * Math.ceil((scaledHeight - heightLeft) / usableHeight))
+  while (heightLeft > 1) {
+    position = margin - (scaledHeight - heightLeft)
     pdf.addPage()
     pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, scaledHeight)
     heightLeft -= usableHeight
   }
+}
+
+async function generatePDF(element, filename, orientation = 'p') {
+  const canvas = await captureElementWithRetry(element)
+  const imgData = canvas.toDataURL('image/jpeg', 0.95)
+  const pdf = new jsPDF(orientation, 'mm', 'a4')
+  const pdfWidth = pdf.internal.pageSize.getWidth()
+  const margin = 8
+  const usableWidth = pdfWidth - margin * 2
+  const canvasWidth = canvas.width
+  const canvasHeight = canvas.height
+  const ratio = usableWidth / canvasWidth
+  const scaledHeight = canvasHeight * ratio
+  addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight)
   pdf.save(`${filename}.pdf`)
 }
 
 const printStyles = `
+  .print-all-students { display: none; }
   @media print {
-    @page { margin: 12mm 8mm 16mm; }
-    body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-    html, body { overflow: visible !important; height: auto !important; }
+    @page { margin: 10mm 6mm 14mm; size: A4 portrait; }
+    body {
+      -webkit-print-color-adjust: exact;
+      print-color-adjust: exact;
+      overflow: visible !important;
+      height: auto !important;
+    }
+    html, body, #root, .h-screen, .flex, .flex-1, .flex-col {
+      overflow: visible !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      width: 100% !important;
+    }
+    html::-webkit-scrollbar,
+    body::-webkit-scrollbar,
+    #root::-webkit-scrollbar {
+      display: none !important;
+      width: 0 !important;
+      height: 0 !important;
+    }
     .no-print { display: none !important; }
     .print-only { display: block !important; }
-    .print-area { overflow: visible !important; height: auto !important; }
-    .print-area table { font-size: 9pt !important; }
-    .print-area th, .print-area td { padding: 3pt 4pt !important; }
+    .print-area { display: none !important; }
+    .print-all-students { display: block !important; }
+    aside, header, footer, nav {
+      display: none !important;
+    }
+    .print-all-students > div { page-break-after: always; }
   }
 `
 
@@ -181,6 +252,20 @@ function StudentReports() {
   const [selectedStudent, setSelectedStudent] = useState(null)
   const [bulkStudents, setBulkStudents] = useState([])
   const [activeTab, setActiveTab] = useState('list')
+
+  const [reportHeading, setReportHeading] = useState('')
+  const [schoolClosingDate, setSchoolClosingDate] = useState('')
+  const [schoolOpeningDate, setSchoolOpeningDate] = useState('')
+  const [parentGreeting, setParentGreeting] = useState('')
+  const [closingMessage, setClosingMessage] = useState('')
+  const [classTeacherComment, setClassTeacherComment] = useState('')
+  const [headTeacherComment, setHeadTeacherComment] = useState('')
+
+  const [examLabel1, setExamLabel1] = useState('')
+  const [examLabel2, setExamLabel2] = useState('')
+  const [teacherSubjects, setTeacherSubjects] = useState([])
+  const [subjectRanks, setSubjectRanks] = useState({})
+  const [showPrintHint, setShowPrintHint] = useState(true)
 
   const [loading, setLoading] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
@@ -270,15 +355,29 @@ function StudentReports() {
         if (!selectedClass) return
         const classLevel = selectedClass.level || 'O_LEVEL'
 
-        const [gRes, sRes, exclRes] = await Promise.all([
+        const [gRes, sRes, exclRes, tsRes] = await Promise.all([
           supabase.from('grades').select('*').eq('level', classLevel).order('min_mark', { ascending: false }),
           supabase.from('subjects').select('*').eq('level', classLevel).order('subject_name'),
           supabase.from('class_excluded_subjects').select('subject_id').eq('class_id', selectedClassId),
+          supabase.from('teacher_subjects').select('*, teachers!inner(*, profiles!inner(full_name)), class_streams!inner(class_id)').eq('class_streams.class_id', selectedClassId),
         ])
         setGrades(gRes.data || [])
         const excludedIds = new Set((exclRes.data || []).map(r => r.subject_id))
         const assignedSubjects = (sRes.data || []).filter(s => !excludedIds.has(s.id))
         setSubjects(assignedSubjects)
+        const tsMap = {}
+        ;(tsRes.data || []).forEach(ts => {
+          const fullName = ts.teachers?.profiles?.full_name || ''
+          if (fullName && !tsMap[ts.subject_id]) {
+            const parts = fullName.trim().split(/\s+/)
+            const initial = parts[0].charAt(0).toUpperCase()
+            const surname = parts.length > 1 ? parts[parts.length - 1] : parts[0]
+            tsMap[ts.subject_id] = `Mwl. ${initial}. ${surname}`
+          } else if (!tsMap[ts.subject_id]) {
+            tsMap[ts.subject_id] = ''
+          }
+        })
+        setTeacherSubjects(tsMap)
 
         let loadedStudents = []
         let loadedMarks = []
@@ -344,6 +443,55 @@ function StudentReports() {
           }
         }
 
+        // Calculate subject ranks
+        const ranks = {}
+        if (mode === 'single') {
+          assignedSubjects.forEach(subj => {
+            const rankScores = []
+            loadedMarks.forEach(m => {
+              if (m.subject_id !== subj.id || m.is_absent) return
+              const theory = m.marks_obtained || 0
+              const hp = subjectHasPractical(subj, selectedExam)
+              const practical = hp ? (m.practical_marks || 0) : 0
+              rankScores.push({ student_id: m.student_id, total: theory + practical })
+            })
+            rankScores.sort((a, b) => b.total - a.total)
+            let rank = 1
+            rankScores.forEach((s, idx) => {
+              if (idx > 0 && s.total < rankScores[idx - 1].total) rank = idx + 1
+              ranks[`${s.student_id}_${subj.id}`] = rank
+            })
+          })
+        } else {
+          // Combined mode: rank by combined percentage of both exams
+          assignedSubjects.forEach(subj => {
+            const rankScores = []
+            const uniqueStudentIds = [...new Set([...loadedMarks, ...loadedMarks2].map(m => m.student_id))]
+            uniqueStudentIds.forEach(sid => {
+              const m1 = loadedMarks.find(m => m.student_id === sid && m.subject_id === subj.id)
+              const m2 = loadedMarks2.find(m => m.student_id === sid && m.subject_id === subj.id)
+              if (!m1) return
+              const allAbsent = m1?.is_absent
+              if (allAbsent) return
+              const hp1 = subjectHasPractical(subj, selectedExam)
+              const hp2 = subjectHasPractical(subj, selectedExam2)
+              const c1 = computeCombinedMark(m1, hp1)
+              const c2 = computeCombinedMark(m2, hp2)
+              const combinedTotal = (c1.total ?? 0) + (c2.total ?? 0)
+              const combinedMax = c1.max + c2.max
+              const pct = combinedMax > 0 ? (combinedTotal / combinedMax) * 100 : null
+              if (pct != null) rankScores.push({ student_id: sid, pct })
+            })
+            rankScores.sort((a, b) => b.pct - a.pct)
+            let rank = 1
+            rankScores.forEach((s, idx) => {
+              if (idx > 0 && s.pct < rankScores[idx - 1].pct) rank = idx + 1
+              ranks[`${s.student_id}_${subj.id}`] = rank
+            })
+          })
+        }
+        setSubjectRanks(ranks)
+
         setStudents(loadedStudents)
         setMarks(loadedMarks)
         setMarks2(loadedMarks2)
@@ -355,7 +503,7 @@ function StudentReports() {
       }
     }
     loadData()
-  }, [selectedClassId, activeExamIds, classes])
+  }, [selectedClassId, activeExamIds, classes, mode, selectedExam, selectedExam2])
 
   const markMap = useMemo(() => {
     const map = {}
@@ -416,34 +564,108 @@ function StudentReports() {
       ? sortedStudents.filter(s => s.result?.position != null)
       : sortedStudents
     if (studentList.length === 0) {
-      alert('No students with results found for this class.')
+      alert('Hakuna wanafunzi wenye matokeo kwa darasa hili.')
       return
     }
-    setGeneratingBulkPDF('Preparing...')
+    setGeneratingBulkPDF('Inaandaa...')
     setBulkStudents(studentList)
   }, [sortedStudents, mode])
 
+  // Bulk PDF: single multi-page PDF with all students (one per page)
   useEffect(() => {
     if (bulkStudents.length === 0 || generatingBulkPDF === false) return
-    const run = async () => {
+    const timer = setTimeout(async () => {
+      const errors = []
       try {
+        const c = classes.find(cl => cl.id === selectedClassId)
+        const className = c?.class_name || 'Darasa'
+        const filename = `${className.replace(/[^a-zA-Z0-9]/g, '_')}_Ripoti_Zote`
+
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const margin = 8
+        const usableWidth = pdfWidth - margin * 2
+
         for (let i = 0; i < bulkStudents.length; i++) {
-          const student = bulkStudents[i]
-          const name = `${student.first_name} ${student.middle_name || ''} ${student.surname}`.replace(/\s+/g, ' ').trim()
-          const filename = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_report`
-          setGeneratingBulkPDF(`Generating ${i + 1} of ${bulkStudents.length}...`)
-          await generatePDF(bulkContainerRef.current.children[i], filename)
+          setGeneratingBulkPDF(`Inaandaa ${i + 1} kati ya ${bulkStudents.length}...`)
+          await new Promise(resolve => setTimeout(resolve, 50))
+
+          const studentEl = bulkContainerRef.current?.children[i]
+          if (!studentEl) {
+            console.warn(`Bulk PDF: student element at index ${i} not found, skipping`)
+            continue
+          }
+
+          const s = bulkStudents[i]
+          const studentName = `${s.first_name || ''} ${s.middle_name || ''} ${s.surname || ''}`.trim()
+
+          try {
+            const canvas = await captureElementWithRetry(studentEl)
+            const imgData = canvas.toDataURL('image/jpeg', 0.95)
+            const canvasWidth = canvas.width
+            const canvasHeight = canvas.height
+            const ratio = usableWidth / canvasWidth
+            const scaledHeight = canvasHeight * ratio
+
+            if (i > 0 || pdf.getNumberOfPages() > 0) {
+              if (i > 0) pdf.addPage()
+            }
+            addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight)
+          } catch (studentErr) {
+            console.error(`Bulk PDF: failed to capture report for ${studentName}:`, studentErr)
+            errors.push({ name: studentName, error: studentErr.message })
+          }
         }
+
+        if (errors.length > 0) {
+          console.warn(`Bulk PDF completed with ${errors.length} error(s):`, errors.map(e => e.name).join(', '))
+        }
+
+        pdf.save(`${filename}.pdf`)
       } catch (err) {
         console.error('Bulk PDF generation error:', err)
+        alert('Kuna tatizo wakati wa kuandaa PDF. Tafadhali jaribu tena.')
       } finally {
         setGeneratingBulkPDF(false)
         setBulkStudents([])
       }
-    }
-    const timer = setTimeout(run, 500)
+    }, 800)
     return () => clearTimeout(timer)
   }, [bulkStudents, generatingBulkPDF])
+
+  // Load per-class report settings from DB when class changes or report tab opens
+  useEffect(() => {
+    if (!selectedClassId) { setReportHeading(''); setExamLabel1(''); setExamLabel2(''); return }
+    supabase
+      .from('class_report_settings')
+      .select('report_heading, exam_label_1, exam_label_2')
+      .eq('class_id', selectedClassId)
+      .maybeSingle()
+      .then(({ data, error }) => {
+        if (error) console.warn('Report settings load error:', error)
+        setReportHeading(data?.report_heading || '')
+        if (data?.exam_label_1) setExamLabel1(data.exam_label_1)
+        else if (selectedExam?.name) setExamLabel1(selectedExam.name)
+        else setExamLabel1('')
+        if (data?.exam_label_2) setExamLabel2(data.exam_label_2)
+        else if (selectedExam2?.name) setExamLabel2(selectedExam2.name)
+        else setExamLabel2('')
+      })
+  }, [selectedClassId, selectedExam?.name, selectedExam2?.name, activeTab])
+
+  // Auto-save report settings to DB with debounce
+  useEffect(() => {
+    if (!selectedClassId) return
+    const timer = setTimeout(async () => {
+      await supabase
+        .from('class_report_settings')
+        .upsert(
+          { class_id: selectedClassId, report_heading: reportHeading, exam_label_1: examLabel1, exam_label_2: examLabel2 },
+          { onConflict: 'class_id' }
+        )
+    }, 2000)
+    return () => clearTimeout(timer)
+  }, [reportHeading, examLabel1, examLabel2, selectedClassId])
 
   const combinedStudentData = useMemo(() => {
     if (mode !== 'combined' || !selectedStudent) return null
@@ -506,331 +728,302 @@ function StudentReports() {
     return { entries, avgPct, gradeObj: overallGrade, pts: totalPoints, totalMarks, division, validCount: principalValid.length }
   }, [mode, selectedStudent, subjects, markMap, markMap2, selectedExam, selectedExam2, grades, classes, selectedClassId])
 
-  const ReportCard = useCallback(({ student, isBulk }) => {
+  const ReportCard = useCallback(({ student }) => {
     const s = student
     const sr = mode === 'single' ? studentResults.find(r => r.student_id === s.id) || null : null
 
+    let totalPtsSingle = 0
+    if (mode === 'single') {
+      subjects.forEach(subject => {
+        const mark = markMap[`${s.id}_${subject.id}`]
+        const hp = subjectHasPractical(subject, selectedExam)
+        const total = ((mark?.marks_obtained ?? 0) + (hp ? (mark?.practical_marks ?? 0) : 0))
+        const max = hp ? 150 : 100
+        const pct = mark && !mark.is_absent ? (total / max) * 100 : null
+        const g = getGradeForPercentage(pct, grades)
+        if (g) totalPtsSingle += g.points
+      })
+    }
+
+    const cData = mode === 'combined' ? combinedStudentData : null
+
     return (
-      <div
-        className="bg-white border border-gray-200 overflow-hidden"
-        style={{ fontFamily: 'Arial, sans-serif', pageBreakAfter: 'always' }}
-      >
-        <div className="px-6 pt-6 pb-3 border-b-2 border-gray-800 text-center">
-          <div className="flex items-center justify-center gap-4 mb-2">
-            {schoolInfo?.national_logo_url && (
-              <img src={schoolInfo.national_logo_url} alt="" className="w-14 h-14 object-contain" crossOrigin="anonymous" />
-            )}
-            <div>
-              <h1 className="text-lg font-bold uppercase text-gray-900 tracking-wide">
-                {schoolInfo?.school_name || 'School Name'}
-              </h1>
-              <p className="text-xs text-gray-600">{schoolInfo?.address || ''}</p>
-              {(schoolInfo?.region || schoolInfo?.district) && (
-                <p className="text-xs text-gray-600">
-                  {[schoolInfo?.region, schoolInfo?.district].filter(Boolean).join(' - ')}
-                </p>
+      <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px', lineHeight: '1.35', color: '#000', pageBreakAfter: 'always', background: '#fff', padding: '18px 25px', overflow: 'hidden' }}>
+        {/* HEADER: Logos + User Heading */}
+        <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '6px', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ width: '72px', display: 'flex', justifyContent: 'flex-start' }}>
+              {schoolInfo?.national_logo_url && (
+                <img src={schoolInfo.national_logo_url} alt="" style={{ width: '56px', height: '56px', objectFit: 'contain' }} crossOrigin="anonymous" />
               )}
-              <p className="text-xs text-gray-600">
-                {schoolInfo?.phone ? `Tel: ${schoolInfo.phone}` : ''}
-                {schoolInfo?.phone && schoolInfo?.email ? ' | ' : ''}
-                {schoolInfo?.email || ''}
+            </div>
+            <div style={{ flex: 1, textAlign: 'center', fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'pre-line', lineHeight: '1.2' }}>
+              {reportHeading || (mode === 'combined' ? 'RIPOTI MCHANGANYIKO' : 'RIPOTI YA MWANAFUNZI')}
+            </div>
+            <div style={{ width: '72px', display: 'flex', justifyContent: 'flex-end' }}>
+              {schoolInfo?.logo_url && (
+                <img src={schoolInfo.logo_url} alt="" style={{ width: '56px', height: '56px', objectFit: 'contain' }} crossOrigin="anonymous" />
+              )}
+            </div>
+          </div>
+          {mode === 'combined' && (
+            <div style={{ fontSize: '11px', marginTop: '4px' }}>{(examLabel1 || selectedExam?.name)} + {(examLabel2 || selectedExam2?.name)}</div>
+          )}
+        </div>
+
+        {/* STUDENT NAME */}
+        <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', whiteSpace: 'pre-line' }}>
+          {s.first_name} {s.middle_name || ''} {s.surname}
+        </div>
+
+        {/* ADDRESS TO PARENT */}
+        <p style={{ fontSize: '12px', fontStyle: 'italic', marginBottom: '4px' }}>
+          {parentGreeting || `Wazazi/Mlezi wa ${s.first_name} ${s.surname},`}
+        </p>
+        <p style={{ fontSize: '12px', marginBottom: '8px' }}>
+          Hii ni taarifa ya matokeo ya mtoto wako kwa muhula ulioisha. Tafadhali isome kwa makini, jadiliana naye, na utie sahihi sehemu ya mzazi iliyopo mwishoni mwa ripoti hii.
+        </p>
+
+        {/* TABLE 1: Subject Results */}
+        <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>MATOKEO YA MASOMO</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
+          <thead>
+            <tr style={{ background: '#f0f0f0' }}>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left', width: '4%' }}>#</th>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left' }}>Somo</th>
+              {mode === 'combined' ? (
+                <>
+                  <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{(examLabel1 || selectedExam?.name || 'Mth. 1')}</th>
+                  <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{(examLabel2 || selectedExam2?.name || 'Mth. 2')}</th>
+                </>
+              ) : selectedExam?.has_practical ? (
+                <>
+                  <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || 'Nadharia'}</th>
+                  <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel2 || 'Vitendo'}</th>
+                </>
+              ) : (
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || 'Alama'}</th>
+              )}
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '8%' }}>Wastani</th>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '7%' }}>Daraja</th>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '6%' }}>Nafasi</th>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '18%' }}>Sahihi ya Mwalimu</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mode === 'single' && subjects.map((subject, idx) => {
+              const mark = markMap[`${s.id}_${subject.id}`]
+              const hp = subjectHasPractical(subject, selectedExam)
+              const theoryMark = mark?.marks_obtained ?? null
+              const practicalMark = hp ? (mark?.practical_marks ?? null) : null
+              const total = (theoryMark || 0) + (practicalMark || 0)
+              const max = hp ? 150 : 100
+              const pct = mark && !mark.is_absent ? (total / max) * 100 : null
+              const gradeObj = getGradeForPercentage(pct, grades)
+              const isAbsent = mark?.is_absent
+
+              return (
+                <tr key={subject.id}>
+                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{idx + 1}</td>
+                  <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{subject.subject_name}</td>
+                  {selectedExam?.has_practical ? (
+                    <>
+                      <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                        {isAbsent ? '-' : theoryMark != null ? theoryMark : '-'}
+                      </td>
+                      <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                        {isAbsent ? '-' : practicalMark != null ? practicalMark : '-'}
+                      </td>
+                    </>
+                  ) : (
+                    <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                      {isAbsent ? '-' : theoryMark != null ? theoryMark : '-'}
+                    </td>
+                  )}
+                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                    {isAbsent ? '-' : pct != null ? `${pct.toFixed(0)}` : '-'}
+                  </td>
+                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
+                    {isAbsent ? '-' : gradeObj?.grade || '-'}
+                  </td>
+                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                    {isAbsent ? '-' : subjectRanks[`${s.id}_${subject.id}`] || '-'}
+                  </td>
+                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                    {teacherSubjects[subject.id] || ''}
+                  </td>
+                </tr>
+              )
+            })}
+            {mode === 'combined' && cData?.entries.map((entry, idx) => (
+              <tr key={entry.subject.id}>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{idx + 1}</td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{entry.subject.subject_name}</td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {entry.isAbsent1 ? '-' : entry.exam1Total != null ? entry.exam1Total : '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {entry.isAbsent2 ? '-' : entry.exam2Total != null ? entry.exam2Total : '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {entry.combinedPct != null ? `${entry.combinedPct.toFixed(0)}` : '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
+                  {entry.gradeObj?.grade || '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {entry.isAbsent1 && entry.isAbsent2 ? '-' : subjectRanks[`${s.id}_${entry.subject.id}`] || '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                  {teacherSubjects[entry.subject.id] || ''}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* TABLE 2: Character Assessment */}
+        <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>TATHMINI YA MWENENDO WA MWANAFUNZI</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
+          <thead>
+            <tr style={{ background: '#f0f0f0' }}>
+              {['Tabia', 'Uwajibikaji', 'Ubunifu', 'Kujiamini', 'Usahihi', 'Ushirikiano', 'Michezo'].map(h => (
+                <th key={h} style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{h}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              {[1, 2, 3, 4, 5, 6, 7].map(i => (
+                <td key={i} style={{ border: '1px solid #000', padding: '8px 4px', textAlign: 'center' }}></td>
+              ))}
+            </tr>
+          </tbody>
+        </table>
+
+        {/* TABLE 3: Grade Boundary */}
+        <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>VIWANGO VYA DARAJA</h3>
+        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
+          <thead>
+            <tr style={{ background: '#f0f0f0' }}>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '15%' }}>Daraja</th>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>Asilimia</th>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '12%' }}>Pointi</th>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>Maana</th>
+            </tr>
+          </thead>
+          <tbody>
+            {grades.slice().reverse().map((g, idx) => (
+              <tr key={idx}>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>{g.grade}</td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{g.min_mark}-{g.max_mark}%</td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{g.points != null ? g.points : '-'}</td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{g.remarks || '-'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+
+        {/* SUMMARY */}
+        <p style={{ fontSize: '12px', marginBottom: '8px' }}>
+          {s.first_name} amekuwa namba <strong>{mode === 'single' ? (sr?.position || '-') : '-'}</strong> kati ya wanafunzi <strong>{students.length}</strong>.
+          Amepata wastani wa <strong>{mode === 'single' ? (sr?.average_marks != null ? `${sr.average_marks.toFixed(1)}%` : '-') : (cData?.avgPct != null ? `${cData.avgPct.toFixed(1)}%` : '-')}</strong>,
+          daraja <strong>{mode === 'single' ? (sr?.grade || getGradeForPercentage(sr?.average_marks, grades)?.grade || '-') : (cData?.gradeObj?.grade || '-')}</strong>,
+          division <strong>{mode === 'single' ? ((sr?.division || '').replace('Division ', '') || '-') : (cData?.division || '-')}</strong>
+          ya pointi <strong>{mode === 'single' ? (totalPtsSingle > 0 ? totalPtsSingle : '-') : (cData?.pts != null ? cData.pts : '-')}</strong>.
+        </p>
+
+        {/* AUTO COMMENTS BASED ON GRADE */}
+        {(() => {
+          const avg = mode === 'single' ? (sr?.average_marks ?? null) : (cData?.avgPct ?? null)
+          const g = mode === 'single' ? (sr?.grade || getGradeForPercentage(sr?.average_marks, grades)?.grade || '') : (cData?.gradeObj?.grade || '')
+
+          let autoClass = 'Endelea kujitahidi katika masomo yako.'
+          let autoHead = 'Nawataka wazazi kuendelea kumhimiza mtoto wenu kusoma kwa bidii.'
+
+          if (g === 'A') {
+            autoClass = 'Umefanya vizuri sana. Endelea kudumisha kiwango hiki cha juu cha ufaulu.'
+            autoHead = 'Napongeza juhudi za mwanafunzi huyu. Asanteni kwa ushirikiano wenu mkamilifu.'
+          } else if (g === 'B') {
+            autoClass = 'Umefanya vizuri. Endelea kujitahidi zaidi ili kufikia daraja la juu zaidi.'
+            autoHead = 'Nawataka wazazi kuendelea kumhimiza mtoto wenu kusoma kwa bidii ili kuboresha zaidi.'
+          } else if (g === 'C') {
+            autoClass = 'Unaendelea wastani. Jitahidi zaidi ili kuboresha matokeo yako.'
+            autoHead = 'Nawataka wazazi kushirikiana nasi kumhimiza mtoto wenu kusoma kwa bidii zaidi.'
+          } else if (g === 'D') {
+            autoClass = 'Unahitaji kuongeza juhudi zaidi katika masomo yako na kusoma kwa bidii.'
+            autoHead = 'Nawataka wazazi kuchukua hatua za dharura kumsaidia mtoto wenu kuboresha ufaulu wake.'
+          } else if (g === 'F' || g === 'E') {
+            autoClass = 'Unahitaji kusoma kwa bidii zaidi na kuhudhuria masomo yote kwa ukamilifu.'
+            autoHead = 'Nawataka wazazi kufuatilia kwa karibu zaidi maendeleo ya mtoto wenu na kushirikiana nasi.'
+          }
+
+          return (
+            <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+              <p style={{ margin: '2px 0' }}>
+                <strong>Maoni ya Mwalimu wa Darasa:</strong> {classTeacherComment || (avg != null ? autoClass : '________________________________________')}
+              </p>
+              <p style={{ margin: '2px 0' }}>
+                <strong>Maoni ya Mkuu wa Shule:</strong> {headTeacherComment || (avg != null ? autoHead : '________________________________________')}
               </p>
             </div>
-            {schoolInfo?.logo_url && (
-              <img src={schoolInfo.logo_url} alt="" className="w-14 h-14 object-contain" crossOrigin="anonymous" />
-            )}
+          )
+        })()}
+
+        {/* CLOSING MESSAGE */}
+        <p style={{ fontSize: '12px', fontStyle: 'italic', marginBottom: '4px' }}>
+          {closingMessage || 'Asante kwa ushirikiano wenu katika kuhakikisha maendeleo ya mtoto wenu. Mungu awabariki.'}
+        </p>
+        <p style={{ fontSize: '12px', marginBottom: '8px' }}>
+          <strong>Tarehe ya Kufunga:</strong> {schoolClosingDate ? new Date(schoolClosingDate).toLocaleDateString('en-TZ') : '________'} &nbsp;|&nbsp;
+          <strong>Tarehe ya Kufungua:</strong> {schoolOpeningDate ? new Date(schoolOpeningDate).toLocaleDateString('en-TZ') : '________'}
+        </p>
+
+        {/* SIGNATURES */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px' }}>
+          <div style={{ textAlign: 'center', width: '30%' }}>
+            <div style={{ height: '28px' }}></div>
+            <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+              <div style={{ fontWeight: 'bold' }}>Mkuu wa Shule</div>
+              <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
+            </div>
           </div>
-          <h2 className="text-base font-bold uppercase text-gray-800 tracking-wider">
-            {mode === 'combined' ? 'Combined Report Card' : 'Student Report Card'}
-          </h2>
-          {mode === 'combined' && (
-            <p className="text-xs text-gray-600">{selectedExam?.name} + {selectedExam2?.name}</p>
-          )}
-        </div>
-
-        <div className="px-6 py-3 border-b border-gray-200">
-          <table className="w-full text-xs">
-            <tbody>
-              <tr>
-                <td className="py-0.5 w-36"><span className="font-semibold text-gray-700">Student Name:</span></td>
-                <td className="py-0.5 w-52">
-                  <span className="text-gray-900 font-medium">
-                    {s.first_name} {s.middle_name || ''} {s.surname}
-                  </span>
-                </td>
-                <td className="py-0.5 w-36"><span className="font-semibold text-gray-700">Admission No:</span></td>
-                <td className="py-0.5">
-                  <span className="text-gray-900 font-mono">{s.admission_number}</span>
-                </td>
-              </tr>
-              <tr>
-                <td className="py-0.5"><span className="font-semibold text-gray-700">Gender:</span></td>
-                <td className="py-0.5"><span className="text-gray-900">{s.gender}</span></td>
-                <td className="py-0.5"><span className="font-semibold text-gray-700">Class:</span></td>
-                <td className="py-0.5">
-                  <span className="text-gray-900">{classes.find(c => c.id === selectedClassId)?.class_name || ''}</span>
-                </td>
-              </tr>
-              <tr>
-                <td className="py-0.5"><span className="font-semibold text-gray-700">Date of Birth:</span></td>
-                <td className="py-0.5">
-                  <span className="text-gray-900">
-                    {s.date_of_birth ? new Date(s.date_of_birth).toLocaleDateString('en-TZ') : '-'}
-                  </span>
-                </td>
-                <td className="py-0.5"><span className="font-semibold text-gray-700">Exams:</span></td>
-                <td className="py-0.5">
-                  <span className="text-gray-900">
-                    {mode === 'single'
-                      ? (selectedExam?.name || '')
-                      : `${selectedExam?.name || '?'} + ${selectedExam2?.name || '?'}`
-                    }
-                  </span>
-                </td>
-              </tr>
-              {mode === 'single' && sr && (
-                <tr>
-                  <td className="py-0.5"><span className="font-semibold text-gray-700">Position:</span></td>
-                  <td className="py-0.5">
-                    <span className="text-gray-900 font-bold">
-                      {sr.position ? `${sr.position} out of ${students.length}` : '-'}
-                    </span>
-                  </td>
-                  <td className="py-0.5" />
-                  <td className="py-0.5" />
-                </tr>
-              )}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="px-6 py-3">
-          <h3 className="text-xs font-bold text-gray-800 mb-2 uppercase tracking-wider">Subject Performance</h3>
-          <table className="w-full text-xs border-collapse border border-gray-300">
-            <thead>
-              <tr className="bg-gray-100">
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left text-[10px] font-bold text-gray-700 uppercase w-6">#</th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left text-[10px] font-bold text-gray-700 uppercase">Subject</th>
-                {mode === 'combined' ? (
-                  <>
-                    <th className="border border-gray-300 px-1.5 py-1.5 text-center text-[10px] font-bold text-gray-700 uppercase w-14">
-                      {selectedExam?.exam_type?.replace('_', ' ') || 'Exam 1'}
-                    </th>
-                    <th className="border border-gray-300 px-1.5 py-1.5 text-center text-[10px] font-bold text-gray-700 uppercase w-14">
-                      {selectedExam2?.exam_type?.replace('_', ' ') || 'Exam 2'}
-                    </th>
-                  </>
-                ) : selectedExam?.has_practical ? (
-                  <>
-                    <th className="border border-gray-300 px-1.5 py-1.5 text-center text-[10px] font-bold text-gray-700 uppercase w-12">Theory</th>
-                    <th className="border border-gray-300 px-1.5 py-1.5 text-center text-[10px] font-bold text-gray-700 uppercase w-12">Practical</th>
-                  </>
-                ) : null}
-                <th className="border border-gray-300 px-1.5 py-1.5 text-center text-[10px] font-bold text-gray-700 uppercase w-12">Marks</th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-center text-[10px] font-bold text-gray-700 uppercase w-10">Grade</th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-center text-[10px] font-bold text-gray-700 uppercase w-8">Pts</th>
-                <th className="border border-gray-300 px-1.5 py-1.5 text-left text-[10px] font-bold text-gray-700 uppercase">Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              {mode === 'single' && subjects.map((subject, idx) => {
-                const mark = markMap[`${s.id}_${subject.id}`]
-                const hp = subjectHasPractical(subject, selectedExam)
-                const theoryMark = mark?.marks_obtained ?? null
-                const practicalMark = hp ? (mark?.practical_marks ?? null) : null
-                const total = (theoryMark || 0) + (practicalMark || 0)
-                const max = hp ? 150 : 100
-                const pct = mark && !mark.is_absent ? (total / max) * 100 : null
-                const gradeObj = getGradeForPercentage(pct, grades)
-                const isAbsent = mark?.is_absent
-
-                return (
-                  <tr key={subject.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center text-gray-600">{idx + 1}</td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 font-medium text-gray-800">{subject.subject_name}</td>
-                    {selectedExam?.has_practical && (
-                      <>
-                        <td className="border border-gray-300 px-1.5 py-1.5 text-center text-gray-700">
-                          {isAbsent ? <span className="text-amber-500 text-[10px]">Abs</span> : theoryMark != null ? theoryMark : '-'}
-                        </td>
-                        <td className="border border-gray-300 px-1.5 py-1.5 text-center text-gray-700">
-                          {isAbsent ? <span className="text-amber-500 text-[10px]">Abs</span> : practicalMark != null ? practicalMark : '-'}
-                        </td>
-                      </>
-                    )}
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center font-semibold text-gray-800">
-                      {isAbsent ? <span className="text-amber-500 text-[10px]">Abs</span> : pct != null ? `${pct.toFixed(0)}%` : '-'}
-                    </td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center font-bold">
-                      {isAbsent ? <span className="text-gray-400">-</span> : gradeObj ? (
-                        <span className={`px-1 py-0.5 rounded text-[10px] font-bold ${
-                          gradeObj.grade === 'A' ? 'bg-green-100 text-green-800' :
-                          gradeObj.grade === 'B' ? 'bg-blue-100 text-blue-800' :
-                          gradeObj.grade === 'C' ? 'bg-yellow-100 text-yellow-800' :
-                          gradeObj.grade === 'D' ? 'bg-orange-100 text-orange-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>{gradeObj.grade}</span>
-                      ) : '-'}
-                    </td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center font-medium text-gray-700">
-                      {isAbsent ? '-' : gradeObj?.points != null ? gradeObj.points : '-'}
-                    </td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-gray-600 text-[10px]">
-                      {isAbsent ? 'Absent' : gradeObj?.remarks || '-'}
-                    </td>
-                  </tr>
-                )
-              })}
-
-              {mode === 'combined' && combinedStudentData?.entries.map((entry, idx) => {
-                return (
-                  <tr key={entry.subject.id} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50/50'}>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center text-gray-600">{idx + 1}</td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 font-medium text-gray-800">{entry.subject.subject_name}</td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center text-gray-700">
-                      {entry.isAbsent1 ? <span className="text-amber-500 text-[10px]">Abs</span> : entry.exam1Total != null ? entry.exam1Total : '-'}
-                    </td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center text-gray-700">
-                      {entry.isAbsent2 ? <span className="text-amber-500 text-[10px]">Abs</span> : entry.exam2Total != null ? entry.exam2Total : '-'}
-                    </td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center font-semibold text-gray-800">
-                      {entry.combinedPct != null ? `${entry.combinedPct.toFixed(0)}%` : '-'}
-                    </td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center font-bold">
-                      {entry.gradeObj ? (
-                        <span className={`px-1 py-0.5 rounded text-[10px] font-bold ${
-                          entry.gradeObj.grade === 'A' ? 'bg-green-100 text-green-800' :
-                          entry.gradeObj.grade === 'B' ? 'bg-blue-100 text-blue-800' :
-                          entry.gradeObj.grade === 'C' ? 'bg-yellow-100 text-yellow-800' :
-                          entry.gradeObj.grade === 'D' ? 'bg-orange-100 text-orange-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>{entry.gradeObj.grade}</span>
-                      ) : '-'}
-                    </td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-center font-medium text-gray-700">
-                      {entry.gradeObj?.points != null ? entry.gradeObj.points : '-'}
-                    </td>
-                    <td className="border border-gray-300 px-1.5 py-1.5 text-gray-600 text-[10px]">
-                      {entry.gradeObj?.remarks || '-'}
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="px-6 pb-3">
-          {mode === 'single' && sr && (
-            <div className="grid grid-cols-5 gap-2 mb-3">
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-gray-900">{sr.total_marks ?? '-'}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Total</div>
-              </div>
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-gray-900">{sr.average_marks ?? '-'}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Average</div>
-              </div>
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-indigo-600">{sr.grade || '-'}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Grade</div>
-              </div>
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-purple-600">{(sr.division || '').replace('Division ', '') || '-'}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Division</div>
-              </div>
-                <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                  <div className="text-sm font-bold text-gray-900">
-                    {(() => { 
-                      let totalPts = 0
-                      subjects.forEach(subject => {
-                        const mark = markMap[`${s.id}_${subject.id}`]
-                        const hp = subjectHasPractical(subject, selectedExam)
-                        const total = ((mark?.marks_obtained ?? 0) + (hp ? (mark?.practical_marks ?? 0) : 0))
-                        const max = hp ? 150 : 100
-                        const pct = mark && !mark.is_absent ? (total / max) * 100 : null
-                        const g = getGradeForPercentage(pct, grades)
-                        if (g) totalPts += g.points
-                      })
-                      return totalPts > 0 ? totalPts : '-'
-                    })()}
-                  </div>
-                  <div className="text-[9px] text-gray-500 uppercase">Total Pts</div>
-                </div>
+          <div style={{ textAlign: 'center', width: '30%' }}>
+            <div style={{ height: '40px' }}></div>
+            <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+              <div style={{ fontWeight: 'bold' }}>Mwalimu Mkuu wa Masomo</div>
+              <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
             </div>
-          )}
-          {mode === 'combined' && combinedStudentData && (
-            <div className="grid grid-cols-5 gap-2 mb-3">
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-gray-900">{combinedStudentData.totalMarks.toFixed(0)}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Total</div>
-              </div>
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-gray-900">{combinedStudentData.avgPct != null ? `${combinedStudentData.avgPct.toFixed(1)}%` : '-'}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Average</div>
-              </div>
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-indigo-600">{combinedStudentData.gradeObj?.grade || '-'}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Grade</div>
-              </div>
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-purple-600">{combinedStudentData.division || '-'}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Division</div>
-              </div>
-              <div className="bg-gray-50 rounded p-2 text-center border border-gray-200">
-                <div className="text-sm font-bold text-gray-900">{combinedStudentData.pts != null ? combinedStudentData.pts : '-'}</div>
-                <div className="text-[9px] text-gray-500 uppercase">Total Pts</div>
-              </div>
-            </div>
-          )}
-
-          <div className="mb-2">
-            <h4 className="text-[10px] font-bold text-gray-700 uppercase mb-1 tracking-wider">Grading Key</h4>
-            <div className="flex flex-wrap gap-0.5">
-              {grades.slice().reverse().map((g, idx) => (
-                <span key={idx} className={`text-[8px] px-1.5 py-0.5 rounded font-medium ${
-                  g.grade === 'A' ? 'bg-green-100 text-green-800' :
-                  g.grade === 'B' ? 'bg-blue-100 text-blue-800' :
-                  g.grade === 'C' ? 'bg-yellow-100 text-yellow-800' :
-                  g.grade === 'D' ? 'bg-orange-100 text-orange-800' :
-                  g.grade === 'E' ? 'bg-red-100 text-red-800' :
-                  'bg-gray-100 text-gray-800'
-                }`}>
-                  {g.grade}: {g.min_mark}-{g.max_mark}%{g.points != null ? ` (${g.points}p)` : ''}
-                </span>
-              ))}
+          </div>
+          <div style={{ textAlign: 'center', width: '30%' }}>
+            <div style={{ height: '40px' }}></div>
+            <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+              <div style={{ fontWeight: 'bold' }}>Mhuri wa Shule</div>
+              <div style={{ fontSize: '8px', color: '#555' }}>Mhuri</div>
             </div>
           </div>
         </div>
 
-        <div className="px-6 pb-6 pt-2 border-t border-gray-200">
-          <div className="grid grid-cols-3 gap-6">
-            <div className="text-center">
-              <div className="h-8" />
-              <div className="border-t border-gray-400 pt-0.5">
-                <p className="text-[10px] font-semibold text-gray-700">Class Teacher</p>
-                <p className="text-[8px] text-gray-500">Signature & Date</p>
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="h-8" />
-              <div className="border-t border-gray-400 pt-0.5">
-                <p className="text-[10px] font-semibold text-gray-700">Head of School</p>
-                <p className="text-[8px] text-gray-500">Signature & Date</p>
-              </div>
-            </div>
-            <div className="text-center">
-              <div className="h-8" />
-              <div className="border-t border-gray-400 pt-0.5">
-                <p className="text-[10px] font-semibold text-gray-700">Headmaster</p>
-                <p className="text-[8px] text-gray-500">Signature & Date</p>
-              </div>
-            </div>
+        {/* PARENT SECTION */}
+        <div style={{ border: '2px solid #000', padding: '8px', marginTop: '6px' }}>
+          <h4 style={{ fontSize: '12px', fontWeight: 'bold', textAlign: 'center', margin: '0 0 4px 0' }}>
+            SEHEMU YA MZAZI / MLEZI
+          </h4>
+          <p style={{ fontSize: '12px', marginBottom: '6px' }}>
+            Tafadhali jaza sehemu hii, kisha kata na kumrudishia mwanafunzi shuleni.
+          </p>
+          <div style={{ fontSize: '12px', lineHeight: '1.6' }}>
+            <p style={{ margin: '2px 0' }}><strong>Maoni:</strong> ________________________________________</p>
+            <p style={{ margin: '2px 0' }}><strong>Sahihi:</strong> _________________ &emsp; <strong>Jina:</strong> _________________</p>
+            <p style={{ margin: '2px 0' }}><strong>Uhusiano:</strong> _________________ &emsp; <strong>Tarehe:</strong> _________________</p>
+          </div>
+          <div style={{ textAlign: 'center', marginTop: '4px' }}>
+            <span style={{ fontSize: '8px', color: '#888' }}>- - - - - - - - - - Kata hapa - - - - - - - - - -</span>
           </div>
         </div>
       </div>
     )
-  }, [subjects, markMap, markMap2, studentResults, studentResults, grades, selectedExam, selectedExam2, selectedClassId, classes, schoolInfo, mode, students.length, combinedStudentData])
+  }, [subjects, markMap, markMap2, studentResults, grades, selectedExam, selectedExam2, selectedClassId, classes, schoolInfo, mode, students.length, combinedStudentData, reportHeading, parentGreeting, closingMessage, schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment, teacherSubjects, examLabel1, examLabel2, subjectRanks])
 
   if (loading) {
     return (
@@ -844,13 +1037,13 @@ function StudentReports() {
     <div>
       <style>{printStyles}</style>
       <div className="no-print mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Student Report Cards</h1>
-        <p className="text-gray-500 mt-1">Generate and download individual PDF report cards for students</p>
+        <h1 className="text-2xl font-bold text-gray-900">Ripoti za Wanafunzi</h1>
+        <p className="text-gray-500 mt-1">Tengeneza na pakua ripoti za wanafunzi kwa PDF</p>
       </div>
 
       <div className="no-print bg-white rounded-xl border border-gray-200 p-5 mb-6">
         <div className="flex items-center gap-4 mb-4">
-          <span className="text-sm font-medium text-gray-700">Report Type:</span>
+          <span className="text-sm font-medium text-gray-700">Aina ya Ripoti:</span>
           <div className="flex gap-2">
             <button
               onClick={() => { setMode('single'); resetSelections() }}
@@ -858,7 +1051,7 @@ function StudentReports() {
                 mode === 'single' ? 'bg-maroon-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              Single Exam
+              Mtihani Mmoja
             </button>
             <button
               onClick={() => { setMode('combined'); resetSelections() }}
@@ -866,25 +1059,25 @@ function StudentReports() {
                 mode === 'combined' ? 'bg-maroon-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              Combined Report
+              Ripoti Mchanganyiko
             </button>
           </div>
           {mode === 'combined' && (
-            <span className="text-xs text-gray-400">Select two exams to combine (e.g., Midterm + Terminal, Midterm + Annual)</span>
+            <span className="text-xs text-gray-400">Chagua mitihani miwili kuunganisha (mf. Midterm + Terminal)</span>
           )}
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {mode === 'single' ? 'Academic Year' : 'Exam 1 Year'}
+              {mode === 'single' ? 'Mwaka wa Masomo' : 'Mwaka wa Mtihani 1'}
             </label>
             <select
               value={selectedYearId}
               onChange={(e) => { setSelectedYearId(e.target.value); setSelectedExamId(''); resetSelections() }}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
-              <option value="">All Years</option>
+              <option value="">Miaka Yote</option>
               {academicYears.map((y) => (
                 <option key={y.id} value={y.id}>{y.year_name}</option>
               ))}
@@ -892,14 +1085,14 @@ function StudentReports() {
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
-              {mode === 'single' ? 'Select Exam' : 'Select Exam 1'}
+              {mode === 'single' ? 'Chagua Mtihani' : 'Chagua Mtihani 1'}
             </label>
             <select
               value={selectedExamId}
               onChange={(e) => { setSelectedExamId(e.target.value); resetSelections() }}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
-              <option value="">Choose an exam...</option>
+              <option value="">Chagua mtihani...</option>
               {(selectedYearId ? exams.filter(e => e.academic_year_id === selectedYearId) : exams).map((exam) => (
                 <option key={exam.id} value={exam.id}>
                   {exam.name} ({exam.exam_type?.replace('_', ' ')})
@@ -909,13 +1102,13 @@ function StudentReports() {
           </div>
           {mode === 'combined' && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Exam 2 Year</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Mwaka wa Mtihani 2</label>
               <select
                 value={selectedYear2Id}
                 onChange={(e) => { setSelectedYear2Id(e.target.value); setSelectedExam2Id(''); resetSelections() }}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
               >
-                <option value="">All Years</option>
+                <option value="">Miaka Yote</option>
                 {academicYears.map((y) => (
                   <option key={y.id} value={y.id}>{y.year_name}</option>
                 ))}
@@ -1033,7 +1226,7 @@ function StudentReports() {
                         <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                       </svg>
                     )}
-                    {generatingBulkPDF !== false ? generatingBulkPDF : `Download All (${sortedStudents.length})`}
+                    {generatingBulkPDF !== false ? generatingBulkPDF : `Pakua Zote (${sortedStudents.length})`}
                   </button>
                 </div>
               </div>
@@ -1081,6 +1274,12 @@ function StudentReports() {
 
           {activeTab === 'report' && selectedStudent && (
             <div>
+              <div className="no-print mb-2 bg-blue-50 border border-blue-200 rounded px-3 py-1.5 flex items-center gap-2">
+                <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="text-xs text-blue-700">Chapisha ripoti zote: bonyeza <kbd className="px-1 py-0.5 bg-blue-100 border border-blue-200 rounded text-xs font-mono">Ctrl+P</kbd> ukiwa kwenye mtazamo huu</span>
+              </div>
               <div className="no-print flex items-center justify-between mb-4">
                 <button
                   onClick={handleBack}
@@ -1089,7 +1288,7 @@ function StudentReports() {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                   </svg>
-                  Back to List
+                  Rudi kwenye Orodha
                 </button>
                 <button
                   onClick={handleDownloadPDF}
@@ -1106,8 +1305,78 @@ function StudentReports() {
                       <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
                     </svg>
                   )}
-                  {generatingPDF ? 'Generating...' : 'Download PDF'}
+                  {generatingPDF ? 'Inaandaa...' : 'Pakua PDF'}
                 </button>
+              </div>
+
+              <div className="no-print bg-white rounded-xl border border-gray-200 p-4 mb-4">
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">Mipangilio ya Ripoti</h4>
+                <div className="mb-3">
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Kichwa cha Ripoti <span className="text-gray-400">(bonyeza Enter kwa mstari mpya, hadi mistari 4)</span></label>
+                  <textarea value={reportHeading} onChange={e => setReportHeading(e.target.value)} placeholder="e.g. TAARIFA YA MATOKEO YA MTIHANI WA MWISHO WA MUHULA WA KWANZA 2025" rows={4} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500 resize-none" />
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Tarehe ya Kufunga</label>
+                    <input type="date" value={schoolClosingDate} onChange={e => setSchoolClosingDate(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Tarehe ya Kufungua</label>
+                    <input type="date" value={schoolOpeningDate} onChange={e => setSchoolOpeningDate(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Salamu kwa Mzazi</label>
+                    <input type="text" value={parentGreeting} onChange={e => setParentGreeting(e.target.value)} placeholder="e.g. Wazazi wa [Jina] ..." className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Maoni ya Mwalimu wa Darasa <span className="text-gray-400">(moja kwa moja kama tupu)</span></label>
+                    <input type="text" value={classTeacherComment} onChange={e => setClassTeacherComment(e.target.value)} placeholder="" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Maoni ya Mkuu wa Shule <span className="text-gray-400">(moja kwa moja kama tupu)</span></label>
+                    <input type="text" value={headTeacherComment} onChange={e => setHeadTeacherComment(e.target.value)} placeholder="" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ujumbe wa Kufunga</label>
+                  <input type="text" value={closingMessage} onChange={e => setClosingMessage(e.target.value)} placeholder="e.g. Asante kwa ushirikiano wenu. Mungu awabariki." className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                </div>
+                <div className="border-t border-gray-200 pt-3 mt-3">
+                  <h5 className="text-xs font-semibold text-gray-700 mb-2">Majina ya Safu Wima Kwenye Ripoti</h5>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {mode === 'combined' ? (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Mtihani 1</label>
+                          <input type="text" value={examLabel1} onChange={e => setExamLabel1(e.target.value)} placeholder={selectedExam?.name || 'Mtihani 1'} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Mtihani 2</label>
+                          <input type="text" value={examLabel2} onChange={e => setExamLabel2(e.target.value)} placeholder={selectedExam2?.name || 'Mtihani 2'} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                        </div>
+                      </>
+                    ) : selectedExam?.has_practical ? (
+                      <>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Nadharia</label>
+                          <input type="text" value={examLabel1} onChange={e => setExamLabel1(e.target.value)} placeholder="Nadharia" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Vitendo</label>
+                          <input type="text" value={examLabel2} onChange={e => setExamLabel2(e.target.value)} placeholder="Vitendo" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                        </div>
+                      </>
+                    ) : (
+                      <div>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Alama</label>
+                        <input type="text" value={examLabel1} onChange={e => setExamLabel1(e.target.value)} placeholder="Alama" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                      </div>
+                    )}
+                  </div>
+                  <p className="text-[10px] text-gray-400 mt-1">Majina haya yataonekana kwenye safu wima za jedwali la matokeo kwa darasa hili tu.</p>
+                </div>
               </div>
 
               <div className="print-area" ref={reportRef}>
@@ -1116,21 +1385,22 @@ function StudentReports() {
             </div>
           )}
 
-          {/* Bulk print container — hidden on screen, visible during print */}
-          <div className="print-only" style={{ display: 'none' }} ref={bulkContainerRef}>
-            {bulkStudents.map((student, idx) => (
-              <ReportCard key={student.id} student={student} isBulk />
+          {/* Bulk container — off-screen for dom-to-image-more capture */}
+          <div ref={bulkContainerRef} style={{ position: 'absolute', left: '-99999px', top: 0, width: '794px', background: '#fff', zIndex: -1 }}>
+            {bulkStudents.map((student) => (
+              <ReportCard key={student.id} student={student} />
             ))}
           </div>
-          {bulkStudents.length > 0 && (
-            <style>{`
-              .print-only { display: none !important; }
-              @media print {
-                .print-only { display: block !important; }
-                .no-print { display: none !important; }
-              }
-            `}</style>
-          )}
+
+          {/* Print all students — visible only during Ctrl+P / browser print */}
+          <div className="print-all-students">
+            {(mode === 'single'
+              ? sortedStudents.filter(s => s.result?.position != null)
+              : sortedStudents
+            ).map(student => (
+              <ReportCard key={student.id} student={student} />
+            ))}
+          </div>
         </div>
       )}
 

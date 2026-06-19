@@ -71,14 +71,6 @@ function Login() {
     }
   }
 
-  if (authLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen bg-slate-50">
-        <div className="w-10 h-10 border-4 border-slate-200 border-t-maroon-600 rounded-full animate-spin" />
-      </div>
-    )
-  }
-
   if (resetMode) {
     return (
       <div className="min-h-screen lg:grid lg:grid-cols-2 bg-slate-50">
@@ -187,7 +179,7 @@ function Login() {
   }
 
   return (
-    <div className="min-h-screen lg:grid lg:grid-cols-2 bg-slate-50">
+    <div className="min-h-svh overflow-y-auto lg:grid lg:grid-cols-2 bg-slate-50">
       {/* Left - Desktop only */}
       <div className="hidden lg:flex bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 items-center justify-center text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-neutral-950/20" />
@@ -227,25 +219,25 @@ function Login() {
       </div>
 
       {/* Right - Form */}
-      <div className="flex items-center justify-center p-6">
+      <div className="flex items-start sm:items-center justify-center p-4 sm:p-6 py-4">
         <div className="w-full max-w-md">
           {/* Mobile banner */}
-          <div className="lg:hidden mb-8">
-            <div className="bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 rounded-2xl p-8 text-white text-center relative overflow-hidden">
+          <div className="lg:hidden mb-4 sm:mb-6">
+            <div className="bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 rounded-2xl p-5 sm:p-8 text-white text-center relative overflow-hidden">
               <div className="absolute inset-0 bg-neutral-950/20" />
               <div className="relative z-10">
                 {schoolInfo?.logo_url ? (
-                  <div className="w-20 h-20 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center p-2">
+                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 bg-white rounded-2xl flex items-center justify-center p-2">
                     <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
                   </div>
                 ) : (
-                  <div className="w-16 h-16 mx-auto mb-4 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center border border-white/20">
+                  <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center border border-white/20">
                     <span className="text-xl font-bold text-white">K</span>
                   </div>
                 )}
                 <h2 className="text-lg font-bold">Kizaga Secondary School</h2>
                 <p className="text-maroon-100 text-xs">Staff Portal</p>
-                <div className="flex items-center justify-center gap-4 mt-4 text-maroon-100 text-xs">
+                <div className="hidden sm:flex items-center justify-center gap-4 mt-4 text-maroon-100 text-xs">
                   <span>Results</span>
                   <span className="w-1 h-1 rounded-full bg-maroon-100/40" />
                   <span>Performance</span>
@@ -256,10 +248,11 @@ function Login() {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-6 sm:p-8">
-            <div className="text-center mb-8">
+          <div className="bg-white rounded-2xl shadow-lg shadow-gray-200/50 p-5 sm:p-8">
+            <div className="text-center mb-5 sm:mb-8">
               <h1 className="text-xl sm:text-2xl font-bold text-slate-900">Welcome back</h1>
               <p className="text-sm text-slate-500 mt-1">Sign in to your account to continue</p>
+              {authLoading && <p className="text-xs text-slate-400 mt-2">Checking saved session...</p>}
             </div>
 
             <form onSubmit={handleLogin} className="space-y-5">
@@ -347,11 +340,13 @@ function Login() {
 
               <button
                 type="submit"
-                disabled={isLoading}
+                disabled={isLoading || authLoading}
                 className="w-full py-3 bg-maroon-600 hover:bg-maroon-700 active:bg-maroon-800 disabled:opacity-60 disabled:cursor-not-allowed text-white font-semibold rounded-xl text-sm transition-all flex items-center justify-center gap-2"
               >
                 {isLoading ? (
                   <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Signing in...</>
+                ) : authLoading ? (
+                  <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Checking...</>
                 ) : 'Sign In'}
               </button>
             </form>

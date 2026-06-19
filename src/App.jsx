@@ -30,6 +30,13 @@ import TeacherDashboard from './pages/teacher/Dashboard'
 import Profile from './pages/Profile'
 import Notifications from './pages/Notifications'
 import SendNotification from './pages/SendNotification'
+import SendSMS from './pages/SendSMS'
+import AdmissionForm from './pages/public/AdmissionForm'
+import TrackApplication from './pages/public/TrackApplication'
+import SchoolRules from './pages/public/SchoolRules'
+import JoiningInstructions from './pages/public/JoiningInstructions'
+import ManageAdmissions from './pages/ManageAdmissions'
+import ManageUniforms from './pages/ManageUniforms'
 
 function App() {
   return (
@@ -38,6 +45,10 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/" element={<Landing />} />
+        <Route path="/apply" element={<AdmissionForm />} />
+        <Route path="/track-application" element={<TrackApplication />} />
+        <Route path="/school-rules" element={<SchoolRules />} />
+        <Route path="/joining-instructions" element={<JoiningInstructions />} />
         <Route
           element={
             <ProtectedRoute>
@@ -60,6 +71,8 @@ function App() {
                   <Route path="academic-years" element={<AcademicYears />} />
                   <Route path="school-settings" element={<SchoolSettings />} />
                   <Route path="class-upgrade" element={<ClassUpgrade />} />
+                  <Route path="admissions" element={<ManageAdmissions />} />
+                  <Route path="uniforms" element={<ManageUniforms />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -70,6 +83,8 @@ function App() {
               <RoleBasedRoute allowedRoles={['headmaster']}>
                 <Routes>
                   <Route index element={<HeadmasterDashboard />} />
+                  <Route path="admissions" element={<ManageAdmissions />} />
+                  <Route path="uniforms" element={<ManageUniforms />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -92,6 +107,7 @@ function App() {
                   <Route path="academic-years" element={<AcademicYears />} />
                   <Route path="enter-marks" element={<EnterMarks />} />
                   <Route path="class-upgrade" element={<ClassUpgrade />} />
+                  <Route path="admissions" element={<ManageAdmissions />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -112,6 +128,7 @@ function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="send-notification" element={<SendNotification />} />
+          <Route path="send-sms" element={<SendSMS />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

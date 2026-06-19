@@ -29,10 +29,17 @@ function Landing() {
   const { user, profile, loading } = useAuth()
   const [schoolInfo, setSchoolInfo] = useState(null)
   const [currentSlide, setCurrentSlide] = useState(0)
+  const [uniforms, setUniforms] = useState([])
 
   useEffect(() => {
     supabase.from('school_settings').select('logo_url, school_name').limit(1).then(({ data }) => {
       if (data?.[0]) setSchoolInfo(data[0])
+    })
+  }, [])
+
+  useEffect(() => {
+    supabase.from('uniforms').select('*').order('sort_order').order('created_at').then(({ data }) => {
+      if (data) setUniforms(data)
     })
   }, [])
 
@@ -69,7 +76,10 @@ function Landing() {
               <a href="#about" className="text-sm text-gray-600 hover:text-maroon-600 transition">About</a>
               <a href="#academics" className="text-sm text-gray-600 hover:text-maroon-600 transition">Academics</a>
               <a href="#facilities" className="text-sm text-gray-600 hover:text-maroon-600 transition">Facilities</a>
-              <a href="#results" className="text-sm text-gray-600 hover:text-maroon-600 transition">Results</a>
+              <a href="#uniforms" className="text-sm text-gray-600 hover:text-maroon-600 transition">Sare</a>
+              <Link to="/school-rules" className="text-sm text-gray-600 hover:text-maroon-600 transition">Rules</Link>
+              <Link to="/joining-instructions" className="text-sm text-gray-600 hover:text-maroon-600 transition">Join</Link>
+              <Link to="/track-application" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition">Fuatilia Ombi</Link>
               <a href="#contact" className="text-sm text-gray-600 hover:text-maroon-600 transition">Contact</a>
             </nav>
 
@@ -101,6 +111,21 @@ function Landing() {
           </div>
         </div>
       </header>
+
+      {/* ========== TRACK BANNER ========== */}
+      <div className="bg-emerald-50 border-b border-emerald-200">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs sm:text-sm text-emerald-800">
+            <span className="font-medium">Umekwisha tuma ombi?</span> Fuatilia hali ya ombi lako kwa kutumia namba ya ombi.
+          </p>
+          <Link
+            to="/track-application"
+            className="text-xs sm:text-sm font-medium text-emerald-700 hover:text-emerald-800 underline underline-offset-2"
+          >
+            Fuatilia Ombi &rarr;
+          </Link>
+        </div>
+      </div>
 
       {/* ========== HERO ========== */}
       <section className="relative bg-black text-white overflow-hidden">
@@ -137,6 +162,12 @@ function Landing() {
               through modern facilities, dedicated teachers, and a comprehensive school management system.
             </p>
             <div className="flex flex-wrap gap-3">
+              <Link
+                to="/apply"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white font-semibold rounded-xl hover:bg-emerald-700 transition text-sm"
+              >
+                Tuma Ombi Sasa
+              </Link>
               <a
                 href="#about"
                 className="inline-flex items-center gap-2 px-6 py-3 bg-white text-maroon-800 font-semibold rounded-xl hover:bg-gray-100 transition text-sm"
@@ -431,6 +462,121 @@ function Landing() {
         </div>
       </section>
 
+      {/* ========== UNIFORMS ========== */}
+      <section id="uniforms" className="py-16 sm:py-20 bg-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Sare za Shule</h2>
+            <div className="w-16 h-1 bg-maroon-600 mx-auto rounded-full mb-4" />
+            <p className="text-gray-500 max-w-2xl mx-auto">
+              Kizaga Secondary School ina sare maalum kwa wanafunzi. Wanafunzi wanatakiwa kuvaa sare kamili kila siku.
+            </p>
+          </div>
+
+          {uniforms.length > 0 ? (
+            <div className="space-y-10">
+              {['SCHOOL','HOSTEL','SHAMBA','SPORTS'].filter(cat => uniforms.some(u => u.category === cat)).map(category => {
+                const items = uniforms.filter(u => u.category === category)
+                return (
+                  <div key={category}>
+                    <h3 className="text-xl font-semibold text-gray-800 mb-4 text-center">
+                      {category === 'SCHOOL' ? 'Sare za Shule' : category === 'HOSTEL' ? 'Sare za Hostel' : category === 'SHAMBA' ? 'Sare za Shamba' : 'Sare za Michezo'}
+                    </h3>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+                      {items.map(u => (
+                        <div key={u.id} className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+                          {u.image_url ? (
+                            <div className="aspect-[4/3] bg-gray-100 overflow-hidden">
+                              <img src={u.image_url} alt={u.title} className="w-full h-full object-cover" />
+                            </div>
+                          ) : (
+                            <div className="aspect-[4/3] bg-gradient-to-br from-maroon-50 to-maroon-100 flex items-center justify-center p-8">
+                              <div className="text-center">
+                                <div className="w-32 h-48 mx-auto bg-white rounded-xl shadow-lg border border-gray-200 flex items-center justify-center mb-3">
+                                  <svg className="w-16 h-16 text-maroon-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                  </svg>
+                                </div>
+                              </div>
+                            </div>
+                          )}
+                          <div className="p-5">
+                            <h3 className="text-lg font-semibold text-gray-900 mb-2">{u.title}</h3>
+                            {u.description && <p className="text-sm text-gray-500 mb-2">{u.description}</p>}
+                            {u.items?.length > 0 && (
+                              <ul className="space-y-1.5 text-sm text-gray-600">
+                                {u.items.map((item, i) => (
+                                  <li key={i} className="flex items-center gap-2">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>
+                                    {item}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8 max-w-5xl mx-auto">
+              <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="aspect-[4/3] bg-gradient-to-br from-maroon-50 to-maroon-100 flex items-center justify-center p-8">
+                  <div className="text-center">
+                    <div className="w-32 h-48 mx-auto bg-white rounded-xl shadow-lg border border-gray-200 flex items-center justify-center mb-3">
+                      <svg className="w-16 h-16 text-maroon-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-maroon-700">O-Level Uniform</span>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">O-Level Sare</h3>
+                  <ul className="space-y-1.5 text-sm text-gray-600">
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Mashati meupe (White shirts)</li>
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Suruali au sketi za rangi ya kahawia (Brown trousers/skirts)</li>
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Tie ya shule (School tie)</li>
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Viatu vyeusi (Black shoes)</li>
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Sweater ya shule (School sweater)</li>
+                  </ul>
+                </div>
+              </div>
+              <div className="bg-gray-50 rounded-2xl border border-gray-200 overflow-hidden">
+                <div className="aspect-[4/3] bg-gradient-to-br from-maroon-50 to-maroon-100 flex items-center justify-center p-8">
+                  <div className="text-center">
+                    <div className="w-32 h-48 mx-auto bg-white rounded-xl shadow-lg border border-gray-200 flex items-center justify-center mb-3">
+                      <svg className="w-16 h-16 text-maroon-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z" />
+                      </svg>
+                    </div>
+                    <span className="text-sm font-semibold text-maroon-700">A-Level Uniform</span>
+                  </div>
+                </div>
+                <div className="p-5">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-2">A-Level Sare</h3>
+                  <ul className="space-y-1.5 text-sm text-gray-600">
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Mashati ya blue (Blue shirts)</li>
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Suruali au sketi za rangi ya navy (Navy trousers/skirts)</li>
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Tie ya shule (School tie)</li>
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Viatu vyeusi (Black shoes)</li>
+                    <li className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-maroon-500 shrink-0"></span>Blazer ya shule (School blazer)</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          )}
+          <div className="text-center mt-8">
+            <Link to="/school-rules" className="text-sm text-maroon-600 hover:text-maroon-700 font-medium">
+              Tazama kanuni kamili za shule &rarr;
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* ========== HEADMASTER ========== */}
       <section className="py-16 sm:py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -568,8 +714,11 @@ function Landing() {
                 <li><a href="#about" className="text-sm text-gray-400 hover:text-white transition">About Us</a></li>
                 <li><a href="#academics" className="text-sm text-gray-400 hover:text-white transition">Academics</a></li>
                 <li><a href="#facilities" className="text-sm text-gray-400 hover:text-white transition">Facilities</a></li>
-                <li><a href="#results" className="text-sm text-gray-400 hover:text-white transition">Results</a></li>
-                <li><a href="#contact" className="text-sm text-gray-400 hover:text-white transition">Contact</a></li>
+                <li><a href="#uniforms" className="text-sm text-gray-400 hover:text-white transition">Sare za Shule</a></li>
+                <li><Link to="/apply" className="text-sm text-gray-400 hover:text-white transition">Tuma Ombi</Link></li>
+                <li><Link to="/school-rules" className="text-sm text-gray-400 hover:text-white transition">Kanuni za Shule</Link></li>
+                <li><Link to="/joining-instructions" className="text-sm text-gray-400 hover:text-white transition">Maelekezo ya Kujiunga</Link></li>
+                <li><Link to="/track-application" className="text-sm text-gray-400 hover:text-white transition">Fuatilia Ombi</Link></li>
               </ul>
             </div>
 

@@ -260,22 +260,76 @@ function injectHexColors(doc) {
 }
 
 async function generatePDF(element, filename) {
+  const overflowWidths = Array.from(element.querySelectorAll('.overflow-x-auto')).map(el => el.scrollWidth)
+  const width = Math.max(element.scrollWidth, element.offsetWidth, ...overflowWidths)
+  const height = Math.max(element.scrollHeight, element.offsetHeight)
   const canvas = await domtoimage.toCanvas(element, {
     scale: 2,
     bgcolor: '#ffffff',
+    width,
+    height,
     style: {
       overflow: 'visible',
-      height: 'auto',
-      width: element.scrollWidth + 'px',
+      width: `${width}px`,
+      height: `${height}px`,
+      maxWidth: 'none',
+      maxHeight: 'none',
     },
     onclone: (node) => {
       const doc = node.ownerDocument
       injectHexColors(doc)
+
+      const selectors = ['aside', 'header', 'nav', 'footer', '.no-print', '[class*="sidebar"]', '[class*="topbar"]', '[class*="navbar"]']
+      selectors.forEach(sel => {
+        try {
+          const els = doc.querySelectorAll(sel)
+          els.forEach(el => { if (el) el.style.display = 'none' })
+        } catch { /* skip */ }
+      })
+      const rootEl = doc.documentElement
+      if (rootEl) { rootEl.style.overflow = 'hidden'; rootEl.style.height = 'auto' }
+      const bodyEl = doc.body
+      if (bodyEl) { bodyEl.style.overflow = 'hidden'; bodyEl.style.height = 'auto' }
+      const sbStyle = doc.createElement('style')
+      sbStyle.textContent = '::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }'
+      doc.head.appendChild(sbStyle)
+
+      const exportStyles = doc.createElement('style')
+      exportStyles.textContent = `
+        .pdf-export, .pdf-export * { box-sizing: border-box !important; color: #111827 !important; box-shadow: none !important; text-shadow: none !important; }
+        .pdf-export { background: #ffffff !important; font-family: Arial, Helvetica, sans-serif !important; }
+        .pdf-export .overflow-x-auto, .pdf-export .overflow-y-auto, .pdf-export .overflow-hidden { overflow: visible !important; height: auto !important; max-height: none !important; }
+        .pdf-export .overflow-x-auto::-webkit-scrollbar, .pdf-export .overflow-y-auto::-webkit-scrollbar, .pdf-export .overflow-hidden::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
+        .pdf-export table { width: 100% !important; border-collapse: collapse !important; table-layout: auto !important; font-size: 12px !important; line-height: 1.25 !important; page-break-inside: auto !important; }
+        .pdf-export th, .pdf-export td { border: 1px solid #6b7280 !important; padding: 3px 4px !important; background: #ffffff !important; vertical-align: middle !important; }
+        .pdf-export th { background: #f3f4f6 !important; font-weight: 700 !important; text-transform: uppercase !important; }
+        .pdf-export tr { page-break-inside: avoid !important; break-inside: avoid !important; }
+        .pdf-export h1, .pdf-export h2, .pdf-export h3, .pdf-export p { margin: 0 !important; }
+        .pdf-export h3 { color: #111827 !important; font-size: 12px !important; font-weight: 700 !important; }
+        .pdf-export .rounded-xl, .pdf-export .rounded-lg, .pdf-export .rounded { border-radius: 0 !important; }
+        .pdf-export .border, .pdf-export .border-gray-200, .pdf-export .border-gray-100 { border-color: #6b7280 !important; }
+        .pdf-export .bg-white, .pdf-export [class*="bg-green"], .pdf-export [class*="bg-red"], .pdf-export [class*="bg-blue"], .pdf-export [class*="bg-pink"], .pdf-export [class*="bg-purple"], .pdf-export [class*="bg-amber"] { background: #ffffff !important; }
+        .pdf-export [class*="sticky"] { position: static !important; }
+        .pdf-export .school-header { border-bottom: 2px solid #111827 !important; padding-bottom: 10px !important; margin-bottom: 12px !important; }
+        .pdf-export .school-header img { width: 48px !important; height: 48px !important; object-fit: contain !important; }
+        .pdf-export .school-header h1 { font-size: 16px !important; letter-spacing: 0.04em !important; }
+        .pdf-export .school-header p, .pdf-export .school-header span { font-size: 14px !important; }
+        .pdf-export .ranking-summary table { font-size: 12px !important; page-break-inside: avoid !important; break-inside: avoid !important; }
+        .pdf-export .ranking-summary thead { display: table-header-group !important; }
+      `
+      doc.head.appendChild(exportStyles)
+      node.classList.add('pdf-export')
+      node.style.overflow = 'visible'
+      node.style.width = `${width}px`
+      node.style.height = `${height}px`
+      node.querySelectorAll('.overflow-x-auto, .overflow-y-auto, .overflow-hidden').forEach(el => {
+        el.style.setProperty('overflow', 'visible', 'important')
+        el.style.setProperty('max-height', 'none', 'important')
+      })
       const imgs = doc.querySelectorAll('img')
       imgs.forEach(img => { img.crossOrigin = 'anonymous' })
     },
   })
-  const imgData = canvas.toDataURL('image/jpeg', 0.95)
   const pdf = new jsPDF('l', 'mm', 'a4')
   const pdfWidth = pdf.internal.pageSize.getWidth()
   const pdfHeight = pdf.internal.pageSize.getHeight()
@@ -285,16 +339,25 @@ async function generatePDF(element, filename) {
   const canvasWidth = canvas.width
   const canvasHeight = canvas.height
   const ratio = usableWidth / canvasWidth
-  const scaledHeight = canvasHeight * ratio
-  let heightLeft = scaledHeight
-  let position = margin
-  pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, scaledHeight)
-  heightLeft -= usableHeight
-  while (heightLeft > 0) {
-    position = margin - (usableHeight * Math.ceil((scaledHeight - heightLeft) / usableHeight))
-    pdf.addPage()
-    pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, scaledHeight)
-    heightLeft -= usableHeight
+  const pageCanvasHeight = Math.floor(usableHeight / ratio)
+  let sourceY = 0
+  let page = 0
+
+  while (sourceY < canvasHeight) {
+    const sliceHeight = Math.min(pageCanvasHeight, canvasHeight - sourceY)
+    const pageCanvas = document.createElement('canvas')
+    pageCanvas.width = canvasWidth
+    pageCanvas.height = sliceHeight
+    const ctx = pageCanvas.getContext('2d')
+    ctx.fillStyle = '#ffffff'
+    ctx.fillRect(0, 0, pageCanvas.width, pageCanvas.height)
+    ctx.drawImage(canvas, 0, sourceY, canvasWidth, sliceHeight, 0, 0, canvasWidth, sliceHeight)
+
+    if (page > 0) pdf.addPage()
+    const pageImg = pageCanvas.toDataURL('image/jpeg', 0.95)
+    pdf.addImage(pageImg, 'JPEG', margin, margin, usableWidth, sliceHeight * ratio)
+    sourceY += sliceHeight
+    page++
   }
   pdf.save(`${filename}.pdf`)
 }
@@ -448,7 +511,26 @@ function Results() {
             loadedResults = srRes.data || []
           }
 
-          // Fallback: no students found via class — pull from marks directly
+          // Second attempt: use direct class_id on students table (if column exists)
+          if (loadedStudents.length === 0) {
+            const { data: byClassId } = await supabase
+              .from('students')
+              .select('*')
+              .eq('class_id', selectedClassId)
+              .order('surname')
+            if (byClassId?.length > 0) {
+              const classStudentIds = byClassId.map(s => s.id)
+              const [mRes, srRes] = await Promise.all([
+                supabase.from('marks').select('*').eq('exam_id', selectedExamId).in('subject_id', subjectIds).in('student_id', classStudentIds),
+                supabase.from('student_results').select('*').eq('exam_id', selectedExamId).in('student_id', classStudentIds),
+              ])
+              loadedMarks = mRes.data || []
+              loadedResults = srRes.data || []
+              loadedStudents = byClassId
+            }
+          }
+
+          // Final fallback: pull from marks directly
           if (loadedStudents.length === 0) {
             const { data: mData } = await supabase
               .from('marks')
@@ -502,6 +584,7 @@ function Results() {
     const BEST_N = classLevel === 'A_LEVEL' ? 3 : 7
     return students.map(student => {
       const result = resultsMap[student.id] || null
+      const resultGrade = result?.grade || getGradeForPercentage(result?.average_marks, grades)?.grade || null
       const allPoints = []
       subjects.forEach(subject => {
         if (classLevel === 'A_LEVEL' && subject.subject_type === 'ELECTIVE') return
@@ -520,7 +603,7 @@ function Results() {
       const totalPoints = bestPoints.reduce((s, p) => s + p, 0)
       const points = bestPoints.length > 0 ? totalPoints : null
       const division = points ? calcDivision(points, classLevel) : '0'
-      return { ...student, result, points, division }
+      return { ...student, result, resultGrade, points, division }
     })
   }, [students, resultsMap, grades, subjects, markMap, selectedExam, classLevel])
 
@@ -661,9 +744,9 @@ function Results() {
         }
       })
       row.push(student.result?.average_marks ?? '-')
-      row.push(student.result?.grade ?? '-')
+      row.push(student.resultGrade ?? '-')
       row.push(student.result?.position ?? '-')
-      row.push((student.result?.division || '').replace('Division ', '') || '-')
+      row.push(student.division || '-')
       row.push(student.points ?? '-')
       return row
     })
@@ -833,41 +916,40 @@ function Results() {
         @media print {
           @page { size: A4 landscape; margin: 12mm 8mm 16mm; }
           body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          body, html, #root, .h-screen, main, .overflow-y-auto, .overflow-x-auto { height: auto !important; min-height: 0 !important; overflow: visible !important; }
+          body, html, #root, .h-screen, main, .overflow-y-auto, .overflow-x-auto, .overflow-hidden { height: auto !important; min-height: 0 !important; overflow: visible !important; }
           aside, nav, header, .no-print, .no-print * { display: none !important; }
-          .print-area { margin: 0 !important; padding: 0 !important; width: 100% !important; }
+          .print-area, .print-area * { color: #111827 !important; box-shadow: none !important; text-shadow: none !important; }
+          .print-area { margin: 0 !important; padding: 0 !important; width: 100% !important; background: #fff !important; font-family: Arial, Helvetica, sans-serif !important; }
           .print-area .overflow-x-auto { overflow: visible !important; display: block !important; }
-          .print-area .overflow-hidden { overflow: visible !important; }
+          .print-area .overflow-y-auto, .print-area .overflow-hidden { overflow: visible !important; height: auto !important; max-height: none !important; }
+          .print-area .overflow-x-auto::-webkit-scrollbar, .print-area .overflow-y-auto::-webkit-scrollbar, .print-area .overflow-hidden::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }
           .print-area .grid-cols-1 > div { overflow: visible !important; }
           .print-area .grid-cols-1 > div > div { overflow: visible !important; }
-          .print-area table { font-size: 5.5pt !important; width: 100% !important; border-collapse: collapse !important; page-break-inside: auto !important; }
+          .print-area table { font-size: 12pt !important; line-height: 1.25 !important; width: 100% !important; border-collapse: collapse !important; page-break-inside: auto !important; table-layout: auto !important; }
           .print-area thead { display: table-header-group !important; }
           .print-area tbody { display: table-row-group !important; }
           .print-area tr { page-break-inside: avoid !important; }
-          .print-area th, .print-area td { padding: 0.5pt 1.5pt !important; border: 1px solid #ccc !important; min-width: 0 !important; }
-          .print-area th { background: #f3f4f6 !important; font-weight: 600 !important; }
+          .print-area th, .print-area td { padding: 1pt 1.5pt !important; border: 1px solid #6b7280 !important; min-width: 0 !important; background: #fff !important; }
+          .print-area th { background: #f3f4f6 !important; font-weight: 700 !important; text-transform: uppercase !important; }
           .print-area [class*="sticky"] { position: static !important; }
-          .print-area .rounded-xl { border: 1px solid #e5e7eb !important; border-radius: 0 !important; box-shadow: none !important; }
-          .print-area .bg-green-50\\/40, .print-area .bg-red-50\\/40 { background: transparent !important; }
-          .print-area h3 { font-size: 8pt !important; }
-          .print-area h2 { font-size: 10pt !important; }
+          .print-area .rounded-xl, .print-area .rounded-lg, .print-area .rounded { border-radius: 0 !important; }
+          .print-area .border, .print-area .border-gray-200, .print-area .border-gray-100 { border-color: #6b7280 !important; }
+          .print-area [class*="bg-green"], .print-area [class*="bg-red"], .print-area [class*="bg-blue"], .print-area [class*="bg-pink"], .print-area [class*="bg-purple"], .print-area [class*="bg-amber"] { background: #fff !important; }
+          .print-area h3 { font-size: 12pt !important; }
+          .print-area h2 { font-size: 14pt !important; }
           .print-area .school-header { border-bottom: 2px solid #000 !important; margin-bottom: 3mm !important; }
           .print-area .school-header h1 { font-size: 16pt !important; }
-          .print-area .school-header p { font-size: 9pt !important; }
-          .print-area .school-header img { width: 20pt !important; height: 20pt !important; }
+          .print-area .school-header p, .print-area .school-header span { font-size: 14pt !important; }
+          .print-area .school-header img { width: 36pt !important; height: 36pt !important; object-fit: contain !important; }
           .print-area .school-header .flex { display: flex !important; justify-content: center !important; align-items: center !important; gap: 4pt !important; }
           .print-area .school-header > div:last-child { margin-top: 2pt !important; padding-top: 2pt !important; }
-          .print-area .stats-grid { display: flex !important; gap: 2pt !important; }
-          .print-area .stats-grid > div { flex: 1 !important; text-align: center !important; padding: 1.5pt !important; border: 1px solid #ddd !important; }
-          .print-area .stats-grid > div div:first-child { font-size: 9pt !important; font-weight: 700 !important; }
-          .print-area .stats-grid > div div:last-child { font-size: 5.5pt !important; }
           .print-area .div-summary-wrap { display: flex !important; justify-content: center !important; }
           .print-area .div-summary-wrap > div { width: 100% !important; max-width: 400px !important; }
           .print-area .no-break { break-inside: avoid !important; page-break-inside: avoid !important; }
-
-          .print-area .grid-cols-1 { display: block !important; }
-          .print-area .grid-cols-1 > div { display: inline-block !important; width: calc(50% - 6pt) !important; vertical-align: top !important; }
-          .print-area .grid-cols-1 > div:first-child { margin-right: 12pt !important; }
+          .print-area .ranking-summary { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 6pt !important; align-items: start !important; break-inside: auto !important; page-break-inside: auto !important; }
+          .print-area .ranking-summary > div { width: auto !important; overflow: visible !important; break-inside: avoid !important; page-break-inside: avoid !important; }
+          .print-area .ranking-summary table { font-size: 12pt !important; page-break-inside: avoid !important; break-inside: avoid !important; }
+          .print-area .ranking-summary thead { display: table-header-group !important; }
         }
       `}</style>
 
@@ -931,23 +1013,7 @@ function Results() {
                   </svg>
                   Export Excel
                 </button>
-                <button
-                  onClick={handleDownloadPDF}
-                  disabled={generatingPDF}
-                  className="px-3 py-1.5 text-xs font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {generatingPDF ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                    </svg>
-                  )}
-                  {generatingPDF ? 'Generating...' : 'Download PDF'}
-                </button>
+
               </div>
             </div>
           )}
@@ -956,10 +1022,13 @@ function Results() {
           {(() => {
             const className = classes.find(c => c.id === selectedClassId)?.class_name || ''
             const today = new Date().toLocaleDateString('en-TZ', { day: 'numeric', month: 'long', year: 'numeric' })
-            const boys = students.filter(s => s.gender === 'Male').length
-            const girls = students.filter(s => s.gender === 'Female').length
-            const present = students.filter(s => marks.some(m => m.student_id === s.id && !m.is_absent)).length
-            const absent = students.length - present
+            const registeredBoys = students.filter(s => s.gender === 'Male').length
+            const registeredGirls = students.filter(s => s.gender === 'Female').length
+            const presentStudents = students.filter(s => marks.some(m => m.student_id === s.id && !m.is_absent))
+            const presentBoys = presentStudents.filter(s => s.gender === 'Male').length
+            const presentGirls = presentStudents.filter(s => s.gender === 'Female').length
+            const absentBoys = registeredBoys - presentBoys
+            const absentGirls = registeredGirls - presentGirls
             const avg = studentsWithResults.filter(s => s.result?.average_marks != null)
             const classAvg = avg.length ? avg.reduce((s, st) => s + st.result.average_marks, 0) / avg.length : 0
             const classGradeObj = getGradeForPercentage(classAvg, grades)
@@ -1018,61 +1087,63 @@ function Results() {
 
                 {/* Division Summary - Centered */}
                 <div className="flex justify-center mb-6 no-break">
-                  <div className="w-full max-w-md">
+                  <div className="w-full max-w-lg">
                     <DivisionSummary summary={divisionSummary} title="Division Summary" />
                   </div>
                 </div>
 
                 {/* Student Results Table */}
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-                  <div className="px-5 py-3 border-b border-gray-100">
-                    <h3 className="text-sm font-semibold text-gray-800">Student Results</h3>
-                  </div>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-gray-200 bg-gray-50">
-                          <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase w-10">#</th>
-                          <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style={{ minWidth: 130 }}>
-                            Student Name
-                          </th>
-                          {subjects.map((subject) => {
-                            const hp = subjectHasPractical(subject, selectedExam)
-                            return hp ? (
-                              <th key={subject.id} className="text-center px-1 py-3 text-xs font-semibold text-gray-500 uppercase" colSpan={2} style={{ minWidth: 90 }}>
-                                <div>{subject.subject_code}</div>
+                <div className="flex justify-center mb-6">
+                  <div className="w-full">
+                    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                      <div className="px-5 py-3 border-b border-gray-100">
+                        <h3 className="text-sm font-semibold text-gray-800">Student Results</h3>
+                      </div>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-gray-200 bg-gray-50">
+                              <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase w-10">#</th>
+                              <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase sticky left-0 bg-gray-50 z-10" style={{ minWidth: 130 }}>
+                                Student Name
                               </th>
-                            ) : (
-                              <th key={subject.id} className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 60 }}>
-                                <div>{subject.subject_code}</div>
-                              </th>
-                            )
-                          })}
-                          <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 40 }}>Avg</th>
-                          <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Grd</th>
-                          <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Pos</th>
-                          <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Div</th>
-                          <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Pts</th>
-                        </tr>
-                        {anyPractical && (
-                          <tr className="border-b border-gray-100 bg-gray-50/50">
-                            <th className="px-2 py-1" />
-                            <th className="px-3 py-1" />
-                            {subjects.map((subject) => {
-                              const hp = subjectHasPractical(subject, selectedExam)
-                              return hp ? (
-                                <React.Fragment key={subject.id}>
-                                  <th className="text-center px-1 py-1 text-[10px] font-medium text-gray-400 uppercase">T</th>
-                                  <th className="text-center px-1 py-1 text-[10px] font-medium text-gray-400 uppercase">P</th>
-                                </React.Fragment>
-                              ) : (
-                                <th key={subject.id} className="text-center px-2 py-1 text-[10px] font-medium text-gray-400 uppercase">Mks</th>
-                              )
-                            })}
-                            <th className="px-2 py-1" colSpan={5} />
-                          </tr>
-                        )}
-                      </thead>
+                              {subjects.map((subject) => {
+                                const hp = subjectHasPractical(subject, selectedExam)
+                                return hp ? (
+                                  <th key={subject.id} className="text-center px-1 py-3 text-xs font-semibold text-gray-500 uppercase" colSpan={2} style={{ minWidth: 90 }}>
+                                    <div>{subject.subject_code}</div>
+                                  </th>
+                                ) : (
+                                  <th key={subject.id} className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 60 }}>
+                                    <div>{subject.subject_code}</div>
+                                  </th>
+                                )
+                              })}
+                              <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 40 }}>Avg</th>
+                              <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Grd</th>
+                              <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Pos</th>
+                              <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Div</th>
+                              <th className="text-center px-1.5 py-3 text-xs font-semibold text-gray-500 uppercase" style={{ minWidth: 35 }}>Pts</th>
+                            </tr>
+                            {anyPractical && (
+                              <tr className="border-b border-gray-100 bg-gray-50/50">
+                                <th className="px-2 py-1" />
+                                <th className="px-3 py-1" />
+                                {subjects.map((subject) => {
+                                  const hp = subjectHasPractical(subject, selectedExam)
+                                  return hp ? (
+                                    <React.Fragment key={subject.id}>
+                                      <th className="text-center px-1 py-1 text-[10px] font-medium text-gray-400 uppercase">T</th>
+                                      <th className="text-center px-1 py-1 text-[10px] font-medium text-gray-400 uppercase">P</th>
+                                    </React.Fragment>
+                                  ) : (
+                                    <th key={subject.id} className="text-center px-2 py-1 text-[10px] font-medium text-gray-400 uppercase">Mks</th>
+                                  )
+                                })}
+                                <th className="px-2 py-1" colSpan={5} />
+                              </tr>
+                            )}
+                          </thead>
                       <tbody className="divide-y divide-gray-100">
                         {sortedStudents.map((student) => {
                           const isTop = topSet.has(student.id)
@@ -1127,13 +1198,13 @@ function Results() {
                                 {student.result?.average_marks != null ? student.result.average_marks : '-'}
                               </td>
                               <td className="px-2 py-2 text-center text-sm font-semibold text-gray-800">
-                                {student.result?.grade || '-'}
+                                {student.resultGrade || '-'}
                               </td>
                               <td className="px-2 py-2 text-center text-sm text-gray-600">
                                 {student.result?.position != null ? student.result.position : '-'}
                               </td>
                               <td className="px-2 py-2 text-center text-sm font-medium text-gray-800">
-                                {(student.result?.division || '').replace('Division ', '') || '-'}
+                                {student.division || '-'}
                               </td>
                               <td className="px-2 py-2 text-center text-sm font-semibold text-gray-800">
                                 {student.points != null ? student.points : '-'}
@@ -1144,36 +1215,48 @@ function Results() {
                       </tbody>
                     </table>
                   </div>
+                  </div>
+                  </div>
                 </div>
 
                 {/* Student Statistics */}
                 <div className="flex justify-center mb-6 no-break">
-                  <div className="w-full max-w-xl">
+                  <div className="w-full max-w-2xl">
                     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                       <div className="px-5 py-3 border-b border-gray-100">
-                        <h3 className="text-sm font-semibold text-gray-800">Student Statistics</h3>
+                        <h3 className="text-sm font-semibold text-gray-800">Official Student Statistics</h3>
                       </div>
-                      <div className="stats-grid grid grid-cols-5 gap-4 p-5">
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-gray-900">{students.length}</div>
-                          <div className="text-xs text-gray-500 uppercase tracking-wide">Registered</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-blue-600">{boys}</div>
-                          <div className="text-xs text-gray-500 uppercase tracking-wide">Boys</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-pink-600">{girls}</div>
-                          <div className="text-xs text-gray-500 uppercase tracking-wide">Girls</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-green-600">{present}</div>
-                          <div className="text-xs text-gray-500 uppercase tracking-wide">Present</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-2xl font-bold text-amber-600">{absent}</div>
-                          <div className="text-xs text-gray-500 uppercase tracking-wide">Absentees</div>
-                        </div>
+                      <div className="p-5">
+                        <table className="w-full text-sm border border-gray-200 rounded-lg overflow-hidden">
+                          <thead>
+                            <tr className="bg-gray-50 border-b border-gray-200">
+                              <th className="text-left px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Category</th>
+                              <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Total</th>
+                              <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Boys</th>
+                              <th className="text-center px-4 py-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">Girls</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            <tr>
+                              <td className="px-4 py-2 font-medium text-gray-800">Registered</td>
+                              <td className="px-4 py-2 text-center font-bold text-gray-900">{students.length}</td>
+                              <td className="px-4 py-2 text-center font-semibold text-blue-700">{registeredBoys}</td>
+                              <td className="px-4 py-2 text-center font-semibold text-pink-700">{registeredGirls}</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-medium text-gray-800">Present</td>
+                              <td className="px-4 py-2 text-center font-bold text-green-700">{presentStudents.length}</td>
+                              <td className="px-4 py-2 text-center font-semibold text-blue-700">{presentBoys}</td>
+                              <td className="px-4 py-2 text-center font-semibold text-pink-700">{presentGirls}</td>
+                            </tr>
+                            <tr>
+                              <td className="px-4 py-2 font-medium text-gray-800">Absentees</td>
+                              <td className="px-4 py-2 text-center font-bold text-amber-700">{absentBoys + absentGirls}</td>
+                              <td className="px-4 py-2 text-center font-semibold text-blue-700">{absentBoys}</td>
+                              <td className="px-4 py-2 text-center font-semibold text-pink-700">{absentGirls}</td>
+                            </tr>
+                          </tbody>
+                        </table>
                       </div>
                     </div>
                   </div>
@@ -1205,10 +1288,16 @@ function Results() {
                 </div>
 
                 {/* Subject Grade Analysis */}
-                <SubjectGradeMatrix subjects={subjects} matrix={subjectGradeMatrix} grades={grades} subjectAverages={subjectAverages} />
+                <div className="flex justify-center mb-6">
+                  <div className="w-full">
+                    <SubjectGradeMatrix subjects={subjects} matrix={subjectGradeMatrix} grades={grades} subjectAverages={subjectAverages} />
+                  </div>
+                </div>
 
                 {/* Top & Bottom Students */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 mb-6 no-break">
+                <div className="flex justify-center mb-6 no-break">
+                  <div className="w-full">
+                    <div className="ranking-summary grid grid-cols-1 sm:grid-cols-2 gap-6">
                   <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                     <div className="px-4 py-2.5 border-b border-gray-100 bg-green-50/40">
                       <h3 className="text-sm font-semibold text-green-800">Top 10 Students</h3>
@@ -1230,8 +1319,8 @@ function Results() {
                               <td className="px-2 py-1.5 text-center text-xs text-gray-500 font-medium">{s.result.position}</td>
                               <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{s.first_name} {s.middle_name} {s.surname}</td>
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.result.average_marks}</td>
-                              <td className="px-2 py-1.5 text-center text-xs font-semibold text-gray-800">{s.result.grade}</td>
-                              <td className="px-2 py-1.5 text-center text-xs text-gray-800">{(s.result.division || '').replace('Division ', '') || '-'}</td>
+                              <td className="px-2 py-1.5 text-center text-xs font-semibold text-gray-800">{s.resultGrade || '-'}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.division || '-'}</td>
                             </tr>
                           ))}
                           {sortedStudents.filter(s => s.result?.position != null).length === 0 && (
@@ -1263,8 +1352,8 @@ function Results() {
                               <td className="px-2 py-1.5 text-center text-xs text-gray-500 font-medium">{s.result.position}</td>
                               <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{s.first_name} {s.middle_name} {s.surname}</td>
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.result.average_marks}</td>
-                              <td className="px-2 py-1.5 text-center text-xs font-semibold text-gray-800">{s.result.grade}</td>
-                              <td className="px-2 py-1.5 text-center text-xs text-gray-800">{(s.result.division || '').replace('Division ', '') || '-'}</td>
+                              <td className="px-2 py-1.5 text-center text-xs font-semibold text-gray-800">{s.resultGrade || '-'}</td>
+                              <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.division || '-'}</td>
                             </tr>
                           ))}
                           {sortedStudents.filter(s => s.result?.position != null).length === 0 && (
@@ -1273,6 +1362,8 @@ function Results() {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                  </div>
                   </div>
                 </div>
               </>

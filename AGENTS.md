@@ -95,6 +95,36 @@ Uploaded school logo (`school_settings.logo_url`) now displayed in:
 - Logo wrapped in `bg-white/10 backdrop-blur-sm border border-white/20` glass container on dark backgrounds (Login left panel, Landing footer) for visibility
 - **Required**: Run `migration_fix_public_read_school_settings.sql` to add public SELECT policy, otherwise logo won't load on Login/Landing/ForgotPassword pages
 
+## StudentReports.jsx — Formal Report Card Redesign
+
+### What was done
+Complete redesign of the student report card in `StudentReports.jsx` into a formal Tanzanian-style report.
+
+| Feature | Details |
+|---------|---------|
+| **Input form** (no-print) | Report Heading, School Closing Date, School Opening Date, Parent Greeting, Class Teacher Comment, Head Teacher Comment, School Closing Message — all editable before PDF generation |
+| **Header** | Two logos (national_logo_url left, logo_url right), school name + address + contact, configurable heading |
+| **Student info** | Name, admission number, gender, class, term, date |
+| **Parent address** | Configurable greeting sentence + standard intro paragraph |
+| **Table 1: Subject Results** | Subject, Exam scores, Percentage, Grade, Points, Teacher Signature column (empty for handwritten signature) |
+| **Table 2: Character Assessment** | 7-column grid (Tabia, Uwajibikaji, Ubunifu, Kujiamini, Usahihi, Ushirikiano, Michezo) with 2 rows — scoring row + Sahihi Mwalimu row |
+| **Table 3: Grade Boundaries** | Daraja, Asilimia, Pointi, Maana — pulled from DB grades |
+| **Summary sentence** | Swahili: "Jina amekuwa namba X kati ya wanafunzi Y ..." with position, average, grade, division, points |
+| **Comments section** | Maoni ya Mwalimu wa Darasa + Maoni ya Mkuu wa Shule (editable) |
+| **Closing message** | Configurable closing message + school close/open dates |
+| **Signatures** | 3-column: Mkuu wa Shule, Mwalimu Mkuu wa Masomo, Mhuri wa Shule |
+| **Parent section** | SEHEMU YA MZAZI/MLEZI with Maoni, Sahihi, Jina, Uhusiano, Tarehe + cut line |
+| **Print/PDF** | Inline styles (no Tailwind) for accurate rendering in dom-to-image-more; `@media print` with page-break handling; portrait A4 PDF |
+
+### Key changes
+- `StudentReports.jsx` — added 7 new state vars for form inputs
+- `StudentReports.jsx` — `ReportCard` component completely rewritten with inline `style` objects (no Tailwind classes) for reliable canvas capture
+- `StudentReports.jsx` — input form fields added in report view tab (no-print)
+- Print styles updated: tighter margins, `page-break-after: always` on report cards
+
+### File locations
+- `src/pages/academic/StudentReports.jsx` — all changes
+
 ## Known DB issues
 - `compute_student_result()` in `migration_grading_update.sql` still sums ALL subjects for A-Level division — fix in `migration_fix_alevel_points_db.sql` (not yet applied to DB)
 - A-Level division on Results page now uses frontend calculation (`calcDivision`) so the page displays correctly regardless of DB state
