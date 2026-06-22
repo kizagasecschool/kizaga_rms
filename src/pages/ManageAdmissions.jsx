@@ -29,8 +29,25 @@ export default function ManageAdmissions() {
   const [selected, setSelected] = useState(null)
   const [notes, setNotes] = useState('')
   const [saving, setSaving] = useState(false)
+  const [showRequestModal, setShowRequestModal] = useState(false)
+  const [requestMessage, setRequestMessage] = useState('')
+  const [requireAttachment, setRequireAttachment] = useState(false)
+  const [sendingRequest, setSendingRequest] = useState(false)
+  const [conversations, setConversations] = useState([])
+  const [loadingConversations, setLoadingConversations] = useState(false)
+  const [previewAttachment, setPreviewAttachment] = useState(null)
+  const [classes, setClasses] = useState([])
+  const [classStreams, setClassStreams] = useState([])
+  const [showConvertModal, setShowConvertModal] = useState(false)
+  const [converting, setConverting] = useState(false)
+  const [convertClassId, setConvertClassId] = useState('')
+  const [convertStreamId, setConvertStreamId] = useState('')
+  const [convertAdmissionNo, setConvertAdmissionNo] = useState('')
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   const canManage = ['admin', 'headmaster', 'academic'].includes(profile?.role)
+  const canCreateStudent = ['admin', 'academic'].includes(profile?.role)
 
   const loadApplications = async () => {
     setLoading(true)
@@ -48,6 +65,8 @@ export default function ManageAdmissions() {
 
   useEffect(() => {
     loadApplications()
+    supabase.from('classes').select('*').order('sort_order').then(({ data }) => setClasses(data || []))
+    supabase.from('class_streams').select('*, streams(*)').then(({ data }) => setClassStreams(data || []))
   }, [])
 
   const filtered = filter === 'all'
@@ -73,6 +92,113 @@ export default function ManageAdmissions() {
       showToast('Imeshindwa kubadilisha hali', 'error')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const loadConversations = async (applicationId) => {
+    setLoadingConversations(true)
+    const { data, error } = await supabase
+      .rpc('get_application_conversations', { p_application_id: applicationId })
+    if (!error) setConversations(data || [])
+    setLoadingConversations(false)
+  }
+
+  useEffect(() => {
+    if (selected) {
+      loadConversations(selected.id)
+    } else {
+      setConversations([])
+    }
+  }, [selected])
+
+  const handleSendRequest = async () => {
+    if (!requestMessage.trim()) return
+    setSendingRequest(true)
+    try {
+      const { error } = await supabase
+        .rpc('send_application_request', {
+          p_application_id: selected.id,
+          p_message: requestMessage.trim(),
+          p_requires_attachment: requireAttachment,
+        })
+      if (error) throw error
+      showToast('Ombi la maelezo limetumwa', 'success')
+      setShowRequestModal(false)
+      setRequestMessage('')
+      setRequireAttachment(false)
+      setSelected(null)
+      loadApplications()
+    } catch (err) {
+      console.error(err)
+      showToast('Imeshindwa kutuma ombi', 'error')
+    } finally {
+      setSendingRequest(false)
+    }
+  }
+
+  const generateAdmissionNumber = async () => {
+    const year = new Date().getFullYear().toString()
+    const prefix = year + 'K'
+    const { data } = await supabase
+      .from('students')
+      .select('admission_number')
+      .like('admission_number', prefix + '%')
+      .order('admission_number', { ascending: false })
+      .limit(1)
+    if (data && data.length > 0) {
+      const lastNum = parseInt(data[0].admission_number.replace(prefix, ''), 10) || 0
+      return prefix + String(lastNum + 1).padStart(3, '0')
+    }
+    return prefix + '001'
+  }
+
+  const handleOpenConvertModal = async () => {
+    const matchedClass = classes.find(c => c.class_name === selected.class_applying)
+    const admNo = await generateAdmissionNumber()
+    setConvertClassId(matchedClass?.id || '')
+    setConvertStreamId('')
+    setConvertAdmissionNo(admNo)
+    setShowConvertModal(true)
+  }
+
+  const handleConvert = async () => {
+    if (!convertStreamId) return
+    setConverting(true)
+    try {
+      const { error } = await supabase
+        .rpc('convert_application_to_student', {
+          p_application_id: selected.id,
+          p_class_stream_id: convertStreamId,
+          p_admission_number: convertAdmissionNo,
+        })
+      if (error) throw error
+      showToast('Mwanafunzi ameundwa kikamilifu', 'success')
+      setShowConvertModal(false)
+      setSelected(null)
+      loadApplications()
+    } catch (err) {
+      console.error(err)
+      showToast('Imeshindwa kuunda mwanafunzi', 'error')
+    } finally {
+      setConverting(false)
+    }
+  }
+
+  const handleDelete = async () => {
+    setDeleting(true)
+    try {
+      const { error } = await supabase
+        .rpc('delete_admission_application', { p_application_id: selected.id })
+      if (error) throw error
+      showToast('Ombi limefutwa', 'success')
+      setShowDeleteConfirm(false)
+      setSelected(null)
+      loadApplications()
+    } catch (err) {
+      console.error(err)
+      showToast('Imeshindwa kufuta ombi', 'error')
+    } finally {
+      setDeleting(false)
     }
   }
 
@@ -266,6 +392,15 @@ export default function ManageAdmissions() {
                     {saving ? 'Inabadilisha...' : 'Kubali Ombi'}
                   </button>
                 )}
+                {selected.status === 'approved' && canCreateStudent && (
+                  <button
+                    onClick={handleOpenConvertModal}
+                    disabled={converting}
+                    className="px-4 py-2 bg-purple-600 text-white text-xs font-medium rounded-lg hover:bg-purple-700 disabled:opacity-50"
+                  >
+                    Ingiza kwenye Wanafunzi
+                  </button>
+                )}
                 {selected.status !== 'rejected' && (
                   <button
                     onClick={() => handleStatusChange(selected.id, 'rejected')}
@@ -277,7 +412,11 @@ export default function ManageAdmissions() {
                 )}
                 {selected.status !== 'needs_info' && (
                   <button
-                    onClick={() => handleStatusChange(selected.id, 'needs_info')}
+                    onClick={() => {
+                      setRequestMessage('')
+                      setRequireAttachment(false)
+                      setShowRequestModal(true)
+                    }}
                     disabled={saving}
                     className="px-4 py-2 bg-blue-600 text-white text-xs font-medium rounded-lg hover:bg-blue-700 disabled:opacity-50"
                   >
@@ -293,9 +432,228 @@ export default function ManageAdmissions() {
                     Weka Tena Inasubiri
                   </button>
                 )}
+                <button
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-4 py-2 bg-gray-600 text-white text-xs font-medium rounded-lg hover:bg-gray-700"
+                >
+                  Futa Ombi
+                </button>
               </div>
+
+              {/* Conversation History */}
+              {selected && conversations.length > 0 && (
+                <div className="border-t border-gray-200 pt-4 mt-4">
+                  <h3 className="text-sm font-semibold text-gray-700 mb-3">Mazungumzo</h3>
+                  <div className="space-y-3 max-h-64 overflow-y-auto">
+                    {conversations.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`p-3 rounded-xl text-sm ${
+                          msg.sender === 'academic'
+                            ? 'bg-blue-50 border border-blue-200 ml-8'
+                            : 'bg-gray-50 border border-gray-200 mr-8'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-xs text-gray-500">
+                            {msg.sender === 'academic' ? 'Shule' : 'Mwombaji'}
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            {new Date(msg.created_at).toLocaleDateString('sw-TZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                        <p className="text-gray-800 whitespace-pre-wrap">{msg.message || 'Hakuna ujumbe'}</p>
+                        {msg.sender === 'academic' && msg.requires_attachment && (
+                          <p className="text-xs text-blue-600 font-medium mt-1">* Attachment inahitajika</p>
+                        )}
+                        {msg.attachment_url && (
+                          <button
+                            onClick={() => setPreviewAttachment(msg.attachment_url)}
+                            className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-1 underline"
+                          >
+                            Fungua attachment
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Loading conversations */}
+              {selected && loadingConversations && (
+                <div className="border-t border-gray-200 pt-4 mt-4 text-center text-sm text-gray-400">
+                  Inapakia mazungumzo...
+                </div>
+              )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Delete Confirmation */}
+      {showDeleteConfirm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm mx-4 p-6">
+            <h3 className="text-base font-bold text-gray-900 mb-2">Futa Ombi?</h3>
+            <p className="text-sm text-gray-600 mb-5">Je, una uhakika unataka kufuta ombi hili? Hatua hii haiwezi kutenduliwa.</p>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowDeleteConfirm(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                Ghairi
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50"
+              >
+                {deleting ? 'Inafuta...' : 'Futa'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Convert to Student Modal */}
+      {showConvertModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Ingiza Mwanafunzi</h2>
+            <p className="text-sm text-gray-500 mb-4">
+              Ombi litafutwa baada ya mwanafunzi kuundwa.
+            </p>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Namba ya Udahili</label>
+                <input
+                  value={convertAdmissionNo}
+                  readOnly
+                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Darasa</label>
+                <select
+                  value={convertClassId}
+                  onChange={(e) => { setConvertClassId(e.target.value); setConvertStreamId('') }}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="">-- Chagua Darasa --</option>
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>{c.class_name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Stream</label>
+                <select
+                  value={convertStreamId}
+                  onChange={(e) => setConvertStreamId(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                >
+                  <option value="">-- Chagua Stream --</option>
+                  {classStreams
+                    .filter(cs => cs.class_id === convertClassId)
+                    .map(cs => (
+                      <option key={cs.id} value={cs.id}>
+                        {cs.streams?.stream_name ? `Stream ${cs.streams.stream_name}` : cs.id}
+                      </option>
+                    ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex gap-3 justify-end mt-6">
+              <button
+                onClick={() => setShowConvertModal(false)}
+                disabled={converting}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                Ghairi
+              </button>
+              <button
+                onClick={handleConvert}
+                disabled={converting || !convertStreamId}
+                className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 disabled:opacity-50"
+              >
+                {converting ? 'Inaunda...' : 'Thibitisha na Unda'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Attachment Preview Modal */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setPreviewAttachment(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700">Attachment</h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewAttachment}
+                  download
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700"
+                >
+                  Download
+                </a>
+                <button onClick={() => setPreviewAttachment(null)} className="p-1 text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 p-2">
+              <iframe
+                src={previewAttachment}
+                className="w-full h-[80vh] rounded-lg border-0"
+                title="Attachment Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Request More Info Modal */}
+      {showRequestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-lg mx-4 p-6">
+            <h2 className="text-lg font-bold text-gray-900 mb-4">Omba Maelezo Zaidi</h2>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Maelezo kwa Mwombaji</label>
+              <textarea
+                value={requestMessage}
+                onChange={(e) => setRequestMessage(e.target.value)}
+                rows={4}
+                className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm"
+                placeholder="Andika maelezo ya kile shule inahitaji..."
+              />
+            </div>
+            <label className="flex items-center gap-2 text-sm text-gray-700 mb-6 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={requireAttachment}
+                onChange={(e) => setRequireAttachment(e.target.checked)}
+                className="rounded border-gray-300"
+              />
+              Nahitaji attachment (PDF) kutoka kwa mwombaji
+            </label>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setShowRequestModal(false)}
+                disabled={sendingRequest}
+                className="px-4 py-2 text-sm font-medium text-gray-600 bg-gray-100 rounded-lg hover:bg-gray-200 disabled:opacity-50"
+              >
+                Ghairi
+              </button>
+              <button
+                onClick={handleSendRequest}
+                disabled={sendingRequest || !requestMessage.trim()}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+              >
+                {sendingRequest ? 'Inatuma...' : 'Tuma Ombi'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

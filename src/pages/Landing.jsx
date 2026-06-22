@@ -79,6 +79,7 @@ function Landing() {
               <a href="#uniforms" className="text-sm text-gray-600 hover:text-maroon-600 transition">Sare</a>
               <Link to="/school-rules" className="text-sm text-gray-600 hover:text-maroon-600 transition">Rules</Link>
               <Link to="/joining-instructions" className="text-sm text-gray-600 hover:text-maroon-600 transition">Join</Link>
+              <Link to="/events-announcements" className="text-sm text-gray-600 hover:text-maroon-600 transition">Events</Link>
               <Link to="/track-application" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition">Fuatilia Ombi</Link>
               <a href="#contact" className="text-sm text-gray-600 hover:text-maroon-600 transition">Contact</a>
             </nav>
@@ -503,7 +504,7 @@ function Landing() {
                           <div className="p-5">
                             <h3 className="text-lg font-semibold text-gray-900 mb-2">{u.title}</h3>
                             {u.description && <p className="text-sm text-gray-500 mb-2">{u.description}</p>}
-                            {u.items?.length > 0 && (
+                            {Array.isArray(u.items) && u.items.length > 0 && (
                               <ul className="space-y-1.5 text-sm text-gray-600">
                                 {u.items.map((item, i) => (
                                   <li key={i} className="flex items-center gap-2">
@@ -718,6 +719,7 @@ function Landing() {
                 <li><Link to="/apply" className="text-sm text-gray-400 hover:text-white transition">Tuma Ombi</Link></li>
                 <li><Link to="/school-rules" className="text-sm text-gray-400 hover:text-white transition">Kanuni za Shule</Link></li>
                 <li><Link to="/joining-instructions" className="text-sm text-gray-400 hover:text-white transition">Maelekezo ya Kujiunga</Link></li>
+                <li><Link to="/events-announcements" className="text-sm text-gray-400 hover:text-white transition">Matukio na Matangazo</Link></li>
                 <li><Link to="/track-application" className="text-sm text-gray-400 hover:text-white transition">Fuatilia Ombi</Link></li>
               </ul>
             </div>

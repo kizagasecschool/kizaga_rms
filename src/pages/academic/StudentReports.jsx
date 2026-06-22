@@ -10,20 +10,28 @@ function subjectHasPractical(subject, exam) {
   return subject?.has_practical || SCIENCE_SUBJECTS.includes(subject?.subject_code)
 }
 
+function calcDivision(totalPoints, level) {
+  if (totalPoints <= 0) return '0'
+  if (level === 'A_LEVEL') {
+    if (totalPoints >= 3 && totalPoints <= 9) return 'I'
+    if (totalPoints >= 10 && totalPoints <= 12) return 'II'
+    if (totalPoints >= 13 && totalPoints <= 17) return 'III'
+    if (totalPoints >= 18 && totalPoints <= 19) return 'IV'
+    return '0'
+  }
+  if (totalPoints >= 7 && totalPoints <= 17) return 'I'
+  if (totalPoints >= 18 && totalPoints <= 21) return 'II'
+  if (totalPoints >= 22 && totalPoints <= 25) return 'III'
+  if (totalPoints >= 26 && totalPoints <= 33) return 'IV'
+  return '0'
+}
+
 function getGradeForPercentage(pct, grades) {
   if (pct === null || pct === undefined) return null
   for (const g of grades) {
     if (pct >= g.min_mark) return g
   }
   return grades[grades.length - 1] || null
-}
-
-function getPointsForAverage(avg, grades) {
-  if (avg === null || avg === undefined) return null
-  for (const g of grades) {
-    if (avg >= g.min_mark) return g.points
-  }
-  return grades[grades.length - 1]?.points ?? null
 }
 
 function getMarkTotal(mark, hp) {
@@ -218,6 +226,318 @@ const printStyles = `
   }
 `
 
+function ReportCard({ student, ctx }) {
+  const s = student
+  const {
+    mode, studentResults, subjects, markMap, selectedExam, selectedExam2,
+    grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
+    subjectRanks, teacherSubjects, parentGreeting, closingMessage,
+    schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
+    students, computeCombinedData
+  } = ctx
+
+  const sr = mode === 'single' ? studentResults.find(r => r.student_id === s.id) || null : null
+
+  let totalPtsSingle = 0
+  let divisionSingle = '0'
+  if (mode === 'single') {
+    const pts = []
+    const classLevel = classes.find(c => c.id === selectedClassId)?.level || 'O_LEVEL'
+    subjects.forEach(subject => {
+      if (classLevel === 'A_LEVEL' && subject.subject_type === 'ELECTIVE') return
+      const mark = markMap[`${s.id}_${subject.id}`]
+      const hp = subjectHasPractical(subject, selectedExam)
+      const total = ((mark?.marks_obtained ?? 0) + (hp ? (mark?.practical_marks ?? 0) : 0))
+      const max = hp ? 150 : 100
+      const pct = mark && !mark.is_absent ? (total / max) * 100 : null
+      const g = getGradeForPercentage(pct, grades)
+      if (g && g.points > 0) pts.push(g.points)
+    })
+    pts.sort((a, b) => a - b)
+    const bestN = classLevel === 'A_LEVEL' ? 3 : 7
+    const bestPoints = pts.slice(0, bestN)
+    totalPtsSingle = bestPoints.reduce((s, p) => s + p, 0)
+    divisionSingle = calcDivision(totalPtsSingle, classLevel)
+  }
+
+  const cData = mode === 'combined' ? computeCombinedData(s) : null
+
+  return (
+    <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px', lineHeight: '1.35', color: '#000', pageBreakAfter: 'always', background: '#fff', padding: '18px 25px', overflow: 'hidden' }}>
+      {/* HEADER: Logos + User Heading */}
+      <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '6px', marginBottom: '8px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+          <div style={{ width: '130px', display: 'flex', justifyContent: 'flex-start' }}>
+            {schoolInfo?.national_logo_url && (
+              <img src={schoolInfo.national_logo_url} alt="" style={{ width: '110px', height: '110px', objectFit: 'contain' }} crossOrigin="anonymous" />
+            )}
+          </div>
+          <div style={{ flex: 1, textAlign: 'center', fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'pre-line', lineHeight: '1.2' }}>
+            {reportHeading || (mode === 'combined' ? 'RIPOTI MCHANGANYIKO' : 'RIPOTI YA MWANAFUNZI')}
+          </div>
+          <div style={{ width: '130px', display: 'flex', justifyContent: 'flex-end' }}>
+            {schoolInfo?.logo_url && (
+              <img src={schoolInfo.logo_url} alt="" style={{ width: '110px', height: '110px', objectFit: 'contain' }} crossOrigin="anonymous" />
+            )}
+          </div>
+        </div>
+        {mode === 'combined' && (
+          <div style={{ fontSize: '11px', marginTop: '4px' }}>{(examLabel1 || selectedExam?.name)} + {(examLabel2 || selectedExam2?.name)}</div>
+        )}
+      </div>
+
+      {/* STUDENT NAME */}
+      <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '4px', whiteSpace: 'pre-line' }}>
+        JINA LA MWANAFUNZI: {s.first_name} {s.middle_name || ''} {s.surname}
+      </div>
+
+      {/* TABLE 1: Subject Results */}
+      <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>MATOKEO YA MASOMO</h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
+        <thead>
+          <tr style={{ background: '#f0f0f0' }}>
+            <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left', width: '4%' }}>#</th>
+            <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left' }}>Somo</th>
+            {mode === 'combined' ? (
+              <>
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{(examLabel1 || selectedExam?.name || 'Mth. 1')}</th>
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{(examLabel2 || selectedExam2?.name || 'Mth. 2')}</th>
+              </>
+            ) : selectedExam?.has_practical ? (
+              <>
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || 'Nadharia'}</th>
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel2 || 'Vitendo'}</th>
+              </>
+            ) : (
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || 'Alama'}</th>
+            )}
+            <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '8%' }}>Wastani</th>
+            <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '7%' }}>Daraja</th>
+            <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '6%' }}>Nafasi</th>
+            <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '18%' }}>Sahihi ya Mwalimu</th>
+          </tr>
+        </thead>
+        <tbody>
+          {mode === 'single' && subjects.map((subject, idx) => {
+            const mark = markMap[`${s.id}_${subject.id}`]
+            const hp = subjectHasPractical(subject, selectedExam)
+            const theoryMark = mark?.marks_obtained ?? null
+            const practicalMark = hp ? (mark?.practical_marks ?? null) : null
+            const total = (theoryMark || 0) + (practicalMark || 0)
+            const max = hp ? 150 : 100
+            const pct = mark && !mark.is_absent ? (total / max) * 100 : null
+            const gradeObj = getGradeForPercentage(pct, grades)
+            const isAbsent = mark?.is_absent
+
+            return (
+              <tr key={subject.id}>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{idx + 1}</td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{subject.subject_name}</td>
+                {selectedExam?.has_practical ? (
+                  <>
+                    <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                      {isAbsent ? '-' : theoryMark != null ? theoryMark : '-'}
+                    </td>
+                    <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                      {isAbsent ? '-' : practicalMark != null ? practicalMark : '-'}
+                    </td>
+                  </>
+                ) : (
+                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                    {isAbsent ? '-' : theoryMark != null ? theoryMark : '-'}
+                  </td>
+                )}
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {isAbsent ? '-' : pct != null ? `${pct.toFixed(0)}` : '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
+                  {isAbsent ? '-' : gradeObj?.grade || '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {isAbsent ? '-' : subjectRanks[`${s.id}_${subject.id}`] || '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                  {teacherSubjects[subject.id] || ''}
+                </td>
+              </tr>
+            )
+          })}
+          {mode === 'combined' && cData?.entries.map((entry, idx) => (
+            <tr key={entry.subject.id}>
+              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{idx + 1}</td>
+              <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{entry.subject.subject_name}</td>
+              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                {entry.isAbsent1 ? '-' : entry.exam1Total != null ? entry.exam1Total : '-'}
+              </td>
+              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                {entry.isAbsent2 ? '-' : entry.exam2Total != null ? entry.exam2Total : '-'}
+              </td>
+              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                {entry.combinedPct != null ? `${entry.combinedPct.toFixed(0)}` : '-'}
+              </td>
+              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
+                {entry.gradeObj?.grade || '-'}
+              </td>
+              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                {entry.isAbsent1 && entry.isAbsent2 ? '-' : subjectRanks[`${s.id}_${entry.subject.id}`] || '-'}
+              </td>
+              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                {teacherSubjects[entry.subject.id] || ''}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+
+      {/* TABLE 2: Character Assessment */}
+      <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>TATHMINI YA MWENENDO WA MWANAFUNZI</h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
+        <thead>
+          <tr style={{ background: '#f0f0f0' }}>
+            {['Tabia', 'Uwajibikaji', 'Ubunifu', 'Kujiamini', 'Usafi', 'Ushirikiano', 'Michezo'].map(h => (
+              <th key={h} style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{h}</th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            {[1, 2, 3, 4, 5, 6, 7].map(i => (
+              <td key={i} style={{ border: '1px solid #000', padding: '8px 4px', textAlign: 'center' }}></td>
+            ))}
+          </tr>
+        </tbody>
+      </table>
+
+      {/* TABLE 3: Grade Boundary */}
+      <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>VIWANGO VYA DARAJA</h3>
+      <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
+        <tbody>
+          <tr>
+            <td style={{ border: '1px solid #000', padding: '3px 6px', textAlign: 'left' }}>
+              {grades.slice().reverse().map((g, idx) => (
+                <span key={idx}>{idx > 0 && '    '}<strong>{g.grade}</strong> ({g.min_mark}-{g.max_mark}%, {g.points != null ? g.points : '-'}, {g.remarks || '-'})</span>
+              ))}
+            </td>
+          </tr>
+        </tbody>
+      </table>
+
+      {/* SUMMARY */}
+      <p style={{ fontSize: '12px', marginBottom: '8px', fontWeight: 'bold', fontStyle: 'italic' }}>
+        {s.first_name} amekuwa namba <strong>{mode === 'single' ? (sr?.position || '-') : '-'}</strong> kati ya wanafunzi <strong>{students.length}</strong>.
+        Amepata wastani wa <strong>{mode === 'single' ? (sr?.average_marks != null ? `${sr.average_marks.toFixed(1)}%` : '-') : (cData?.avgPct != null ? `${cData.avgPct.toFixed(1)}%` : '-')}</strong>,
+        daraja <strong>{mode === 'single' ? (sr?.grade || getGradeForPercentage(sr?.average_marks, grades)?.grade || '-') : (cData?.gradeObj?.grade || '-')}</strong>,
+        division <strong>{mode === 'single' ? (divisionSingle || '-') : (cData?.division || '-')}</strong>{' '}
+        ya pointi <strong>{mode === 'single' ? (totalPtsSingle > 0 ? totalPtsSingle : '-') : (cData?.pts != null ? cData.pts : '-')}</strong>.
+      </p>
+
+      {/* AUTO COMMENTS BASED ON GRADE */}
+      {(() => {
+        const avg = mode === 'single' ? (sr?.average_marks ?? null) : (cData?.avgPct ?? null)
+        const g = mode === 'single' ? (sr?.grade || getGradeForPercentage(sr?.average_marks, grades)?.grade || '') : (cData?.gradeObj?.grade || '')
+
+        let autoClass = 'Endelea kujitahidi katika masomo yako.'
+        let autoHead = 'Nawataka wazazi kuendelea kumhimiza mtoto wenu kusoma kwa bidii.'
+
+        if (g === 'A') {
+          autoClass = 'Umefanya vizuri sana. Endelea kudumisha kiwango hiki cha juu cha ufaulu.'
+          autoHead = 'Napongeza juhudi za mwanafunzi huyu. Asanteni kwa ushirikiano wenu mkamilifu.'
+        } else if (g === 'B') {
+          autoClass = 'Umefanya vizuri. Endelea kujitahidi zaidi ili kufikia daraja la juu zaidi.'
+          autoHead = 'Nawataka wazazi kuendelea kumhimiza mtoto wenu kusoma kwa bidii ili kuboresha zaidi.'
+        } else if (g === 'C') {
+          autoClass = 'Unaendelea wastani. Jitahidi zaidi ili kuboresha matokeo yako.'
+          autoHead = 'Nawataka wazazi kushirikiana nasi kumhimiza mtoto wenu kusoma kwa bidii zaidi.'
+        } else if (g === 'D') {
+          autoClass = 'Unahitaji kuongeza juhudi zaidi katika masomo yako na kusoma kwa bidii.'
+          autoHead = 'Nawataka wazazi kuchukua hatua za dharura kumsaidia mtoto wenu kuboresha ufaulu wake.'
+        } else if (g === 'F' || g === 'E') {
+          autoClass = 'Unahitaji kusoma kwa bidii zaidi na kuhudhuria masomo yote kwa ukamilifu.'
+          autoHead = 'Nawataka wazazi kufuatilia kwa karibu zaidi maendeleo ya mtoto wenu na kushirikiana nasi.'
+        }
+
+        return (
+          <div style={{ fontSize: '12px', marginBottom: '8px' }}>
+            <p style={{ margin: '2px 0' }}>
+              <strong>Maoni ya Mwalimu wa Darasa:</strong> {classTeacherComment || (avg != null ? autoClass : '________________________________________')}
+            </p>
+            <p style={{ margin: '2px 0' }}>
+              <strong>Maoni ya Mkuu wa Shule:</strong> {headTeacherComment || (avg != null ? autoHead : '________________________________________')}
+            </p>
+          </div>
+        )
+      })()}
+
+      {/* CLOSING MESSAGE */}
+      <p style={{ fontSize: '12px', fontStyle: 'italic', marginBottom: '4px' }}>
+        {closingMessage || 'Asante kwa ushirikiano wenu katika kuhakikisha maendeleo ya mtoto wenu. Mungu awabariki.'}
+      </p>
+      <p style={{ fontSize: '12px', marginBottom: '8px' }}>
+        <strong>Tarehe ya Kufunga:</strong> {schoolClosingDate ? new Date(schoolClosingDate).toLocaleDateString('en-TZ') : '________'} &nbsp;|&nbsp;
+        <strong>Tarehe ya Kufungua:</strong> {schoolOpeningDate ? new Date(schoolOpeningDate).toLocaleDateString('en-TZ') : '________'}
+      </p>
+
+      {/* SIGNATURES */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px' }}>
+        <div style={{ textAlign: 'center', width: '30%' }}>
+          <div style={{ height: '28px' }}></div>
+          <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+            <div style={{ fontWeight: 'bold' }}>Mkuu wa Shule</div>
+            <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', width: '30%' }}>
+          <div style={{ height: '40px' }}></div>
+          <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+            <div style={{ fontWeight: 'bold' }}>Ofisi ya Taaluma</div>
+            <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', width: '30%' }}>
+          <div style={{ height: '40px' }}></div>
+          <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+            <div style={{ fontWeight: 'bold' }}>Mhuri wa Shule</div>
+            <div style={{ fontSize: '8px', color: '#555' }}>Mhuri</div>
+          </div>
+        </div>
+      </div>
+
+      {/* PARENT SECTION */}
+      <div style={{ border: '2px solid #000', padding: '8px', marginTop: '6px' }}>
+        <h4 style={{ fontSize: '12px', fontWeight: 'bold', textAlign: 'center', margin: '0 0 4px 0' }}>
+          SEHEMU YA MZAZI / MLEZI
+        </h4>
+        <p style={{ fontSize: '12px', marginBottom: '6px' }}>
+          Tafadhali jaza sehemu hii, kisha kata na kurudisha shuleni.
+        </p>
+        <div style={{ fontSize: '12px', lineHeight: '1.6' }}>
+          <div style={{ display: 'flex', margin: '2px 0' }}>
+            <span style={{ fontWeight: 'bold', whiteSpace: 'nowrap' }}>Maoni:&nbsp;</span>
+            <span style={{ flex: 1, borderBottom: '1px solid #000', height: '1.2em' }}>&nbsp;</span>
+          </div>
+          <div style={{ display: 'flex', margin: '2px 0' }}>
+            <span style={{ width: '50px' }}>&nbsp;</span>
+            <span style={{ flex: 1, borderBottom: '1px solid #000', height: '1.2em' }}>&nbsp;</span>
+          </div>
+          <div style={{ display: 'flex', margin: '2px 0' }}>
+            <span style={{ fontWeight: 'bold', whiteSpace: 'nowrap', width: '55px' }}>Sahihi:&nbsp;</span>
+            <span style={{ flex: 1, borderBottom: '1px solid #000', height: '1.2em' }}>&nbsp;</span>
+            <span style={{ fontWeight: 'bold', whiteSpace: 'nowrap', marginLeft: '12px', width: '40px' }}>Jina:&nbsp;</span>
+            <span style={{ flex: 1, borderBottom: '1px solid #000', height: '1.2em' }}>&nbsp;</span>
+          </div>
+          <div style={{ display: 'flex', margin: '2px 0' }}>
+            <span style={{ fontWeight: 'bold', whiteSpace: 'nowrap', width: '55px' }}>Uhusiano:&nbsp;</span>
+            <span style={{ flex: 1, borderBottom: '1px solid #000', height: '1.2em' }}>&nbsp;</span>
+            <span style={{ fontWeight: 'bold', whiteSpace: 'nowrap', marginLeft: '12px', width: '40px' }}>Tarehe:&nbsp;</span>
+            <span style={{ flex: 1, borderBottom: '1px solid #000', height: '1.2em' }}>&nbsp;</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  )
+}
+
 function StudentReports() {
   const reportRef = useRef(null)
   const bulkContainerRef = useRef(null)
@@ -265,27 +585,33 @@ function StudentReports() {
   const [examLabel2, setExamLabel2] = useState('')
   const [teacherSubjects, setTeacherSubjects] = useState([])
   const [subjectRanks, setSubjectRanks] = useState({})
-  const [showPrintHint, setShowPrintHint] = useState(true)
-
   const [loading, setLoading] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
+  const [initError, setInitError] = useState(null)
 
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      const [eRes, cRes, stRes, schRes, yRes] = await Promise.all([
-        supabase.from('exams').select('*').order('created_at', { ascending: false }),
-        supabase.from('classes').select('*').order('sort_order'),
-        supabase.from('exam_classes').select('*'),
-        supabase.from('school_settings').select('*').limit(1),
-        supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
-      ])
-      if (eRes.data) setExams(eRes.data)
-      if (cRes.data) setClasses(cRes.data)
-      if (stRes.data) setExamClasses(stRes.data)
-      if (schRes.data && schRes.data.length > 0) setSchoolInfo(schRes.data[0])
-      if (yRes.data) setAcademicYears(yRes.data)
-      setLoading(false)
+      setInitError(null)
+      try {
+        const [eRes, cRes, stRes, schRes, yRes] = await Promise.all([
+          supabase.from('exams').select('*').order('created_at', { ascending: false }),
+          supabase.from('classes').select('*').order('sort_order'),
+          supabase.from('exam_classes').select('*'),
+          supabase.from('school_settings').select('*').limit(1),
+          supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
+        ])
+        if (eRes.data) setExams(eRes.data)
+        if (cRes.data) setClasses(cRes.data)
+        if (stRes.data) setExamClasses(stRes.data)
+        if (schRes.data && schRes.data.length > 0) setSchoolInfo(schRes.data[0])
+        if (yRes.data) setAcademicYears(yRes.data)
+      } catch (err) {
+        console.error('Init load error:', err)
+        setInitError('Imeshindwa kupakia data. Tafadhali angalia mtandao wako na ujaribu tena.')
+      } finally {
+        setLoading(false)
+      }
     }
     load()
   }, [])
@@ -321,21 +647,16 @@ function StudentReports() {
 
   const classIdsForExams = useMemo(() => {
     if (activeExamIds.length === 0) return []
-    const sets = activeExamIds.map(eid =>
-      new Set(examClasses.filter(ec => ec.exam_id === eid).map(ec => ec.class_id))
+    const union = new Set()
+    activeExamIds.forEach(eid =>
+      examClasses.filter(ec => ec.exam_id === eid).forEach(ec => union.add(ec.class_id))
     )
-    const common = classes.filter(c => sets.every(s => s.has(c.id)))
-    return common.map(c => c.id)
+    return classes.filter(c => union.has(c.id)).map(c => c.id)
   }, [activeExamIds, examClasses, classes])
 
   const filteredClasses = useMemo(() => {
     return classes.filter(c => classIdsForExams.includes(c.id))
   }, [classes, classIdsForExams])
-
-  const selectedStudentResult = useMemo(() => {
-    if (!selectedStudent) return null
-    return studentResults.find(sr => sr.student_id === selectedStudent.id) || null
-  }, [selectedStudent, studentResults])
 
   useEffect(() => {
     if (!selectedClassId || activeExamIds.length === 0) {
@@ -470,15 +791,15 @@ function StudentReports() {
             uniqueStudentIds.forEach(sid => {
               const m1 = loadedMarks.find(m => m.student_id === sid && m.subject_id === subj.id)
               const m2 = loadedMarks2.find(m => m.student_id === sid && m.subject_id === subj.id)
-              if (!m1) return
-              const allAbsent = m1?.is_absent
-              if (allAbsent) return
+              if ((!m1 || m1.is_absent) && (!m2 || m2.is_absent)) return
               const hp1 = subjectHasPractical(subj, selectedExam)
               const hp2 = subjectHasPractical(subj, selectedExam2)
               const c1 = computeCombinedMark(m1, hp1)
               const c2 = computeCombinedMark(m2, hp2)
+              const has1 = c1.total != null
+              const has2 = c2.total != null
               const combinedTotal = (c1.total ?? 0) + (c2.total ?? 0)
-              const combinedMax = c1.max + c2.max
+              const combinedMax = (has1 ? c1.max : 0) + (has2 ? c2.max : 0)
               const pct = combinedMax > 0 ? (combinedTotal / combinedMax) * 100 : null
               if (pct != null) rankScores.push({ student_id: sid, pct })
             })
@@ -667,19 +988,21 @@ function StudentReports() {
     return () => clearTimeout(timer)
   }, [reportHeading, examLabel1, examLabel2, selectedClassId])
 
-  const combinedStudentData = useMemo(() => {
-    if (mode !== 'combined' || !selectedStudent) return null
+  const computeCombinedData = useCallback((student) => {
+    if (mode !== 'combined' || !student) return null
     const classLevel = classes.find(c => c.id === selectedClassId)?.level || 'O_LEVEL'
 
     const entries = subjects.map(subject => {
-      const mark1 = markMap[`${selectedStudent.id}_${subject.id}`]
-      const mark2 = markMap2[`${selectedStudent.id}_${subject.id}`]
+      const mark1 = markMap[`${student.id}_${subject.id}`]
+      const mark2 = markMap2[`${student.id}_${subject.id}`]
       const hp1 = subjectHasPractical(subject, selectedExam)
       const hp2 = subjectHasPractical(subject, selectedExam2)
       const c1 = computeCombinedMark(mark1, hp1)
       const c2 = computeCombinedMark(mark2, hp2)
+      const has1 = c1.total != null
+      const has2 = c2.total != null
       const combinedTotal = (c1.total ?? 0) + (c2.total ?? 0)
-      const combinedMax = c1.max + c2.max
+      const combinedMax = (has1 ? c1.max : 0) + (has2 ? c2.max : 0)
       const pct = combinedMax > 0 ? (combinedTotal / combinedMax) * 100 : null
       const gradeObj = pct != null ? getGradeForPercentage(pct, grades) : null
       return {
@@ -710,325 +1033,46 @@ function StudentReports() {
     const bestPoints = allPoints.slice(0, bestN)
     const totalPoints = bestPoints.reduce((s, p) => s + p, 0)
 
-    let division = '0'
-    if (totalPoints > 0) {
-      if (classLevel === 'A_LEVEL') {
-        if (totalPoints >= 3 && totalPoints <= 9) division = 'I'
-        else if (totalPoints >= 10 && totalPoints <= 12) division = 'II'
-        else if (totalPoints >= 13 && totalPoints <= 17) division = 'III'
-        else if (totalPoints >= 18 && totalPoints <= 19) division = 'IV'
-      } else {
-        if (totalPoints >= 7 && totalPoints <= 17) division = 'I'
-        else if (totalPoints >= 18 && totalPoints <= 21) division = 'II'
-        else if (totalPoints >= 22 && totalPoints <= 25) division = 'III'
-        else if (totalPoints >= 26 && totalPoints <= 33) division = 'IV'
-      }
-    }
+    const division = calcDivision(totalPoints, classLevel)
 
     return { entries, avgPct, gradeObj: overallGrade, pts: totalPoints, totalMarks, division, validCount: principalValid.length }
-  }, [mode, selectedStudent, subjects, markMap, markMap2, selectedExam, selectedExam2, grades, classes, selectedClassId])
+  }, [mode, subjects, markMap, markMap2, selectedExam, selectedExam2, grades, classes, selectedClassId])
 
-  const ReportCard = useCallback(({ student }) => {
-    const s = student
-    const sr = mode === 'single' ? studentResults.find(r => r.student_id === s.id) || null : null
-
-    let totalPtsSingle = 0
-    if (mode === 'single') {
-      subjects.forEach(subject => {
-        const mark = markMap[`${s.id}_${subject.id}`]
-        const hp = subjectHasPractical(subject, selectedExam)
-        const total = ((mark?.marks_obtained ?? 0) + (hp ? (mark?.practical_marks ?? 0) : 0))
-        const max = hp ? 150 : 100
-        const pct = mark && !mark.is_absent ? (total / max) * 100 : null
-        const g = getGradeForPercentage(pct, grades)
-        if (g) totalPtsSingle += g.points
-      })
-    }
-
-    const cData = mode === 'combined' ? combinedStudentData : null
-
-    return (
-      <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px', lineHeight: '1.35', color: '#000', pageBreakAfter: 'always', background: '#fff', padding: '18px 25px', overflow: 'hidden' }}>
-        {/* HEADER: Logos + User Heading */}
-        <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: '6px', marginBottom: '8px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-            <div style={{ width: '72px', display: 'flex', justifyContent: 'flex-start' }}>
-              {schoolInfo?.national_logo_url && (
-                <img src={schoolInfo.national_logo_url} alt="" style={{ width: '56px', height: '56px', objectFit: 'contain' }} crossOrigin="anonymous" />
-              )}
-            </div>
-            <div style={{ flex: 1, textAlign: 'center', fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'pre-line', lineHeight: '1.2' }}>
-              {reportHeading || (mode === 'combined' ? 'RIPOTI MCHANGANYIKO' : 'RIPOTI YA MWANAFUNZI')}
-            </div>
-            <div style={{ width: '72px', display: 'flex', justifyContent: 'flex-end' }}>
-              {schoolInfo?.logo_url && (
-                <img src={schoolInfo.logo_url} alt="" style={{ width: '56px', height: '56px', objectFit: 'contain' }} crossOrigin="anonymous" />
-              )}
-            </div>
-          </div>
-          {mode === 'combined' && (
-            <div style={{ fontSize: '11px', marginTop: '4px' }}>{(examLabel1 || selectedExam?.name)} + {(examLabel2 || selectedExam2?.name)}</div>
-          )}
-        </div>
-
-        {/* STUDENT NAME */}
-        <div style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', whiteSpace: 'pre-line' }}>
-          {s.first_name} {s.middle_name || ''} {s.surname}
-        </div>
-
-        {/* ADDRESS TO PARENT */}
-        <p style={{ fontSize: '12px', fontStyle: 'italic', marginBottom: '4px' }}>
-          {parentGreeting || `Wazazi/Mlezi wa ${s.first_name} ${s.surname},`}
-        </p>
-        <p style={{ fontSize: '12px', marginBottom: '8px' }}>
-          Hii ni taarifa ya matokeo ya mtoto wako kwa muhula ulioisha. Tafadhali isome kwa makini, jadiliana naye, na utie sahihi sehemu ya mzazi iliyopo mwishoni mwa ripoti hii.
-        </p>
-
-        {/* TABLE 1: Subject Results */}
-        <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>MATOKEO YA MASOMO</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
-          <thead>
-            <tr style={{ background: '#f0f0f0' }}>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left', width: '4%' }}>#</th>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left' }}>Somo</th>
-              {mode === 'combined' ? (
-                <>
-                  <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{(examLabel1 || selectedExam?.name || 'Mth. 1')}</th>
-                  <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{(examLabel2 || selectedExam2?.name || 'Mth. 2')}</th>
-                </>
-              ) : selectedExam?.has_practical ? (
-                <>
-                  <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || 'Nadharia'}</th>
-                  <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel2 || 'Vitendo'}</th>
-                </>
-              ) : (
-                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || 'Alama'}</th>
-              )}
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '8%' }}>Wastani</th>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '7%' }}>Daraja</th>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '6%' }}>Nafasi</th>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '18%' }}>Sahihi ya Mwalimu</th>
-            </tr>
-          </thead>
-          <tbody>
-            {mode === 'single' && subjects.map((subject, idx) => {
-              const mark = markMap[`${s.id}_${subject.id}`]
-              const hp = subjectHasPractical(subject, selectedExam)
-              const theoryMark = mark?.marks_obtained ?? null
-              const practicalMark = hp ? (mark?.practical_marks ?? null) : null
-              const total = (theoryMark || 0) + (practicalMark || 0)
-              const max = hp ? 150 : 100
-              const pct = mark && !mark.is_absent ? (total / max) * 100 : null
-              const gradeObj = getGradeForPercentage(pct, grades)
-              const isAbsent = mark?.is_absent
-
-              return (
-                <tr key={subject.id}>
-                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{idx + 1}</td>
-                  <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{subject.subject_name}</td>
-                  {selectedExam?.has_practical ? (
-                    <>
-                      <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                        {isAbsent ? '-' : theoryMark != null ? theoryMark : '-'}
-                      </td>
-                      <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                        {isAbsent ? '-' : practicalMark != null ? practicalMark : '-'}
-                      </td>
-                    </>
-                  ) : (
-                    <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                      {isAbsent ? '-' : theoryMark != null ? theoryMark : '-'}
-                    </td>
-                  )}
-                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                    {isAbsent ? '-' : pct != null ? `${pct.toFixed(0)}` : '-'}
-                  </td>
-                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
-                    {isAbsent ? '-' : gradeObj?.grade || '-'}
-                  </td>
-                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                    {isAbsent ? '-' : subjectRanks[`${s.id}_${subject.id}`] || '-'}
-                  </td>
-                  <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                    {teacherSubjects[subject.id] || ''}
-                  </td>
-                </tr>
-              )
-            })}
-            {mode === 'combined' && cData?.entries.map((entry, idx) => (
-              <tr key={entry.subject.id}>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{idx + 1}</td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{entry.subject.subject_name}</td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                  {entry.isAbsent1 ? '-' : entry.exam1Total != null ? entry.exam1Total : '-'}
-                </td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                  {entry.isAbsent2 ? '-' : entry.exam2Total != null ? entry.exam2Total : '-'}
-                </td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                  {entry.combinedPct != null ? `${entry.combinedPct.toFixed(0)}` : '-'}
-                </td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
-                  {entry.gradeObj?.grade || '-'}
-                </td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                  {entry.isAbsent1 && entry.isAbsent2 ? '-' : subjectRanks[`${s.id}_${entry.subject.id}`] || '-'}
-                </td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                  {teacherSubjects[entry.subject.id] || ''}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* TABLE 2: Character Assessment */}
-        <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>TATHMINI YA MWENENDO WA MWANAFUNZI</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
-          <thead>
-            <tr style={{ background: '#f0f0f0' }}>
-              {['Tabia', 'Uwajibikaji', 'Ubunifu', 'Kujiamini', 'Usahihi', 'Ushirikiano', 'Michezo'].map(h => (
-                <th key={h} style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            <tr>
-              {[1, 2, 3, 4, 5, 6, 7].map(i => (
-                <td key={i} style={{ border: '1px solid #000', padding: '8px 4px', textAlign: 'center' }}></td>
-              ))}
-            </tr>
-          </tbody>
-        </table>
-
-        {/* TABLE 3: Grade Boundary */}
-        <h3 style={{ fontSize: '13px', fontWeight: 'bold', marginBottom: '6px', marginTop: '0' }}>VIWANGO VYA DARAJA</h3>
-        <table style={{ width: '100%', borderCollapse: 'collapse', border: '1px solid #000', fontSize: '11px', marginBottom: '6px' }}>
-          <thead>
-            <tr style={{ background: '#f0f0f0' }}>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '15%' }}>Daraja</th>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>Asilimia</th>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '12%' }}>Pointi</th>
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center' }}>Maana</th>
-            </tr>
-          </thead>
-          <tbody>
-            {grades.slice().reverse().map((g, idx) => (
-              <tr key={idx}>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>{g.grade}</td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{g.min_mark}-{g.max_mark}%</td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{g.points != null ? g.points : '-'}</td>
-                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{g.remarks || '-'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* SUMMARY */}
-        <p style={{ fontSize: '12px', marginBottom: '8px' }}>
-          {s.first_name} amekuwa namba <strong>{mode === 'single' ? (sr?.position || '-') : '-'}</strong> kati ya wanafunzi <strong>{students.length}</strong>.
-          Amepata wastani wa <strong>{mode === 'single' ? (sr?.average_marks != null ? `${sr.average_marks.toFixed(1)}%` : '-') : (cData?.avgPct != null ? `${cData.avgPct.toFixed(1)}%` : '-')}</strong>,
-          daraja <strong>{mode === 'single' ? (sr?.grade || getGradeForPercentage(sr?.average_marks, grades)?.grade || '-') : (cData?.gradeObj?.grade || '-')}</strong>,
-          division <strong>{mode === 'single' ? ((sr?.division || '').replace('Division ', '') || '-') : (cData?.division || '-')}</strong>
-          ya pointi <strong>{mode === 'single' ? (totalPtsSingle > 0 ? totalPtsSingle : '-') : (cData?.pts != null ? cData.pts : '-')}</strong>.
-        </p>
-
-        {/* AUTO COMMENTS BASED ON GRADE */}
-        {(() => {
-          const avg = mode === 'single' ? (sr?.average_marks ?? null) : (cData?.avgPct ?? null)
-          const g = mode === 'single' ? (sr?.grade || getGradeForPercentage(sr?.average_marks, grades)?.grade || '') : (cData?.gradeObj?.grade || '')
-
-          let autoClass = 'Endelea kujitahidi katika masomo yako.'
-          let autoHead = 'Nawataka wazazi kuendelea kumhimiza mtoto wenu kusoma kwa bidii.'
-
-          if (g === 'A') {
-            autoClass = 'Umefanya vizuri sana. Endelea kudumisha kiwango hiki cha juu cha ufaulu.'
-            autoHead = 'Napongeza juhudi za mwanafunzi huyu. Asanteni kwa ushirikiano wenu mkamilifu.'
-          } else if (g === 'B') {
-            autoClass = 'Umefanya vizuri. Endelea kujitahidi zaidi ili kufikia daraja la juu zaidi.'
-            autoHead = 'Nawataka wazazi kuendelea kumhimiza mtoto wenu kusoma kwa bidii ili kuboresha zaidi.'
-          } else if (g === 'C') {
-            autoClass = 'Unaendelea wastani. Jitahidi zaidi ili kuboresha matokeo yako.'
-            autoHead = 'Nawataka wazazi kushirikiana nasi kumhimiza mtoto wenu kusoma kwa bidii zaidi.'
-          } else if (g === 'D') {
-            autoClass = 'Unahitaji kuongeza juhudi zaidi katika masomo yako na kusoma kwa bidii.'
-            autoHead = 'Nawataka wazazi kuchukua hatua za dharura kumsaidia mtoto wenu kuboresha ufaulu wake.'
-          } else if (g === 'F' || g === 'E') {
-            autoClass = 'Unahitaji kusoma kwa bidii zaidi na kuhudhuria masomo yote kwa ukamilifu.'
-            autoHead = 'Nawataka wazazi kufuatilia kwa karibu zaidi maendeleo ya mtoto wenu na kushirikiana nasi.'
-          }
-
-          return (
-            <div style={{ fontSize: '12px', marginBottom: '8px' }}>
-              <p style={{ margin: '2px 0' }}>
-                <strong>Maoni ya Mwalimu wa Darasa:</strong> {classTeacherComment || (avg != null ? autoClass : '________________________________________')}
-              </p>
-              <p style={{ margin: '2px 0' }}>
-                <strong>Maoni ya Mkuu wa Shule:</strong> {headTeacherComment || (avg != null ? autoHead : '________________________________________')}
-              </p>
-            </div>
-          )
-        })()}
-
-        {/* CLOSING MESSAGE */}
-        <p style={{ fontSize: '12px', fontStyle: 'italic', marginBottom: '4px' }}>
-          {closingMessage || 'Asante kwa ushirikiano wenu katika kuhakikisha maendeleo ya mtoto wenu. Mungu awabariki.'}
-        </p>
-        <p style={{ fontSize: '12px', marginBottom: '8px' }}>
-          <strong>Tarehe ya Kufunga:</strong> {schoolClosingDate ? new Date(schoolClosingDate).toLocaleDateString('en-TZ') : '________'} &nbsp;|&nbsp;
-          <strong>Tarehe ya Kufungua:</strong> {schoolOpeningDate ? new Date(schoolOpeningDate).toLocaleDateString('en-TZ') : '________'}
-        </p>
-
-        {/* SIGNATURES */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px' }}>
-          <div style={{ textAlign: 'center', width: '30%' }}>
-            <div style={{ height: '28px' }}></div>
-            <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
-              <div style={{ fontWeight: 'bold' }}>Mkuu wa Shule</div>
-              <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
-            </div>
-          </div>
-          <div style={{ textAlign: 'center', width: '30%' }}>
-            <div style={{ height: '40px' }}></div>
-            <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
-              <div style={{ fontWeight: 'bold' }}>Mwalimu Mkuu wa Masomo</div>
-              <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
-            </div>
-          </div>
-          <div style={{ textAlign: 'center', width: '30%' }}>
-            <div style={{ height: '40px' }}></div>
-            <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
-              <div style={{ fontWeight: 'bold' }}>Mhuri wa Shule</div>
-              <div style={{ fontSize: '8px', color: '#555' }}>Mhuri</div>
-            </div>
-          </div>
-        </div>
-
-        {/* PARENT SECTION */}
-        <div style={{ border: '2px solid #000', padding: '8px', marginTop: '6px' }}>
-          <h4 style={{ fontSize: '12px', fontWeight: 'bold', textAlign: 'center', margin: '0 0 4px 0' }}>
-            SEHEMU YA MZAZI / MLEZI
-          </h4>
-          <p style={{ fontSize: '12px', marginBottom: '6px' }}>
-            Tafadhali jaza sehemu hii, kisha kata na kumrudishia mwanafunzi shuleni.
-          </p>
-          <div style={{ fontSize: '12px', lineHeight: '1.6' }}>
-            <p style={{ margin: '2px 0' }}><strong>Maoni:</strong> ________________________________________</p>
-            <p style={{ margin: '2px 0' }}><strong>Sahihi:</strong> _________________ &emsp; <strong>Jina:</strong> _________________</p>
-            <p style={{ margin: '2px 0' }}><strong>Uhusiano:</strong> _________________ &emsp; <strong>Tarehe:</strong> _________________</p>
-          </div>
-          <div style={{ textAlign: 'center', marginTop: '4px' }}>
-            <span style={{ fontSize: '8px', color: '#888' }}>- - - - - - - - - - Kata hapa - - - - - - - - - -</span>
-          </div>
-        </div>
-      </div>
-    )
-  }, [subjects, markMap, markMap2, studentResults, grades, selectedExam, selectedExam2, selectedClassId, classes, schoolInfo, mode, students.length, combinedStudentData, reportHeading, parentGreeting, closingMessage, schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment, teacherSubjects, examLabel1, examLabel2, subjectRanks])
+  const reportContext = useMemo(() => ({
+    mode, studentResults, subjects, markMap, selectedExam, selectedExam2,
+    grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
+    subjectRanks, teacherSubjects, parentGreeting, closingMessage,
+    schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
+    students, computeCombinedData
+  }), [
+    mode, studentResults, subjects, markMap, selectedExam, selectedExam2,
+    grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
+    subjectRanks, teacherSubjects, parentGreeting, closingMessage,
+    schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
+    students, computeCombinedData
+  ])
 
   if (loading) {
     return (
       <div className="no-print flex items-center justify-center py-20">
         <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (initError) {
+    return (
+      <div className="no-print bg-white rounded-xl border border-red-200 p-10 text-center">
+        <div className="w-14 h-14 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Kosa la Kupakia Data</h3>
+        <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">{initError}</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition">
+          Jaribu Tena
+        </button>
       </div>
     )
   }
@@ -1137,7 +1181,7 @@ function StudentReports() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam 2</label>
                 <select
                   value={selectedExam2Id}
-                  onChange={(e) => { setSelectedExam2Id(e.target.value); resetSelections() }}
+                  onChange={(e) => { setSelectedExam2Id(e.target.value) }}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
                 >
                   <option value="">Choose an exam...</option>
@@ -1380,7 +1424,7 @@ function StudentReports() {
               </div>
 
               <div className="print-area" ref={reportRef}>
-                <ReportCard student={selectedStudent} />
+                <ReportCard student={selectedStudent} ctx={reportContext} />
               </div>
             </div>
           )}
@@ -1388,7 +1432,7 @@ function StudentReports() {
           {/* Bulk container — off-screen for dom-to-image-more capture */}
           <div ref={bulkContainerRef} style={{ position: 'absolute', left: '-99999px', top: 0, width: '794px', background: '#fff', zIndex: -1 }}>
             {bulkStudents.map((student) => (
-              <ReportCard key={student.id} student={student} />
+              <ReportCard key={student.id} student={student} ctx={reportContext} />
             ))}
           </div>
 
@@ -1398,7 +1442,7 @@ function StudentReports() {
               ? sortedStudents.filter(s => s.result?.position != null)
               : sortedStudents
             ).map(student => (
-              <ReportCard key={student.id} student={student} />
+              <ReportCard key={student.id} student={student} ctx={reportContext} />
             ))}
           </div>
         </div>

@@ -368,7 +368,6 @@ function Results() {
   const examIdParam = searchParams.get('examId')
 
   const printRef = useRef(null)
-  const [generatingPDF, setGeneratingPDF] = useState(false)
 
   const [exams, setExams] = useState([])
   const [selectedExamId, setSelectedExamId] = useState(examIdParam || '')
@@ -394,25 +393,34 @@ function Results() {
   const [reprocessing, setReprocessing] = useState(false)
   const [reloadToken, setReloadToken] = useState(0)
 
+  const [initError, setInitError] = useState(null)
+
   useEffect(() => {
     const load = async () => {
       setLoading(true)
-      const [eRes, cRes, stRes, schRes, yRes] = await Promise.all([
-        supabase.from('exams').select('*').order('created_at', { ascending: false }),
-        supabase.from('classes').select('*').order('sort_order'),
-        supabase.from('exam_classes').select('*'),
-        supabase.from('school_settings').select('*').limit(1),
-        supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
-      ])
-      if (eRes.data) setExams(eRes.data)
-      if (cRes.data) setClasses(cRes.data)
-      if (stRes.data) setExamClasses(stRes.data)
-      if (schRes.data && schRes.data.length > 0) {
-        setSchoolInfo(schRes.data[0])
-        document.title = schRes.data[0].school_name || 'Kizaga RMS'
+      setInitError(null)
+      try {
+        const [eRes, cRes, stRes, schRes, yRes] = await Promise.all([
+          supabase.from('exams').select('*').order('created_at', { ascending: false }),
+          supabase.from('classes').select('*').order('sort_order'),
+          supabase.from('exam_classes').select('*'),
+          supabase.from('school_settings').select('*').limit(1),
+          supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
+        ])
+        if (eRes.data) setExams(eRes.data)
+        if (cRes.data) setClasses(cRes.data)
+        if (stRes.data) setExamClasses(stRes.data)
+        if (schRes.data && schRes.data.length > 0) {
+          setSchoolInfo(schRes.data[0])
+          document.title = schRes.data[0].school_name || 'Kizaga RMS'
+        }
+        if (yRes.data) setAcademicYears(yRes.data)
+      } catch (err) {
+        console.error('Init load error:', err)
+        setInitError('Imeshindwa kupakia data. Tafadhali angalia mtandao wako na ujaribu tena.')
+      } finally {
+        setLoading(false)
       }
-      if (yRes.data) setAcademicYears(yRes.data)
-      setLoading(false)
     }
     load()
   }, [])
@@ -775,26 +783,27 @@ function Results() {
     XLSX.writeFile(wb, `${examName.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`)
   }, [sortedStudents, subjects, selectedExam, markMap, selectedClassId, classes])
 
-  const handleDownloadPDF = useCallback(async () => {
-    setGeneratingPDF(true)
-    try {
-      const selectedClass = classes.find(c => c.id === selectedClassId)
-      const examName = selectedExam?.name || 'results'
-      const className = selectedClass?.class_name || ''
-      const filename = `${examName.replace(/[^a-zA-Z0-9]/g, '_')}_${className.replace(/[^a-zA-Z0-9]/g, '_')}_results`
-      await generatePDF(printRef.current, filename)
-    } catch (err) {
-      console.error('PDF generation error:', err)
-      showToast('Failed to generate PDF. ' + (err.message || ''), 'error')
-    } finally {
-      setGeneratingPDF(false)
-    }
-  }, [selectedExam, selectedClassId, classes, showToast])
-
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
         <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (initError) {
+    return (
+      <div className="bg-white rounded-xl border border-red-200 p-10 text-center">
+        <div className="w-14 h-14 mx-auto bg-red-50 rounded-full flex items-center justify-center mb-4">
+          <svg className="w-7 h-7 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+          </svg>
+        </div>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Kosa la Kupakia Data</h3>
+        <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">{initError}</p>
+        <button onClick={() => window.location.reload()} className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition">
+          Jaribu Tena
+        </button>
       </div>
     )
   }
@@ -1033,7 +1042,9 @@ function Results() {
             const classAvg = avg.length ? avg.reduce((s, st) => s + st.result.average_marks, 0) / avg.length : 0
             const classGradeObj = getGradeForPercentage(classAvg, grades)
             const pts = studentsWithResults.filter(s => s.points != null)
-            const classGpa = pts.length ? pts.reduce((s, st) => s + (st.points / 7), 0) / pts.length : 0
+            const classLevel = classes.find(c => c.id === selectedClassId)?.level || 'O_LEVEL'
+            const bestN = classLevel === 'A_LEVEL' ? 3 : 7
+            const classGpa = pts.length ? pts.reduce((s, st) => s + (st.points / bestN), 0) / pts.length : 0
 
             return (
               <>
@@ -1041,9 +1052,9 @@ function Results() {
                 {/* School Header */}
                 <div className="school-header mb-6 border-b-2 border-gray-800 pb-4">
                   <div className="flex items-start justify-between">
-                    <div className="w-16 shrink-0 pt-1">
+                    <div className="w-28 shrink-0 pt-1">
                       {schoolInfo?.national_logo_url && (
-                        <img src={schoolInfo.national_logo_url} alt="" className="w-14 h-14 object-contain" />
+                        <img src={schoolInfo.national_logo_url} alt="" className="w-24 h-24 object-contain" crossOrigin="anonymous" />
                       )}
                     </div>
                     <div className="text-center flex-1 px-4">
@@ -1065,9 +1076,9 @@ function Results() {
                         {schoolInfo?.email && <span>{schoolInfo.email}</span>}
                       </div>
                     </div>
-                    <div className="w-16 shrink-0 pt-1 flex justify-end">
+                    <div className="w-28 shrink-0 pt-1 flex justify-end">
                       {schoolInfo?.logo_url && (
-                        <img src={schoolInfo.logo_url} alt="" className="w-14 h-14 object-contain" />
+                        <img src={schoolInfo.logo_url} alt="" className="w-24 h-24 object-contain" crossOrigin="anonymous" />
                       )}
                     </div>
                   </div>

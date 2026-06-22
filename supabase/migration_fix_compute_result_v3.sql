@@ -1,48 +1,14 @@
 -- ============================================================
--- Migration: Update grading logic to match NECTA standards
--- - Fix A-Level grade points (A=1, B=2, C=3, D=4, E=5, S=6, F=7)
--- - Add S grade for A-Level
--- - Replace A-Level GPA with A-Level division (best 3 principals)
--- - Update compute_student_result for new division logic
+-- Migration: Fix compute_student_result issues
+-- Issues fixed:
+-- 1. Average uses raw-sum instead of percentage (can exceed 100, no grade matched)
+-- 2. A-Level filter uses '!= ELECTIVE' but A-Level subjects are 'PRINCIPAL'/'SUBSIDIARY'
+-- 3. marks_obtained has no COALESCE — NULL causes total to become NULL
+-- 4. Points lookup uses raw marks_obtained instead of percentage
+-- 5. is_absent: total should not include absent marks
+-- Run AFTER migration_grading_update.sql
 -- ============================================================
 
--- ============================================================
--- 1. UPDATE A-LEVEL GRADES
--- ============================================================
-DELETE FROM grades WHERE level = 'A_LEVEL';
-
-INSERT INTO grades (min_mark, max_mark, grade, points, remarks, level)
-SELECT v.min_mark, v.max_mark, v.grade, v.points, v.remarks, v.level
-FROM (VALUES
-  (80, 100, 'A',  1, 'Bora sana',      'A_LEVEL'),
-  (70,  79, 'B',  2, 'Mzuri sana',     'A_LEVEL'),
-  (60,  69, 'C',  3, 'Mzuri',          'A_LEVEL'),
-  (50,  59, 'D',  4, 'Wastani',        'A_LEVEL'),
-  (40,  49, 'E',  5, 'Hafifu',         'A_LEVEL'),
-  (35,  39, 'S',  6, 'Dhaifu sana',    'A_LEVEL'),
-  ( 0,  34, 'F',  7, 'Amefeli',        'A_LEVEL')
-) AS v(min_mark, max_mark, grade, points, remarks, level);
-
--- ============================================================
--- 2. A-LEVEL DIVISION CALCULATOR
--- Based on sum of points from BEST 3 PRINCIPAL subjects
--- ============================================================
-CREATE OR REPLACE FUNCTION calculate_a_level_division(p_total_points INTEGER)
-RETURNS TEXT AS $$
-BEGIN
-  RETURN CASE
-    WHEN p_total_points BETWEEN 3  AND 9  THEN 'Division I'
-    WHEN p_total_points BETWEEN 10 AND 12 THEN 'Division II'
-    WHEN p_total_points BETWEEN 13 AND 17 THEN 'Division III'
-    WHEN p_total_points BETWEEN 18 AND 19 THEN 'Division IV'
-    ELSE 'Division 0'
-  END;
-END;
-$$ LANGUAGE plpgsql IMMUTABLE;
-
--- ============================================================
--- 3. UPDATE compute_student_result for new A-Level division
--- ============================================================
 CREATE OR REPLACE FUNCTION compute_student_result(p_student_id UUID, p_exam_id UUID)
 RETURNS VOID AS $$
 DECLARE
@@ -58,6 +24,8 @@ DECLARE
   v_filtered          INTEGER[];
   v_i                 INTEGER;
   v_best3_sum         INTEGER := 0;
+  v_sub_pct           NUMERIC;
+  v_max               NUMERIC;
   rec                 RECORD;
 BEGIN
   SELECT c.level INTO v_level
@@ -68,7 +36,7 @@ BEGIN
 
   FOR rec IN
     SELECT
-      m.marks_obtained,
+      COALESCE(m.marks_obtained, 0) AS marks_obtained,
       COALESCE(m.practical_marks, 0) AS practical_marks,
       sub.level AS sub_level,
       sub.has_practical,
@@ -78,20 +46,29 @@ BEGIN
     JOIN subjects sub ON sub.id = m.subject_id
     WHERE m.student_id = p_student_id AND m.exam_id = p_exam_id
   LOOP
-    v_total := v_total + rec.marks_obtained + rec.practical_marks;
-    IF NOT rec.is_absent THEN
-      v_count := v_count + 1;
+    IF rec.is_absent THEN
+      CONTINUE;
     END IF;
+
+    v_max := CASE WHEN rec.has_practical THEN 150 ELSE 100 END;
+    v_sub_pct := ((rec.marks_obtained + rec.practical_marks) / v_max) * 100;
+
+    v_total := v_total + v_sub_pct;
+    v_count := v_count + 1;
+
+    -- Points based on percentage (normalised 0-100)
     SELECT g.points INTO v_points
     FROM grades g
     WHERE g.level = COALESCE(v_level, rec.sub_level)
-      AND rec.marks_obtained >= g.min_mark
-      AND rec.marks_obtained <= g.max_mark
+      AND v_sub_pct >= g.min_mark
+      AND v_sub_pct <= g.max_mark
+    ORDER BY g.min_mark DESC
     LIMIT 1;
     v_points := COALESCE(v_points, 0);
     v_points_sum := v_points_sum + v_points;
-    -- Collect principal/compulsory subject points for A-Level division
-    IF COALESCE(v_level, 'O_LEVEL') = 'A_LEVEL' AND rec.subject_type != 'ELECTIVE' AND v_points > 0 THEN
+
+    -- For A-Level: only PRINCIPAL subjects count toward division
+    IF COALESCE(v_level, 'O_LEVEL') = 'A_LEVEL' AND rec.subject_type = 'PRINCIPAL' AND v_points > 0 THEN
       v_principal_points := array_append(v_principal_points, v_points);
     END IF;
   END LOOP;
@@ -133,4 +110,4 @@ BEGIN
     division       = EXCLUDED.division,
     updated_at     = NOW();
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER SET search_path = public;

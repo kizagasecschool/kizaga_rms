@@ -1,19 +1,39 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 
-const COLORS = ['bg-blue-100 text-blue-700', 'bg-emerald-100 text-emerald-700', 'bg-amber-100 text-amber-700', 'bg-purple-100 text-purple-700', 'bg-rose-100 text-rose-700', 'bg-cyan-100 text-cyan-700', 'bg-orange-100 text-orange-700', 'bg-indigo-100 text-indigo-700', 'bg-teal-100 text-teal-700', 'bg-pink-100 text-pink-700']
-
 function Analysis() {
   const { profile } = useAuth()
+  const printRef = useRef(null)
   const [loading, setLoading] = useState(true)
   const [teacherId, setTeacherId] = useState(null)
   const [exams, setExams] = useState([])
   const [selectedExamId, setSelectedExamId] = useState('')
   const [selectedExam, setSelectedExam] = useState(null)
+  const [selectedSubjectId, setSelectedSubjectId] = useState('')
   const [gradesConfig, setGradesConfig] = useState([])
   const [subjectAnalysis, setSubjectAnalysis] = useState([])
   const [analyzing, setAnalyzing] = useState(false)
+  const [expandedStreams, setExpandedStreams] = useState({})
+
+  const handlePrint = () => {
+    setExpandedStreams(Object.fromEntries(filteredAnalysis.map(sa => [sa.classStream.id, true])))
+    const s = document.createElement('style')
+    s.id = '__print'
+    s.textContent = `
+      @page { size: A4 landscape; margin: 10mm }
+      @media print {
+        .no-print { display: none !important }
+        .hidden { display: block !important }
+        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; background: #fff }
+        table { border-collapse: collapse; width: 100% }
+        th, td { border: 1px solid #000 !important; padding: 4px 6px; font-size: 10px }
+        th { background: #e5e7eb !important; -webkit-print-color-adjust: exact; print-color-adjust: exact }
+      }
+    `
+    document.head.appendChild(s)
+    setTimeout(() => { window.print(); document.head.removeChild(s) }, 100)
+  }
 
   useEffect(() => {
     const init = async () => {
@@ -57,7 +77,7 @@ function Analysis() {
     init()
   }, [profile])
 
-  const doAnalysis = async (examId) => {
+  const doAnalysis = async (examId, examObj) => {
     if (!examId || !teacherId) return
     setAnalyzing(true)
     try {
@@ -67,6 +87,7 @@ function Analysis() {
         .eq('teacher_id', teacherId)
 
       if (!assignments || assignments.length === 0) return
+      const examHasPractical = examObj?.has_practical === true
 
       const { data: ec } = await supabase
         .from('exam_classes')
@@ -97,6 +118,8 @@ function Analysis() {
         const { subject_id, class_stream_id, subjects, class_streams } = assignment
         const level = class_streams.classes.level
         const grades = gradeMap[level] || []
+        const hasPractical = subjects.has_practical && examHasPractical
+        const maxMarks = hasPractical ? 150 : 100
 
         const { data: students } = await supabase
           .from('students')
@@ -121,61 +144,63 @@ function Analysis() {
         let totalMarks = 0, markCount = 0
         let maleTotal = 0, maleCount = 0
         let femaleTotal = 0, femaleCount = 0
+        let totalPoints = 0, ptCount = 0
         const gradeDist = {}
         grades.forEach(g => { gradeDist[g.grade] = { boys: 0, girls: 0, total: 0 } })
+        const studentDetails = []
 
         students.forEach(s => {
+          const fullName = `${s.first_name} ${s.surname}`.trim()
           const mark = markMap[s.id]
-          if (!mark || mark.is_absent) return
-          const m = parseFloat(mark.marks_obtained) || 0
-          const p = parseFloat(mark.practical_marks) || 0
+          const isAbsent = !mark || mark.is_absent
+          const m = parseFloat(mark?.marks_obtained) || 0
+          const p = parseFloat(mark?.practical_marks) || 0
           const total = m + p
+          const pct = isAbsent ? null : total / maxMarks * 100
+          const gradeObj = pct != null ? grades.find(g => pct >= g.min_mark && pct <= g.max_mark) : null
 
+          studentDetails.push({
+            fullName, gender: s.gender,
+            marksObtained: m, practicalMarks: p, total, pct,
+            grade: gradeObj?.grade || '-', points: gradeObj?.points ?? 0,
+            isAbsent,
+          })
+
+          if (isAbsent) return
           totalMarks += total
           markCount++
-
           if (s.gender === 'Male') { maleTotal += total; maleCount++ }
           else { femaleTotal += total; femaleCount++ }
-
-          const gradeObj = grades.find(g => total >= g.min_mark && total <= g.max_mark)
           if (gradeObj) {
             gradeDist[gradeObj.grade].total++
             if (s.gender === 'Male') gradeDist[gradeObj.grade].boys++
             else gradeDist[gradeObj.grade].girls++
           }
+          if (gradeObj && gradeObj.points != null) { totalPoints += gradeObj.points; ptCount++ }
         })
 
-        const overallAvg = markCount > 0 ? (totalMarks / markCount) : 0
-        const gradeObj = grades.find(g => overallAvg >= g.min_mark && overallAvg <= g.max_mark)
-
-        let totalPoints = 0, ptCount = 0
-        students.forEach(s => {
-          const mark = markMap[s.id]
-          if (!mark || mark.is_absent) return
-          const m = parseFloat(mark.marks_obtained) || 0
-          const p = parseFloat(mark.practical_marks) || 0
-          const total = m + p
-          const g = grades.find(g => total >= g.min_mark && total <= g.max_mark)
-          if (g && g.points != null) { totalPoints += g.points; ptCount++ }
-        })
+        const overallAvg = markCount > 0 ? (totalMarks / maxMarks / markCount * 100) : 0
         const gpa = ptCount > 0 ? (totalPoints / ptCount) : 0
+        const avgGradeObj = overallAvg > 0 ? grades.find(g => overallAvg >= g.min_mark && overallAvg <= g.max_mark) : null
 
         results.push({
-          subject,
+          subject: subjects,
+          hasPractical,
           classStream: class_streams,
           label: `${class_streams.classes.class_name} - ${class_streams.streams.stream_name}`,
           level,
           overallAvg,
-          avgGrade: gradeObj?.grade || '-',
+          avgGrade: avgGradeObj?.grade || '-',
           avgPoints: gpa,
           gradeDist,
-          maleAvg: maleCount > 0 ? (maleTotal / maleCount) : 0,
-          femaleAvg: femaleCount > 0 ? (femaleTotal / femaleCount) : 0,
+          maleAvg: maleCount > 0 ? (maleTotal / maxMarks / maleCount * 100) : 0,
+          femaleAvg: femaleCount > 0 ? (femaleTotal / maxMarks / femaleCount * 100) : 0,
           maleCount,
           femaleCount,
           totalStudents: markCount,
           absentStudents: students.length - markCount,
           totalEnrolled: students.length,
+          students: studentDetails,
         })
       }
       setSubjectAnalysis(results)
@@ -187,25 +212,81 @@ function Analysis() {
   }
 
   useEffect(() => {
+    setSelectedSubjectId('')
     if (!selectedExamId) { setSubjectAnalysis([]); return }
     const exam = exams.find(e => e.id === selectedExamId)
     setSelectedExam(exam || null)
-    doAnalysis(selectedExamId)
+    doAnalysis(selectedExamId, exam)
   }, [selectedExamId])
+
+  const subjectOptions = useMemo(() => {
+    const map = {}
+    subjectAnalysis.forEach(sa => {
+      const id = sa.subject.id
+      if (!map[id]) {
+        map[id] = { ...sa.subject, streams: [], totalEnrolled: 0, totalPresent: 0, totalAbsent: 0 }
+      }
+      map[id].streams.push(sa)
+      map[id].totalEnrolled += sa.totalEnrolled
+      map[id].totalPresent += sa.totalStudents
+      map[id].totalAbsent += sa.absentStudents
+    })
+    return Object.values(map)
+  }, [subjectAnalysis])
+
+  const selectedSubjectData = useMemo(() => {
+    if (!selectedSubjectId) return null
+    return subjectOptions.find(s => s.id === selectedSubjectId) || null
+  }, [selectedSubjectId, subjectOptions])
+
+  const filteredAnalysis = useMemo(() => {
+    if (!selectedSubjectData) return []
+    return selectedSubjectData.streams
+  }, [selectedSubjectData])
 
   const gradeKeys = useMemo(() => {
     const set = new Set()
-    subjectAnalysis.forEach(sa => {
+    filteredAnalysis.forEach(sa => {
       Object.keys(sa.gradeDist).forEach(g => set.add(g))
     })
-    return [...set]
-  }, [subjectAnalysis])
+    return [...set].sort()
+  }, [filteredAnalysis])
+
+  const combinedStats = useMemo(() => {
+    if (filteredAnalysis.length === 0) return null
+    let totalEnrolled = 0, totalPresent = 0, totalAbsent = 0
+    let maleCount = 0, femaleCount = 0
+    let weightedAvg = 0, weightedMaleAvg = 0, weightedFemaleAvg = 0, weightedGpa = 0
+
+    filteredAnalysis.forEach(sa => {
+      totalEnrolled += sa.totalEnrolled
+      totalPresent += sa.totalStudents
+      totalAbsent += sa.absentStudents
+      maleCount += sa.maleCount
+      femaleCount += sa.femaleCount
+      weightedAvg += sa.overallAvg * sa.totalStudents
+      weightedMaleAvg += sa.maleAvg * sa.maleCount
+      weightedFemaleAvg += sa.femaleAvg * sa.femaleCount
+      weightedGpa += sa.avgPoints * sa.totalStudents
+    })
+
+    const overallAvg = totalPresent > 0 ? weightedAvg / totalPresent : 0
+    const maleAvg = maleCount > 0 ? weightedMaleAvg / maleCount : 0
+    const femaleAvg = femaleCount > 0 ? weightedFemaleAvg / femaleCount : 0
+    const gpa = totalPresent > 0 ? weightedGpa / totalPresent : 0
+
+    const level = filteredAnalysis[0]?.level
+    const levelGrades = gradesConfig.filter(g => g.level === level).sort((a, b) => b.min_mark - a.min_mark)
+    const overallGrade = levelGrades.find(g => overallAvg >= g.min_mark)?.grade || '-'
+
+    return { totalEnrolled, totalPresent, totalAbsent, maleCount, femaleCount, overallAvg, maleAvg, femaleAvg, gpa, overallGrade }
+  }, [filteredAnalysis, gradesConfig])
 
   const formatExam = (exam) => {
     if (!exam) return ''
     const y = exam.academic_years?.year_name || ''
     const t = exam.terms?.term_name || ''
-    return `${exam.exam_name} (${t} ${y})`
+    return `${exam.name || exam.exam_name} (${t} ${y})`
   }
 
   if (loading) {
@@ -218,18 +299,19 @@ function Analysis() {
 
   return (
     <div>
-      <div className="mb-6">
+      <div className="mb-6 no-print">
         <h1 className="text-2xl font-bold text-gray-900">Subject Analysis</h1>
-        <p className="text-gray-500 mt-1">Analyze grade distribution, averages, and GPA by subject and gender</p>
+        <p className="text-gray-500 mt-1">Analyze grade distribution, averages, and GPA by subject and stream</p>
       </div>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam</label>
+      {/* Exam Selector */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6 no-print">
+        <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam</label>
+        <div className="flex items-center gap-3">
           <select
             value={selectedExamId}
             onChange={(e) => setSelectedExamId(e.target.value)}
-            className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+            className="flex-1 px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
           >
             <option value="">Choose an exam...</option>
             {exams.length === 0 && <option value="" disabled>No exams available</option>}
@@ -239,12 +321,19 @@ function Analysis() {
               </option>
             ))}
           </select>
+          {selectedSubjectData && (
+            <button onClick={handlePrint} className="px-4 py-2.5 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition flex items-center gap-2">
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" /></svg>
+              Print
+            </button>
+          )}
         </div>
         {selectedExam && (
-          <div className="mt-3 flex items-center gap-3 text-sm text-gray-500">
-            <span>Type: <span className="font-medium text-gray-700">{selectedExam.exam_type?.replace('_', ' ')}</span></span>
-            <span className="text-gray-300">|</span>
-            <span>{subjectAnalysis.length} subject{subjectAnalysis.length !== 1 ? 's' : ''} analyzed</span>
+          <div className="mt-3 text-sm text-gray-500">
+            <span className="font-medium text-gray-700">{selectedExam.exam_type?.replace('_', ' ')}</span>
+            <span className="mx-2">|</span>
+            {!selectedSubjectId && <span>{subjectOptions.length} subject{subjectOptions.length !== 1 ? 's' : ''}</span>}
+            {selectedSubjectData && <span>{filteredAnalysis.length} stream{filteredAnalysis.length !== 1 ? 's' : ''}</span>}
           </div>
         )}
       </div>
@@ -273,64 +362,194 @@ function Analysis() {
         </div>
       )}
 
-      {!analyzing && subjectAnalysis.map((sa, idx) => (
-        <div key={`${sa.subject.id}-${sa.classStream.id}`} className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
-          <div className={`px-5 py-4 border-b border-gray-200 ${COLORS[idx % COLORS.length]} flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2`}>
-            <div>
-              <h2 className="text-sm font-bold">{sa.subject.subject_name} ({sa.subject.subject_code})</h2>
-              <p className="text-xs opacity-75">{sa.label}</p>
-            </div>
-            <div className="flex items-center gap-4 text-xs font-medium">
-              <span>Avg: <strong>{sa.overallAvg.toFixed(1)}%</strong></span>
-              <span>Grade: <strong>{sa.avgGrade}</strong></span>
-              <span>GPA: <strong>{sa.avgPoints.toFixed(1)}</strong></span>
-            </div>
+      {/* Subject Selection Grid */}
+      {!analyzing && subjectAnalysis.length > 0 && !selectedSubjectId && (
+        <div className="no-print">
+          <h2 className="text-sm font-semibold text-gray-700 mb-3">Select a subject to view detailed analysis</h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {subjectOptions.map((subj) => (
+              <button key={subj.id} onClick={() => setSelectedSubjectId(subj.id)} className="bg-white rounded-xl border border-gray-200 p-5 text-left hover:border-maroon-400 hover:shadow-md transition text-center">
+                <h3 className="text-base font-bold text-gray-900">{subj.subject_name}</h3>
+                <p className="text-xs text-gray-500 mt-0.5">{subj.subject_code}</p>
+                <div className="mt-3 flex items-center justify-center gap-4 text-xs text-gray-600">
+                  <span><strong className="text-gray-900">{subj.totalEnrolled}</strong> Enrolled</span>
+                  <span><strong className="text-gray-900">{subj.streams.length}</strong> Stream{subj.streams.length !== 1 ? 's' : ''}</span>
+                </div>
+                <div className="mt-2 flex items-center justify-center gap-2 flex-wrap">
+                  {subj.streams.map(st => (
+                    <span key={st.classStream.id} className="px-2 py-0.5 bg-gray-100 rounded text-xs text-gray-600">{st.label}</span>
+                  ))}
+                </div>
+              </button>
+            ))}
           </div>
+        </div>
+      )}
 
-          <div className="p-5 space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-gray-900">{sa.totalEnrolled}</p>
-                <p className="text-xs text-gray-500">Enrolled</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-gray-900">{sa.totalStudents}</p>
-                <p className="text-xs text-gray-500">Present</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-blue-600">{sa.maleCount}</p>
-                <p className="text-xs text-gray-500">Boys</p>
-              </div>
-              <div className="bg-gray-50 rounded-lg p-3 text-center">
-                <p className="text-lg font-bold text-pink-600">{sa.femaleCount}</p>
-                <p className="text-xs text-gray-500">Girls</p>
+      {/* Detailed Subject View */}
+      {!analyzing && selectedSubjectData && (
+        <div ref={printRef}>
+          {/* Subject Header */}
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
+            <div className="bg-gray-900 text-white px-5 py-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold">{selectedSubjectData.subject_name} ({selectedSubjectData.subject_code})</h2>
+                  <p className="text-sm text-gray-300 mt-0.5">{formatExam(selectedExam)} — {selectedSubjectData.streams[0]?.level === 'O_LEVEL' ? 'O-Level' : 'A-Level'}</p>
+                </div>
+                <button onClick={() => setSelectedSubjectId('')} className="text-sm text-gray-300 hover:text-white transition flex items-center gap-1 no-print">
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 17l-5-5m0 0l5-5m-5 5h12" /></svg>
+                  Back
+                </button>
               </div>
             </div>
 
-            {/* Grade Distribution by Gender */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade Distribution by Gender</h3>
+            {/* Summary Cards */}
+            {combinedStats && (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-px bg-gray-200">
+                {[
+                  { label: 'Enrolled', value: combinedStats.totalEnrolled, cls: '' },
+                  { label: 'Present', value: combinedStats.totalPresent, cls: '' },
+                  { label: 'Boys', value: combinedStats.maleCount, cls: 'text-blue-600' },
+                  { label: 'Girls', value: combinedStats.femaleCount, cls: 'text-pink-600' },
+                  { label: 'Absent', value: combinedStats.totalAbsent, cls: 'text-red-600' },
+                  { label: 'Class Avg', value: `${combinedStats.overallAvg.toFixed(1)}%`, cls: '' },
+                  { label: 'Boys Avg', value: `${combinedStats.maleAvg.toFixed(1)}%`, cls: 'text-blue-600' },
+                  { label: 'Girls Avg', value: `${combinedStats.femaleAvg.toFixed(1)}%`, cls: 'text-pink-600' },
+                ].map((item, i) => (
+                  <div key={i} className="bg-white px-4 py-3 text-center">
+                    <p className={`text-lg font-bold ${item.cls}`}>{item.value}</p>
+                    <p className="text-xs text-gray-500">{item.label}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Stream Summary Table */}
+            <div className="p-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Stream Performance Summary</h3>
               <div className="overflow-x-auto">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm border border-gray-300">
                   <thead>
-                    <tr className="bg-gray-50 border-b border-gray-200">
-                      <th className="text-left px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Grade</th>
-                      <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Boys</th>
-                      <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Girls</th>
-                      <th className="text-center px-3 py-2 text-xs font-semibold text-gray-500 uppercase">Total</th>
+                    <tr className="bg-gray-100 border-b border-gray-300">
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase text-left">Stream</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Enrolled</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Present</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Boys</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Girls</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Absent</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Avg %</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Grade</th>
+                      <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">GPA</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-gray-100">
+                  <tbody className="divide-y divide-gray-200">
+                    {filteredAnalysis.map(sa => (
+                      <tr key={sa.classStream.id} className="hover:bg-gray-50">
+                        <td className="border-r border-gray-200 px-3 py-2 font-medium text-gray-800">{sa.label}</td>
+                        <td className="border-r border-gray-200 px-3 py-2 text-center">{sa.totalEnrolled}</td>
+                        <td className="border-r border-gray-200 px-3 py-2 text-center">{sa.totalStudents}</td>
+                        <td className="border-r border-gray-200 px-3 py-2 text-center">{sa.maleCount}</td>
+                        <td className="border-r border-gray-200 px-3 py-2 text-center">{sa.femaleCount}</td>
+                        <td className="border-r border-gray-200 px-3 py-2 text-center text-red-600">{sa.absentStudents}</td>
+                        <td className="border-r border-gray-200 px-3 py-2 text-center font-medium">{sa.overallAvg.toFixed(1)}</td>
+                        <td className="border-r border-gray-200 px-3 py-2 text-center font-medium">{sa.avgGrade}</td>
+                        <td className="px-3 py-2 text-center font-medium">{sa.avgPoints.toFixed(1)}</td>
+                      </tr>
+                    ))}
+                    {combinedStats && (
+                      <tr className="bg-gray-50 font-bold">
+                        <td className="border-r border-gray-300 px-3 py-2 text-gray-900">Total / Average</td>
+                        <td className="border-r border-gray-300 px-3 py-2 text-center">{combinedStats.totalEnrolled}</td>
+                        <td className="border-r border-gray-300 px-3 py-2 text-center">{combinedStats.totalPresent}</td>
+                        <td className="border-r border-gray-300 px-3 py-2 text-center">{combinedStats.maleCount}</td>
+                        <td className="border-r border-gray-300 px-3 py-2 text-center">{combinedStats.femaleCount}</td>
+                        <td className="border-r border-gray-300 px-3 py-2 text-center text-red-600">{combinedStats.totalAbsent}</td>
+                        <td className="border-r border-gray-300 px-3 py-2 text-center">{combinedStats.overallAvg.toFixed(1)}</td>
+                        <td className="border-r border-gray-300 px-3 py-2 text-center">{combinedStats.overallGrade}</td>
+                        <td className="px-3 py-2 text-center">{combinedStats.gpa.toFixed(1)}</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            {/* Student Details */}
+            <div className="px-5 pb-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Student Scores</h3>
+              {filteredAnalysis.map(sa => {
+                const isOpen = expandedStreams[sa.classStream.id]
+                return (
+                  <div key={sa.classStream.id} className="mb-3 border border-gray-200 rounded-lg overflow-hidden">
+                    <button onClick={() => setExpandedStreams(p => ({ ...p, [sa.classStream.id]: !isOpen }))} className="w-full flex items-center justify-between px-4 py-2.5 bg-gray-50 hover:bg-gray-100 transition text-sm font-medium text-gray-700">
+                      <span>{sa.label} — <span className="font-normal text-gray-500">{sa.totalStudents} students</span></span>
+                      <svg className={`w-4 h-4 transition ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" /></svg>
+                    </button>
+                    <div className={`overflow-x-auto ${isOpen ? '' : 'hidden'}`}>
+                      <table className="w-full text-xs border-t border-gray-200">
+                        <thead>
+                          <tr className="bg-gray-100 border-b border-gray-200">
+                            <th className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-600 text-left">#</th>
+                            <th className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-600 text-left">Student Name</th>
+                            <th className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-600">Gender</th>
+                            <th className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-600">Marks</th>
+                            {sa.hasPractical && <th className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-600">Practical</th>}
+                            <th className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-600">{sa.hasPractical ? 'Total (150)' : 'Total (100)'}</th>
+                            <th className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-600">%</th>
+                            <th className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-600">Grade</th>
+                            <th className="px-3 py-2 font-semibold text-gray-600">Points</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-100">
+                          {sa.students.map((sd, i) => (
+                            <tr key={i} className={`hover:bg-gray-50 ${sd.isAbsent ? 'text-red-500 bg-red-50' : ''}`}>
+                              <td className="border-r border-gray-100 px-3 py-1.5 text-gray-400">{i + 1}</td>
+                              <td className="border-r border-gray-100 px-3 py-1.5 font-medium text-gray-800">{sd.fullName}</td>
+                              <td className="border-r border-gray-100 px-3 py-1.5 text-center">{sd.gender === 'Male' ? 'M' : 'F'}</td>
+                              <td className="border-r border-gray-100 px-3 py-1.5 text-center">{sd.isAbsent ? 'Abs' : sd.marksObtained.toFixed(0)}</td>
+                              {sa.hasPractical && <td className="border-r border-gray-100 px-3 py-1.5 text-center">{sd.isAbsent ? '-' : sd.practicalMarks.toFixed(0)}</td>}
+                              <td className="border-r border-gray-100 px-3 py-1.5 text-center font-medium">{sd.isAbsent ? '-' : sd.total.toFixed(0)}</td>
+                              <td className="border-r border-gray-100 px-3 py-1.5 text-center">{sd.isAbsent ? '-' : sd.pct.toFixed(1)}</td>
+                              <td className="border-r border-gray-100 px-3 py-1.5 text-center font-medium">{sd.isAbsent ? '-' : sd.grade}</td>
+                              <td className="px-3 py-1.5 text-center font-medium">{sd.isAbsent ? '-' : sd.points}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Grade Distribution */}
+            <div className="px-5 pb-5">
+              <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade Distribution</h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-300">
+                  <thead>
+                    <tr className="bg-gray-100 border-b border-gray-300">
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Grade</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Boys</th>
+                      <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Girls</th>
+                      <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Total</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
                     {gradeKeys.map(g => {
-                      const d = sa.gradeDist[g]
-                      if (!d) return null
+                      let totalBoys = 0, totalGirls = 0
+                      filteredAnalysis.forEach(sa => {
+                        const d = sa.gradeDist[g]
+                        if (d) { totalBoys += d.boys; totalGirls += d.girls }
+                      })
+                      if (totalBoys === 0 && totalGirls === 0) return null
                       return (
-                        <tr key={g} className="hover:bg-gray-50 transition">
-                          <td className="px-3 py-2 font-semibold text-gray-800">{g}</td>
-                          <td className="px-3 py-2 text-center text-gray-900">{d.boys || '-'}</td>
-                          <td className="px-3 py-2 text-center text-gray-900">{d.girls || '-'}</td>
-                          <td className="px-3 py-2 text-center text-gray-900 font-medium">{d.total || '-'}</td>
+                        <tr key={g} className="hover:bg-gray-50">
+                          <td className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-800">{g}</td>
+                          <td className="border-r border-gray-200 px-3 py-2 text-center">{totalBoys || '-'}</td>
+                          <td className="border-r border-gray-200 px-3 py-2 text-center">{totalGirls || '-'}</td>
+                          <td className="px-3 py-2 text-center font-medium">{totalBoys + totalGirls || '-'}</td>
                         </tr>
                       )
                     })}
@@ -339,50 +558,54 @@ function Analysis() {
               </div>
             </div>
 
-            {/* Average by Gender */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject Average by Gender</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100">
-                  <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">Boys Average</p>
-                  <p className="text-2xl font-bold text-blue-700">{sa.maleAvg.toFixed(1)}%</p>
-                </div>
-                <div className="bg-pink-50 rounded-xl p-4 text-center border border-pink-100">
-                  <p className="text-xs text-pink-600 font-medium uppercase tracking-wide mb-1">Girls Average</p>
-                  <p className="text-2xl font-bold text-pink-700">{sa.femaleAvg.toFixed(1)}%</p>
-                </div>
-                <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
-                  <p className="text-xs text-gray-600 font-medium uppercase tracking-wide mb-1">Overall Average</p>
-                  <p className="text-2xl font-bold text-gray-800">{sa.overallAvg.toFixed(1)}%</p>
+            {/* Averages by Gender */}
+            {combinedStats && (
+              <div className="px-5 pb-5">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Subject Average by Gender</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="bg-blue-50 rounded-xl p-4 text-center border border-blue-100">
+                    <p className="text-xs text-blue-600 font-medium uppercase tracking-wide mb-1">Boys Average</p>
+                    <p className="text-2xl font-bold text-blue-700">{combinedStats.maleAvg.toFixed(1)}%</p>
+                  </div>
+                  <div className="bg-pink-50 rounded-xl p-4 text-center border border-pink-100">
+                    <p className="text-xs text-pink-600 font-medium uppercase tracking-wide mb-1">Girls Average</p>
+                    <p className="text-2xl font-bold text-pink-700">{combinedStats.femaleAvg.toFixed(1)}%</p>
+                  </div>
+                  <div className="bg-gray-50 rounded-xl p-4 text-center border border-gray-200">
+                    <p className="text-xs text-gray-600 font-medium uppercase tracking-wide mb-1">Overall Average</p>
+                    <p className="text-2xl font-bold text-gray-800">{combinedStats.overallAvg.toFixed(1)}%</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
-            {/* Grade & GPA Summary */}
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade & GPA Summary</h3>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-                <div className="bg-purple-50 rounded-xl p-4 text-center border border-purple-100">
-                  <p className="text-xs text-purple-600 font-medium uppercase tracking-wide mb-1">Subject Avg</p>
-                  <p className="text-xl font-bold text-purple-700">{sa.overallAvg.toFixed(1)}%</p>
-                </div>
-                <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100">
-                  <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide mb-1">Grade</p>
-                  <p className="text-xl font-bold text-emerald-700">{sa.avgGrade}</p>
-                </div>
-                <div className="bg-amber-50 rounded-xl p-4 text-center border border-amber-100">
-                  <p className="text-xs text-amber-600 font-medium uppercase tracking-wide mb-1">GPA (Points)</p>
-                  <p className="text-xl font-bold text-amber-700">{sa.avgPoints.toFixed(1)}</p>
-                </div>
-                <div className="bg-indigo-50 rounded-xl p-4 text-center border border-indigo-100">
-                  <p className="text-xs text-indigo-600 font-medium uppercase tracking-wide mb-1">Level</p>
-                  <p className="text-xl font-bold text-indigo-700">{sa.level === 'O_LEVEL' ? 'O-Level' : 'A-Level'}</p>
+            {/* GPA Summary */}
+            {combinedStats && (
+              <div className="px-5 pb-5">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Grade & GPA Summary</h3>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  <div className="bg-purple-50 rounded-xl p-4 text-center border border-purple-100">
+                    <p className="text-xs text-purple-600 font-medium uppercase tracking-wide mb-1">Subject Avg</p>
+                    <p className="text-xl font-bold text-purple-700">{combinedStats.overallAvg.toFixed(1)}%</p>
+                  </div>
+                  <div className="bg-emerald-50 rounded-xl p-4 text-center border border-emerald-100">
+                    <p className="text-xs text-emerald-600 font-medium uppercase tracking-wide mb-1">Overall Grade</p>
+                    <p className="text-xl font-bold text-emerald-700">{combinedStats.overallGrade}</p>
+                  </div>
+                  <div className="bg-amber-50 rounded-xl p-4 text-center border border-amber-100">
+                    <p className="text-xs text-amber-600 font-medium uppercase tracking-wide mb-1">GPA (Points)</p>
+                    <p className="text-xl font-bold text-amber-700">{combinedStats.gpa.toFixed(1)}</p>
+                  </div>
+                  <div className="bg-indigo-50 rounded-xl p-4 text-center border border-indigo-100">
+                    <p className="text-xs text-indigo-600 font-medium uppercase tracking-wide mb-1">Level</p>
+                    <p className="text-xl font-bold text-indigo-700">{filteredAnalysis[0]?.level === 'O_LEVEL' ? 'O-Level' : 'A-Level'}</p>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
-      ))}
+      )}
     </div>
   )
 }

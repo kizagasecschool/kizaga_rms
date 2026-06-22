@@ -50,7 +50,9 @@ const navItems = {
       { path: '/admin/school-settings', icon: I.settings, label: 'School Settings' },
       { path: '/admin/uniforms', icon: I.shirt, label: 'Uniforms' },
       { path: '/admin/admissions', icon: I.book, label: 'Admissions' },
+      { path: '/admin/joining-instructions', icon: I.book, label: 'Joining Instructions' },
     ]},
+    { path: '/admin/events-announcements', icon: I.book, label: 'Matangazo na Matukio' },
     { icon: I.comms, label: 'Communication', children: [
       { path: '/send-sms', icon: I.notif, label: 'Send SMS' },
       { path: '/send-notification', icon: I.notif, label: 'Send Notification' },
@@ -63,6 +65,8 @@ const navItems = {
       { path: '/headmaster/performance', icon: I.chart, label: 'Performance' },
       { path: '/headmaster/admissions', icon: I.book, label: 'Admissions' },
       { path: '/headmaster/uniforms', icon: I.shirt, label: 'Uniforms' },
+      { path: '/headmaster/joining-instructions', icon: I.book, label: 'Joining Instructions' },
+      { path: '/headmaster/events-announcements', icon: I.book, label: 'Events & Announcements' },
     ]},
     { icon: I.comms, label: 'Communication', children: [
       { path: '/send-sms', icon: I.notif, label: 'Send SMS' },

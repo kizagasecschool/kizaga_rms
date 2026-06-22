@@ -265,7 +265,7 @@ function AdminSubjects() {
         await fetchCombinationSubjects()
         showToast('Subject role updated', 'success')
       }
-    } catch (err) {
+    } catch {
       showToast('Failed to update role.', 'error')
     } finally {
       setSaving(false)
@@ -273,14 +273,6 @@ function AdminSubjects() {
   }
 
   // ─── Helpers ─────────────────────────────────────────────
-  const roleColor = (role) => {
-    switch (role) {
-      case 'CORE': return { bg: 'bg-emerald-50', text: 'text-emerald-700', border: 'border-emerald-200', label: 'Core' }
-      case 'SUBSIDIARY': return { bg: 'bg-violet-50', text: 'text-violet-700', border: 'border-violet-200', label: 'Subsidiary' }
-      case 'OPTIONAL': return { bg: 'bg-amber-50', text: 'text-amber-700', border: 'border-amber-200', label: 'Optional' }
-      default: return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200', label: role }
-    }
-  }
 
   if (loading) {
     return (

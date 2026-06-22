@@ -35,6 +35,9 @@ import AdmissionForm from './pages/public/AdmissionForm'
 import TrackApplication from './pages/public/TrackApplication'
 import SchoolRules from './pages/public/SchoolRules'
 import JoiningInstructions from './pages/public/JoiningInstructions'
+import EventsAnnouncements from './pages/public/EventsAnnouncements'
+import ManageEventsAnnouncements from './pages/admin/EventsAnnouncements'
+import ManageJoiningInstructions from './pages/admin/ManageJoiningInstructions'
 import ManageAdmissions from './pages/ManageAdmissions'
 import ManageUniforms from './pages/ManageUniforms'
 
@@ -48,6 +51,7 @@ function App() {
         <Route path="/apply" element={<AdmissionForm />} />
         <Route path="/track-application" element={<TrackApplication />} />
         <Route path="/school-rules" element={<SchoolRules />} />
+        <Route path="/events-announcements" element={<EventsAnnouncements />} />
         <Route path="/joining-instructions" element={<JoiningInstructions />} />
         <Route
           element={
@@ -73,6 +77,8 @@ function App() {
                   <Route path="class-upgrade" element={<ClassUpgrade />} />
                   <Route path="admissions" element={<ManageAdmissions />} />
                   <Route path="uniforms" element={<ManageUniforms />} />
+                  <Route path="events-announcements" element={<ManageEventsAnnouncements />} />
+                  <Route path="joining-instructions" element={<ManageJoiningInstructions />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -85,6 +91,8 @@ function App() {
                   <Route index element={<HeadmasterDashboard />} />
                   <Route path="admissions" element={<ManageAdmissions />} />
                   <Route path="uniforms" element={<ManageUniforms />} />
+                  <Route path="events-announcements" element={<ManageEventsAnnouncements />} />
+                  <Route path="joining-instructions" element={<ManageJoiningInstructions />} />
                 </Routes>
               </RoleBasedRoute>
             }

@@ -126,7 +126,7 @@ function ViewMarks() {
                 .eq('class_streams.class_id', selectedClassId)
                 .order('surname')
               if (byJoin?.length > 0) {
-                loadedStudents = byJoin.map(s => { const { class_streams: _, ...rest } = s; return rest })
+                loadedStudents = byJoin.map(s => { const { class_streams, ...rest } = s; return rest })
               }
             }
           }

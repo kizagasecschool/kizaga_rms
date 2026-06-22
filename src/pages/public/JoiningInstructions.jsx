@@ -1,88 +1,85 @@
+import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 
 export default function JoiningInstructions() {
-  const steps = [
-    {
-      title: 'Hatua ya 1: Jaza Ombi',
-      description: 'Tembelea ukurasa wetu wa maombi ya kujiunga (Apply) na ujaze taarifa zote muhimu za mwanafunzi na mzazi/mlezi. Hakikisha umejaza sehemu zote zenye nyota (*).',
-    },
-    {
-      title: 'Hatua ya 2: Wasilisha Ombi',
-      description: 'Baada ya kukamilisha fomu, bonyeza "Tuma Ombi". Utapokea namba ya ombi (APP-2025-XXXX) ambayo utaitumia kufuatilia hali ya ombi lako.',
-    },
-    {
-      title: 'Hatua ya 3: Subiri Uhakiki',
-      description: 'Uongozi wa shule utakagua ombi lako na kukujulisha hali yake. Unaweza kufuatilia ombi lako kwa kutumia namba ya ombi kwenye ukurasa wa "Fuatilia Ombi".',
-    },
-    {
-      title: 'Hatua ya 4: Kukubaliwa',
-      description: 'Ombi lako likikubaliwa, utapokea taarifa kupitia simu au barua pepe. Utahitaji kuja shuleni kukamilisha usajili na kulipa ada.',
-    },
-    {
-      title: 'Hatua ya 5: Vifaa Vinavyohitajika',
-      description: 'Lete picha 2 za pasi, nakala ya cheti cha kuzaliwa, nakala ya kadi ya taifa ya mzazi, na nyaraka za shule ya awali (kama zipo).',
-    },
-  ]
+  const [records, setRecords] = useState([])
+  const [loading, setLoading] = useState(true)
 
-  const requirements = [
-    'Mtoto awe na umri wa kuanzia miaka 14 hadi 18 kwa Form 1.',
-    'Awe amemaliza elimu ya msingi (darasa la 7) kwa mafanikio.',
-    'Kwa A-Level, awe amemaliza O-Level kwa mafanikio na kupata daraja la kutosha.',
-    'Awe na afya njema na hawezi kuwa na ugonjwa wa kuambukiza.',
-    'Awe tayari kufuata kanuni na sheria za shule.',
-  ]
+  useEffect(() => {
+    supabase.from('joining_instructions').select('*').order('level').then(({ data, error }) => {
+      if (!error) setRecords(data || [])
+      setLoading(false)
+    })
+  }, [])
+
+  const levelBadge = (level) => {
+    if (level === 'O_LEVEL') return { label: 'O-Level', class: 'bg-blue-100 text-blue-700' }
+    return { label: 'A-Level', class: 'bg-purple-100 text-purple-700' }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <div className="bg-maroon-700 text-white py-6 px-4">
         <div className="max-w-4xl mx-auto">
-          <Link to="/" className="text-white/70 hover:text-white text-sm">&larr; Rudi Nyuma</Link>
+          <Link to="/" className="text-white/70 hover:text-white text-sm">&larr; Rudi Nyumbani</Link>
           <h1 className="text-2xl font-bold mt-1">Maelekezo ya Kujiunga</h1>
-          <p className="text-white/70 text-sm mt-1">Hatua rahisi za kufuata ili kujiunga na shule yetu</p>
+          <p className="text-white/70 text-sm mt-1">Pakua maelekezo ya kujiunga kwa O-Level na A-Level</p>
         </div>
       </div>
 
-      <div className="max-w-4xl mx-auto px-4 py-8 space-y-8">
-        {/* Process Steps */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-4">Hatua za Kujiunga</h2>
-          <div className="space-y-4">
-            {steps.map((step, i) => (
-              <div key={i} className="flex gap-4">
-                <div className="w-10 h-10 bg-maroon-100 rounded-full flex items-center justify-center shrink-0">
-                  <span className="text-sm font-bold text-maroon-700">{i + 1}</span>
-                </div>
-                <div>
-                  <h3 className="text-sm font-semibold text-gray-900">{step.title}</h3>
-                  <p className="text-sm text-gray-600 mt-1">{step.description}</p>
-                </div>
-              </div>
-            ))}
+      <div className="max-w-4xl mx-auto px-4 py-8">
+        {loading ? (
+          <div className="flex items-center justify-center py-12">
+            <div className="w-6 h-6 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
           </div>
-        </div>
-
-        {/* Requirements */}
-        <div className="bg-white rounded-2xl border border-gray-200 p-6">
-          <h2 className="text-lg font-semibold text-gray-900 mb-3">Vigezo vya Kuingia</h2>
-          <ul className="space-y-2">
-            {requirements.map((req, i) => (
-              <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
-                <span className="text-green-600 mt-0.5 shrink-0">✓</span>
-                <span>{req}</span>
-              </li>
-            ))}
-          </ul>
-        </div>
-
-        {/* CTA */}
-        <div className="text-center">
-          <Link
-            to="/apply"
-            className="inline-flex px-6 py-3 bg-maroon-700 text-white text-sm font-semibold rounded-xl hover:bg-maroon-800 transition"
-          >
-            Tuma Ombi Sasa
-          </Link>
-        </div>
+        ) : records.length === 0 ? (
+          <div className="bg-white rounded-2xl border border-gray-200 p-12 text-center">
+            <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+              </svg>
+            </div>
+            <h3 className="text-sm font-semibold text-gray-900">Hakuna maelekezo bado</h3>
+            <p className="text-xs text-gray-500 mt-1">Maelekezo ya kujiunga yatakuwepo hapa yakiwa tayari.</p>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {records.map(rec => {
+              const badge = levelBadge(rec.level)
+              return (
+                <div key={rec.id} className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+                  <div className="p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase ${badge.class}`}>
+                        {badge.label}
+                      </span>
+                    </div>
+                    <h2 className="text-lg font-semibold text-gray-900 mb-2">{rec.title}</h2>
+                    {rec.description && (
+                      <p className="text-sm text-gray-500 mb-4">{rec.description}</p>
+                    )}
+                    {rec.pdf_url ? (
+                      <a
+                        href={rec.pdf_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-3 bg-maroon-600 text-white text-sm font-semibold rounded-xl hover:bg-maroon-700 transition"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        Fungua PDF
+                      </a>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">PDF haijapakiwa bado</p>
+                    )}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
       </div>
     </div>
   )

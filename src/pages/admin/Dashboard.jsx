@@ -6,11 +6,9 @@ function AdminDashboard() {
   const { profile } = useAuth()
   const [stats, setStats] = useState({ students: 0, teachers: 0, classes: 0, subjects: 0 })
   const [loading, setLoading] = useState(true)
-  const [schoolInfo, setSchoolInfo] = useState(null)
-
   useEffect(() => {
     supabase.from('school_settings').select('logo_url, school_name').limit(1).then(({ data }) => {
-      if (data?.[0]) setSchoolInfo(data[0])
+      if (data?.[0]) document.title = data[0].school_name || 'Kizaga RMS'
     })
   }, [])
 

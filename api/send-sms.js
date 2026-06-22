@@ -27,44 +27,46 @@ export default async function handler(req, res) {
 
     const { data: settings } = await supabase
       .from('school_settings')
-      .select('beem_api_key, beem_secret_key, beem_sender_id')
+      .select('at_api_key, at_username, at_sender_id')
       .limit(1)
 
-    const apiKey = settings?.[0]?.beem_api_key
-    const secretKey = settings?.[0]?.beem_secret_key
-    const senderId = settings?.[0]?.beem_sender_id || 'N-SMS'
+    const apiKey = settings?.[0]?.at_api_key
+    const username = settings?.[0]?.at_username
+    const senderId = settings?.[0]?.at_sender_id || ''
 
-    if (!apiKey || !secretKey) {
-      return res.status(400).json({ error: 'BeemAfrica API not configured. Add API keys in School Settings.' })
+    if (!apiKey || !username) {
+      return res.status(400).json({ error: 'Africa\'s Talking API not configured. Add API Key and Username in School Settings.' })
     }
 
-    const auth = Buffer.from(`${apiKey}:${secretKey}`).toString('base64')
+    const phones = recipients
+      .map(r => r.phone.replace(/[^0-9]/g, ''))
+      .filter(Boolean)
+      .join(',')
 
-    const payload = {
-      source_addr: senderId,
-      encoding: '0',
-      schedule_time: '',
-      message: message.trim(),
-      recipients: recipients.map((r, i) => ({
-        recipient_id: i + 1,
-        dest_addr: r.phone.replace(/[^0-9]/g, ''),
-      })),
-    }
+    const params = new URLSearchParams()
+    params.append('username', username)
+    params.append('to', phones)
+    params.append('message', message.trim())
+    params.append('bulkSMSMode', '1')
+    if (senderId) params.append('from', senderId)
 
-    const response = await fetch('https://apism.beem.africa/v1/send', {
+    const response = await fetch('https://api.africastalking.com/version1/messaging', {
       method: 'POST',
       headers: {
-        'Authorization': `Basic ${auth}`,
-        'Content-Type': 'application/json',
+        'apiKey': apiKey,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json',
       },
-      body: JSON.stringify(payload),
+      body: params.toString(),
     })
 
     const result = await response.json()
 
     if (!response.ok) {
-      console.error('BeemAfrica API error:', result)
-      return res.status(400).json({ error: result?.message || result?.error || 'Failed to send SMS' })
+      console.error('Africa\'s Talking API error:', result)
+      return res.status(400).json({
+        error: result?.message || result?.error || 'Failed to send SMS',
+      })
     }
 
     return res.status(200).json({

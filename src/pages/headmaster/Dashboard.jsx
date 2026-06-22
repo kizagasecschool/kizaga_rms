@@ -16,9 +16,8 @@ function HeadmasterDashboard() {
 
   useEffect(() => {
     const fetchStats = async () => {
-      const [sRes, srRes, eRes, avgRes] = await Promise.all([
+      const [sRes, eRes, avgRes] = await Promise.all([
         supabase.from('students').select('*', { count: 'exact', head: true }),
-        supabase.from('student_results').select('*', { count: 'exact', head: true }),
         supabase.from('exams').select('*', { count: 'exact', head: true }),
         supabase.from('student_results').select('average_marks'),
       ])

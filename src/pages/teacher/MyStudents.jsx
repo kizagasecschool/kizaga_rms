@@ -66,10 +66,6 @@ function MyStudents() {
           const str = cs.streams
           const label = cls && str ? `${cls.class_name} - ${str.stream_name}` : 'Unknown'
 
-          const streamStudentIds = students
-            .filter(s => s.class_stream_id === cs.id)
-            .map(s => s.id)
-
           const streamSubjectIds = [...(streamSubMap[cs.id] || [])]
 
           const studentList = students

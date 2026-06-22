@@ -1367,11 +1367,11 @@ WHERE NOT EXISTS (SELECT 1 FROM streams s WHERE s.stream_name = v.stream_name);
 INSERT INTO grades (min_mark, max_mark, grade, points, remarks, level)
 SELECT v.min_mark, v.max_mark, v.grade, v.points, v.remarks, v.level
 FROM (VALUES
-  (75, 100, 'A',  1, 'Excellent',      'O_LEVEL'),
-  (65,  74, 'B',  2, 'Very Good',      'O_LEVEL'),
-  (45,  64, 'C',  3, 'Good',           'O_LEVEL'),
-  (30,  44, 'D',  4, 'Satisfactory',   'O_LEVEL'),
-  ( 0,  29, 'F',  5, 'Fail',           'O_LEVEL')
+  (75, 100, 'A',  1, 'Vizuri Sana',    'O_LEVEL'),
+  (65,  74, 'B',  2, 'Vizuri',         'O_LEVEL'),
+  (45,  64, 'C',  3, 'Wastani',        'O_LEVEL'),
+  (30,  44, 'D',  4, 'Mbaya',          'O_LEVEL'),
+  ( 0,  29, 'F',  5, 'Mbaya Sana',     'O_LEVEL')
 ) AS v(min_mark, max_mark, grade, points, remarks, level)
 WHERE NOT EXISTS (SELECT 1 FROM grades g WHERE g.grade = v.grade AND g.level = v.level);
 
@@ -1381,12 +1381,12 @@ WHERE NOT EXISTS (SELECT 1 FROM grades g WHERE g.grade = v.grade AND g.level = v
 INSERT INTO grades (min_mark, max_mark, grade, points, remarks, level)
 SELECT v.min_mark, v.max_mark, v.grade, v.points, v.remarks, v.level
 FROM (VALUES
-  (80, 100, 'A',  5, 'Excellent',      'A_LEVEL'),
-  (70,  79, 'B',  4, 'Very Good',      'A_LEVEL'),
-  (60,  69, 'C',  3, 'Good',           'A_LEVEL'),
-  (50,  59, 'D',  2, 'Satisfactory',   'A_LEVEL'),
-  (40,  49, 'E',  1, 'Pass',           'A_LEVEL'),
-  ( 0,  39, 'F',  0, 'Fail',           'A_LEVEL')
+  (80, 100, 'A',  5, 'Bora sana',      'A_LEVEL'),
+  (70,  79, 'B',  4, 'Mzuri sana',     'A_LEVEL'),
+  (60,  69, 'C',  3, 'Mzuri',          'A_LEVEL'),
+  (50,  59, 'D',  2, 'Wastani',        'A_LEVEL'),
+  (40,  49, 'E',  1, 'Hafifu',         'A_LEVEL'),
+  ( 0,  39, 'F',  0, 'Amefeli',        'A_LEVEL')
 ) AS v(min_mark, max_mark, grade, points, remarks, level)
 WHERE NOT EXISTS (SELECT 1 FROM grades g WHERE g.grade = v.grade AND g.level = v.level);
 

@@ -130,7 +130,7 @@ export default function ManageUniforms() {
       title: u.title,
       description: u.description || '',
       image_url: u.image_url || '',
-      items: u.items || [],
+      items: Array.isArray(u.items) ? u.items : [],
       gender: u.gender || '',
       sort_order: u.sort_order || 0,
     })
@@ -166,7 +166,7 @@ export default function ManageUniforms() {
         p_title: form.title,
         p_description: form.description,
         p_image_url: form.image_url,
-        p_items: JSON.stringify(form.items.filter(Boolean)),
+        p_items: form.items.filter(Boolean),
         p_gender: form.gender,
         p_sort_order: form.sort_order,
       })
@@ -325,7 +325,7 @@ export default function ManageUniforms() {
                 </div>
                 <h3 className="font-semibold text-gray-900 text-sm">{u.title}</h3>
                 {u.description && <p className="text-xs text-gray-500 mt-0.5">{u.description}</p>}
-                {u.items?.length > 0 && (
+                {Array.isArray(u.items) && u.items.length > 0 && (
                   <ul className="mt-2 space-y-0.5">
                     {u.items.map((item, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">

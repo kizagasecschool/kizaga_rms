@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Link } from 'react-router-dom'
 
@@ -7,6 +7,12 @@ export default function TrackApplication() {
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [conversations, setConversations] = useState([])
+  const [replyMessage, setReplyMessage] = useState('')
+  const [replyFile, setReplyFile] = useState(null)
+  const [submittingReply, setSubmittingReply] = useState(false)
+  const [replySuccess, setReplySuccess] = useState('')
+  const [previewAttachment, setPreviewAttachment] = useState(null)
 
   const statusLabels = {
     pending: 'Inasubiri Kukaguliwa',
@@ -24,12 +30,79 @@ export default function TrackApplication() {
     withdrawn: 'bg-gray-100 text-gray-600',
   }
 
+  const loadConversations = async (appId) => {
+    const { data: msgs } = await supabase
+      .rpc('get_application_conversations', { p_application_id: appId })
+    setConversations(msgs || [])
+  }
+
+  useEffect(() => {
+    if (data) loadConversations(data.id)
+  }, [data])
+
+  const handleSubmitReply = async (e) => {
+    e.preventDefault()
+    if (!replyMessage.trim() && !replyFile) return
+    setError('')
+    setReplySuccess('')
+    if (replyFile) {
+      if (replyFile.type !== 'application/pdf') {
+        setError('Tafadhali chagua faili ya PDF pekee')
+        return
+      }
+      if (replyFile.size > 1 * 1024 * 1024) {
+        setError('Faili si zaidi ya 1MB')
+        return
+      }
+    }
+    setSubmittingReply(true)
+    try {
+      let attachmentUrl = ''
+      if (replyFile) {
+        const filePath = `${data.id}/${Date.now()}_${replyFile.name}`
+        const { error: uploadError } = await supabase.storage
+          .from('application-files')
+          .upload(filePath, replyFile)
+        if (uploadError) throw uploadError
+        const { data: urlData } = supabase.storage
+          .from('application-files')
+          .getPublicUrl(filePath)
+        attachmentUrl = urlData.publicUrl
+      }
+      const { error: replyError } = await supabase
+        .rpc('send_application_reply', {
+          p_application_id: data.id,
+          p_message: replyMessage.trim(),
+          p_attachment_url: attachmentUrl,
+        })
+      if (replyError) throw replyError
+      setReplySuccess('Jibu lako limetumwa. Ombi lako sasa linakaguliwa tena.')
+      setReplyMessage('')
+      setReplyFile(null)
+      const { data: updated } = await supabase
+        .from('admission_applications')
+        .select('*')
+        .eq('application_no', appNo.trim().toUpperCase())
+        .maybeSingle()
+      setData(updated)
+      if (updated) loadConversations(updated.id)
+    } catch (err) {
+      console.error(err)
+      setError('Imeshindwa kutuma jibu. Tafadhali jaribu tena.')
+    } finally {
+      setSubmittingReply(false)
+    }
+  }
+
   const handleSearch = async (e) => {
     e.preventDefault()
     if (!appNo.trim()) return
     setLoading(true)
     setError('')
     setData(null)
+    setReplySuccess('')
+    setReplyMessage('')
+    setReplyFile(null)
     try {
       const { data: result, error: queryError } = await supabase
         .from('admission_applications')
@@ -152,9 +225,124 @@ export default function TrackApplication() {
                 <p className="text-sm text-blue-800">{data.admin_notes}</p>
               </div>
             )}
+
+            {/* Conversation History */}
+            {conversations.length > 0 && (
+              <div className="border-t border-gray-100 pt-4">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Mazungumzo</h3>
+                <div className="space-y-3 max-h-72 overflow-y-auto">
+                  {conversations.map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={`p-3 rounded-xl text-sm ${
+                        msg.sender === 'academic'
+                          ? 'bg-blue-50 border border-blue-200 mr-8'
+                          : 'bg-gray-50 border border-gray-200 ml-8'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <span className="font-semibold text-xs text-gray-500">
+                          {msg.sender === 'academic' ? 'Shule' : 'Wewe'}
+                        </span>
+                        <span className="text-xs text-gray-400">
+                          {new Date(msg.created_at).toLocaleDateString('sw-TZ', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        </span>
+                      </div>
+                      <p className="text-gray-800 whitespace-pre-wrap">{msg.message || 'Hakuna ujumbe'}</p>
+                      {msg.sender === 'academic' && msg.requires_attachment && (
+                        <p className="text-xs text-blue-600 font-medium mt-1">* Tafadhali ambatisha faili ya PDF</p>
+                      )}
+                      {msg.attachment_url && (
+                        <button
+                          onClick={() => setPreviewAttachment(msg.attachment_url)}
+                          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 mt-1 underline"
+                        >
+                          Fungua attachment
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Reply Form (only when status is needs_info) */}
+            {data.status === 'needs_info' && (
+              <form onSubmit={handleSubmitReply} className="border-t border-gray-100 pt-4 space-y-4">
+                <h3 className="text-sm font-semibold text-gray-700">Tuma Jibu Lako</h3>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Ujumbe wako</label>
+                  <textarea
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    rows={3}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-sm"
+                    placeholder="Andika jibu lako hapa..."
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Ambatisha faili (PDF, si zaidi ya 1MB)
+                  </label>
+                  <input
+                    type="file"
+                    accept="application/pdf"
+                    onChange={(e) => setReplyFile(e.target.files[0])}
+                    className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-maroon-50 file:text-maroon-700 hover:file:bg-maroon-100"
+                  />
+                  {replyFile && (
+                    <p className="text-xs text-green-600 mt-1">{replyFile.name} ({(replyFile.size / 1024).toFixed(1)} KB)</p>
+                  )}
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={submittingReply || (!replyMessage.trim() && !replyFile)}
+                  className="w-full py-2.5 bg-maroon-600 text-white text-sm font-medium rounded-xl hover:bg-maroon-700 disabled:opacity-50"
+                >
+                  {submittingReply ? 'Inatuma...' : 'Tuma Jibu'}
+                </button>
+              </form>
+            )}
+
+            {replySuccess && (
+              <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-700">
+                {replySuccess}
+              </div>
+            )}
           </div>
         )}
       </div>
+
+      {/* Attachment Preview Modal */}
+      {previewAttachment && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setPreviewAttachment(null)}>
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl mx-4 max-h-[90vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200">
+              <h3 className="text-sm font-semibold text-gray-700">Attachment</h3>
+              <div className="flex items-center gap-2">
+                <a
+                  href={previewAttachment}
+                  download
+                  className="px-3 py-1.5 text-xs font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700"
+                >
+                  Download
+                </a>
+                <button onClick={() => setPreviewAttachment(null)} className="p-1 text-gray-400 hover:text-gray-600 text-lg leading-none">&times;</button>
+              </div>
+            </div>
+            <div className="flex-1 min-h-0 p-2">
+              <iframe
+                src={previewAttachment}
+                className="w-full h-[80vh] rounded-lg border-0"
+                title="Attachment Preview"
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
