@@ -8,6 +8,23 @@ import { useAuth } from '../context/AuthContext'
 
 const STATUSES = ['active', 'inactive', 'graduated', 'transferred', 'expelled']
 
+const parseDate = (str) => {
+  if (!str) return null
+  const trimmed = str.trim()
+  // Already YYYY-MM-DD
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return trimmed
+  // DD-MM-YYYY or DD/MM/YYYY
+  let m = trimmed.match(/^(\d{2})[-\/](\d{2})[-\/](\d{4})$/)
+  if (m) return `${m[3]}-${m[2]}-${m[1]}`
+  // DD-MM-YY or DD/MM/YY (assume 2000+ for YY)
+  m = trimmed.match(/^(\d{2})[-\/](\d{2})[-\/](\d{2})$/)
+  if (m) {
+    const y = parseInt(m[3], 10)
+    return `${2000 + y}-${m[2]}-${m[1]}`
+  }
+  return trimmed
+}
+
 const TEMPLATE_HEADERS = [
   'admission_number', 'first_name', 'middle_name', 'surname',
   'gender', 'date_of_birth', 'class', 'stream',
@@ -21,7 +38,7 @@ const TEMPLATE_ROW = {
   surname: 'Doe',
   gender: 'Male',
   date_of_birth: '2010-05-15',
-  class: 'Form One',
+  class: 'Form 1',
   stream: 'East',
   admission_date: '2025-01-10',
   parent_name: 'Andrew Doe',
@@ -31,11 +48,20 @@ const TEMPLATE_ROW = {
 }
 
 function downloadTemplate() {
+  const instructions = [
+    '# MAELEKEZO: Jaza safu wima zifuatazo kwa mwanafunzi mmoja kwa mstari.',
+    '# COLUMNS ZINAZOHITAJIKA: first_name, surname, gender, date_of_birth, class (au kidato/darasa)',
+    '# JINSIA: "Male" au "Female" pekee',
+    '# TAREHE: Format YYYY-MM-DD (mfano: 2010-05-15)',
+    '# DARASA: Jina lazima lilandane kamili na mfumo (mfano: "Form 1", "Form 2", "Form 3", "Form 4")',
+    '# STREAM: Si lazima (unaweza kuacha tupu)',
+    '',
+  ]
   const csv = Papa.unparse({
     fields: TEMPLATE_HEADERS,
     data: [TEMPLATE_ROW],
   })
-  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' })
+  const blob = new Blob(['\uFEFF' + instructions.join('\r\n') + '\r\n' + csv], { type: 'text/csv;charset=utf-8;' })
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url
@@ -292,15 +318,18 @@ function Students() {
     setBulkDeleting(true)
     try {
       const ids = [...selectedIds]
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .in('id', ids)
-      if (error) throw error
+      const CHUNK = 50
+      let deleted = 0
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        const chunk = ids.slice(i, i + CHUNK)
+        const { error } = await supabase.from('students').delete().in('id', chunk)
+        if (error) throw error
+        deleted += chunk.length
+      }
       await fetchStudents()
       setSelectedIds(new Set())
       setBulkDeleteConfirm(false)
-      showToast(`${ids.length} student(s) deleted successfully`, 'success')
+      showToast(`${deleted} student(s) deleted successfully`, 'success')
     } catch (err) {
       console.error('Bulk delete error:', err)
       showToast('Failed to delete. ' + (err.message || ''), 'error')
@@ -525,30 +554,46 @@ function Students() {
     Papa.parse(file, {
       header: true,
       skipEmptyLines: true,
+      comments: '#',
       complete: (results) => {
         const errors = []
         const valid = []
         results.data.forEach((row, i) => {
-          if (!row.first_name || !row.surname || !row.gender || !row.date_of_birth) {
-            errors.push(`Row ${i + 2}: missing required fields (first_name, surname, gender, date_of_birth)`)
+          const className = row.class || row.kidato || row.darasa || row.class_name || ''
+          const streamName = row.stream || row.stream_name || ''
+          row.class = className
+          row.stream = streamName
+          if (!row.first_name || !row.surname || !row.gender || !row.date_of_birth || !className) {
+            const missing = []
+            if (!row.first_name) missing.push('first_name')
+            if (!row.surname) missing.push('surname')
+            if (!row.gender) missing.push('gender')
+            if (!row.date_of_birth) missing.push('date_of_birth')
+            if (!className) missing.push('class/kidato/darasa')
+            errors.push(`Row ${i + 2}: missing required fields (${missing.join(', ')})`)
             return
           }
           if (!['Male', 'Female'].includes(row.gender)) {
             errors.push(`Row ${i + 2}: gender must be Male or Female`)
             return
           }
-          const csId = resolveClassStream(row.class, row.stream)
-          const cId = resolveClassId(row.class)
+          const cId = resolveClassId(className)
+          if (!cId) {
+            const available = classes.map(c => c.class_name).join(', ')
+            errors.push(`Row ${i + 2}: class "${className}" haipo kwenye mfumo. Madarasa yaliyopo: ${available}`)
+            return
+          }
+          const csId = resolveClassStream(className, streamName)
           valid.push({
-            admission_number: row.admission_number.trim(),
+            admission_number: row.admission_number?.trim() || '',
             first_name: row.first_name.trim(),
             middle_name: (row.middle_name || '').trim() || null,
             surname: row.surname.trim(),
             gender: row.gender.trim(),
-            date_of_birth: row.date_of_birth.trim(),
+            date_of_birth: parseDate(row.date_of_birth),
             class_id: cId,
             class_stream_id: csId,
-            admission_date: (row.admission_date || '').trim() || new Date().toISOString().slice(0, 10),
+            admission_date: parseDate(row.admission_date) || new Date().toISOString().slice(0, 10),
             parent_name: (row.parent_name || '').trim() || null,
             parent_phone: (row.parent_phone || '').trim() || null,
             address: (row.address || '').trim() || null,
@@ -603,7 +648,8 @@ function Students() {
       }
       const { data: inserted, error } = await supabase.from('students').insert(row).select('id').single()
       if (error) {
-        console.error('CSV insert error:', error)
+        console.error('CSV insert error:', JSON.stringify(error, null, 2))
+        console.error('CSV row:', JSON.stringify(row, null, 2))
         failed++
       } else {
         imported++
@@ -1134,12 +1180,11 @@ function Students() {
             <p className="font-medium mb-1">CSV Format Instructions</p>
             <ul className="list-disc list-inside space-y-1 text-xs">
               <li>Download the <button onClick={downloadTemplate} className="text-maroon-600 underline font-medium">template</button> first</li>
-              <li>Required columns: <strong>admission_number, first_name, surname, gender, date_of_birth</strong></li>
+              <li>Required columns: <strong>first_name, surname, gender, date_of_birth, class</strong> (au <strong>kidato</strong>, <strong>darasa</strong>, <strong>class_name</strong>)</li>
               <li>Gender must be <strong>Male</strong> or <strong>Female</strong></li>
               <li>Date format: <strong>YYYY-MM-DD</strong> (e.g., 2010-05-15)</li>
-              <li>Use <strong>class</strong> column to assign student to a class (must match existing class name like "Form 1")</li>
-              <li>Use <strong>stream</strong> column to also assign stream (optional — stream can be added later via bulk assignment)</li>
-              <li>Leave <strong>class</strong> empty to skip class assignment</li>
+              <li>Use <strong>class</strong> column to assign student to a class — jina la darasa lazima lilandane kamili na mfumo (e.g., "Form 1", "Form 2")</li>
+              <li>Use <strong>stream</strong> column to also assign stream (optional)</li>
               <li>File must be UTF-8 encoded CSV</li>
             </ul>
           </div>
