@@ -112,6 +112,9 @@ const navItems = {
     { icon: I.chart, label: 'Analysis', children: [
       { path: '/teacher/analysis', icon: I.chart, label: 'Subject Analysis' },
     ]},
+    { icon: I.results, label: 'Results', children: [
+      { path: '/teacher/results', icon: I.results, label: 'Exam Results' },
+    ]},
   ],
 }
 

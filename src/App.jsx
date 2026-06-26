@@ -129,6 +129,7 @@ function App() {
                   <Route path="enter-marks" element={<EnterMarks />} />
                   <Route path="students" element={<MyStudents />} />
                   <Route path="analysis" element={<Analysis />} />
+                  <Route path="results" element={<AcademicResults />} />
                 </Routes>
               </RoleBasedRoute>
             }

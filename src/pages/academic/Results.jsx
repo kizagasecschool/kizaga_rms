@@ -6,6 +6,7 @@ import domtoimage from 'dom-to-image-more'
 import jsPDF from 'jspdf'
 import Modal from '../../components/Modal'
 import { useNotification } from '../../context/NotificationContext'
+import { useAuth } from '../../context/AuthContext'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
@@ -364,6 +365,8 @@ async function generatePDF(element, filename) {
 
 function Results() {
   const { showToast } = useNotification()
+  const { profile } = useAuth()
+  const isTeacher = profile?.role === 'teacher'
   const [searchParams] = useSearchParams()
   const examIdParam = searchParams.get('examId')
 
@@ -870,7 +873,7 @@ function Results() {
               <span className="text-gray-300">|</span>
               <span>{students.length} students, {subjects.length} subjects</span>
             </div>
-            {canReprocess && selectedClassId && (
+            {canReprocess && selectedClassId && !isTeacher && (
               <button
                 type="button"
                 disabled={reprocessing || loadingData}
