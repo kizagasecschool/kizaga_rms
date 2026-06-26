@@ -257,12 +257,17 @@ function Analysis() {
   }, [selectedSubjectData])
 
   const gradeKeys = useMemo(() => {
+    // Order grades by min_mark descending (A first, F/lowest last)
+    const level = filteredAnalysis[0]?.level
+    const levelGrades = gradesConfig
+      .filter(g => g.level === level)
+      .sort((a, b) => b.min_mark - a.min_mark)
+    if (levelGrades.length > 0) return levelGrades.map(g => g.grade)
+    // Fallback: collect from gradeDist keys
     const set = new Set()
-    filteredAnalysis.forEach(sa => {
-      Object.keys(sa.gradeDist).forEach(g => set.add(g))
-    })
+    filteredAnalysis.forEach(sa => Object.keys(sa.gradeDist).forEach(g => set.add(g)))
     return [...set].sort()
-  }, [filteredAnalysis])
+  }, [filteredAnalysis, gradesConfig])
 
   const combinedStats = useMemo(() => {
     if (filteredAnalysis.length === 0) return null
@@ -555,13 +560,12 @@ function Analysis() {
                         const d = sa.gradeDist[g]
                         if (d) { totalBoys += d.boys; totalGirls += d.girls }
                       })
-                      if (totalBoys === 0 && totalGirls === 0) return null
                       return (
                         <tr key={g} className="hover:bg-gray-50">
                           <td className="border-r border-gray-200 px-3 py-2 font-semibold text-gray-800">{g}</td>
-                          <td className="border-r border-gray-200 px-3 py-2 text-center">{totalBoys || '-'}</td>
-                          <td className="border-r border-gray-200 px-3 py-2 text-center">{totalGirls || '-'}</td>
-                          <td className="px-3 py-2 text-center font-medium">{totalBoys + totalGirls || '-'}</td>
+                          <td className="border-r border-gray-200 px-3 py-2 text-center">{totalBoys}</td>
+                          <td className="border-r border-gray-200 px-3 py-2 text-center">{totalGirls}</td>
+                          <td className="px-3 py-2 text-center font-medium">{totalBoys + totalGirls}</td>
                         </tr>
                       )
                     })}
