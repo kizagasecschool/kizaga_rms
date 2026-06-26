@@ -39,7 +39,7 @@ export default function ManageUniforms() {
     setLoading(true)
     const { data, error } = await supabase.rpc('get_uniforms')
     if (error) {
-      showToast('Imeshindwa kupakia sare', 'error')
+      showToast('Failed to load uniforms', 'error')
     } else {
       setUniforms(data || [])
     }
@@ -99,20 +99,20 @@ export default function ManageUniforms() {
     const file = e.target.files?.[0]
     if (!file) return
     if (!file.type.startsWith('image/')) {
-      showToast('Tafadhali chagua faili ya picha tu', 'error')
+      showToast('Please select an image file', 'error')
       return
     }
     if (file.size > 5 * 1024 * 1024) {
-      showToast('Picha isizidi 5MB', 'error')
+      showToast('Image must be under 5MB', 'error')
       return
     }
     setUploading(true)
     try {
       const url = await uploadImage(file)
       setForm(prev => ({ ...prev, image_url: url }))
-      showToast('Picha imepakiwa', 'success')
+      showToast('Image uploaded', 'success')
     } catch {
-      showToast('Imeshindwa kupakia picha', 'error')
+      showToast('Failed to upload image', 'error')
     } finally {
       setUploading(false)
       if (fileRef.current) fileRef.current.value = ''
@@ -165,7 +165,7 @@ export default function ManageUniforms() {
   const handleSave = async (e) => {
     e.preventDefault()
     if (!form.title) {
-      showToast('Tafadhali jaza jina la sare', 'error')
+      showToast('Please enter a uniform name', 'error')
       return
     }
     setSaving(true)
@@ -182,11 +182,11 @@ export default function ManageUniforms() {
         p_sort_order: form.sort_order,
       })
       if (error) throw error
-      showToast(editing ? 'Sare imesasishwa' : 'Sare imeongezwa', 'success')
+      showToast(editing ? 'Uniform updated' : 'Uniform added', 'success')
       resetForm()
       loadUniforms()
     } catch {
-      showToast('Imeshindwa kuokoa sare', 'error')
+      showToast('Failed to save uniform', 'error')
     } finally {
       setSaving(false)
     }
@@ -197,11 +197,11 @@ export default function ManageUniforms() {
     try {
       const { error } = await supabase.rpc('delete_uniform', { p_id: id })
       if (error) throw error
-      showToast('Sare imefutwa', 'success')
+      showToast('Uniform deleted', 'success')
       if (editing === id) resetForm()
       loadUniforms()
     } catch {
-      showToast('Imeshindwa kufuta sare', 'error')
+      showToast('Failed to delete uniform', 'error')
     }
   }
 

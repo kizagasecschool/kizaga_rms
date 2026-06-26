@@ -55,7 +55,7 @@ export default function ManageAdmissions() {
       .rpc('get_admission_applications')
     if (error) {
       setLoadError(error.message)
-      showToast('Imeshindwa kupakia maombi', 'error')
+      showToast('Failed to load applications', 'error')
     } else {
       setApplications(data || [])
       setLoadError(null)
@@ -83,13 +83,13 @@ export default function ManageAdmissions() {
           notes: notes || null,
         })
       if (error) throw error
-      showToast(`Ombi limebadilishwa kuwa "${statusLabels[newStatus]}"`, 'success')
+      showToast(`Application status changed to "${statusLabels[newStatus]}"`, 'success')
       setSelected(null)
       setNotes('')
       loadApplications()
     } catch (err) {
       console.error(err)
-      showToast('Imeshindwa kubadilisha hali', 'error')
+      showToast('Failed to update status', 'error')
     } finally {
       setSaving(false)
     }
@@ -122,7 +122,7 @@ export default function ManageAdmissions() {
           p_requires_attachment: requireAttachment,
         })
       if (error) throw error
-      showToast('Ombi la maelezo limetumwa', 'success')
+      showToast('Request for information sent', 'success')
       setShowRequestModal(false)
       setRequestMessage('')
       setRequireAttachment(false)
@@ -130,7 +130,7 @@ export default function ManageAdmissions() {
       loadApplications()
     } catch (err) {
       console.error(err)
-      showToast('Imeshindwa kutuma ombi', 'error')
+      showToast('Failed to send message', 'error')
     } finally {
       setSendingRequest(false)
     }
@@ -172,13 +172,13 @@ export default function ManageAdmissions() {
           p_admission_number: convertAdmissionNo,
         })
       if (error) throw error
-      showToast('Mwanafunzi ameundwa kikamilifu', 'success')
+      showToast('Student enrolled successfully', 'success')
       setShowConvertModal(false)
       setSelected(null)
       loadApplications()
     } catch (err) {
       console.error(err)
-      showToast('Imeshindwa kuunda mwanafunzi', 'error')
+      showToast('Failed to enrol student', 'error')
     } finally {
       setConverting(false)
     }
@@ -190,13 +190,13 @@ export default function ManageAdmissions() {
       const { error } = await supabase
         .rpc('delete_admission_application', { p_application_id: selected.id })
       if (error) throw error
-      showToast('Ombi limefutwa', 'success')
+      showToast('Application deleted', 'success')
       setShowDeleteConfirm(false)
       setSelected(null)
       loadApplications()
     } catch (err) {
       console.error(err)
-      showToast('Imeshindwa kufuta ombi', 'error')
+      showToast('Failed to delete application', 'error')
     } finally {
       setDeleting(false)
     }

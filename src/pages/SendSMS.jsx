@@ -92,7 +92,7 @@ export default function SendSMS() {
 
   const loadResultsRecipients = async () => {
     if (!classId || !examId) {
-      showToast('Chagua darasa na mtihani', 'error')
+      showToast('Select a class and exam', 'error')
       return
     }
     setLoadingResults(true)
@@ -106,7 +106,7 @@ export default function SendSMS() {
       ])
 
       if (!students || students.length === 0) {
-        showToast('Hakuna wanafunzi darasa hili', 'error')
+        showToast('No students found in this class', 'error')
         return
       }
 
@@ -156,10 +156,10 @@ export default function SendSMS() {
 
       setPreviewResults(preview)
       setSelectedResults([])
-      showToast(`Wazazi ${list.length} wamepakuliwa`, 'success')
+      showToast(`${list.length} parent(s) loaded`, 'success')
     } catch (err) {
       console.error('Load results error:', err)
-      showToast('Imeshindwa kupakia data', 'error')
+      showToast('Failed to load data', 'error')
     } finally {
       setLoadingResults(false)
     }
@@ -167,7 +167,7 @@ export default function SendSMS() {
 
   const loadRecipients = async () => {
     if (!classId) {
-      showToast('Chagua darasa kwanza', 'error')
+      showToast('Select a class first', 'error')
       return
     }
     setLoadingRecipients(true)
@@ -189,10 +189,10 @@ export default function SendSMS() {
 
       setRecipients(list)
       setSelectedRecipients([])
-      showToast(`Wazazi ${list.length} wamepakuliwa`, 'success')
+      showToast(`${list.length} parent(s) loaded`, 'success')
     } catch (err) {
       console.error('Load recipients error:', err)
-      showToast('Imeshindwa kupakia wazazi', 'error')
+      showToast('Failed to load parents', 'error')
     } finally {
       setLoadingRecipients(false)
     }
@@ -227,11 +227,11 @@ export default function SendSMS() {
 
   const handleSendMessages = async (recipientList, customMessage) => {
     if (!recipientList || recipientList.length === 0) {
-      showToast('Hakuna wapokeaji', 'error')
+      showToast('No recipients selected', 'error')
       return
     }
     if (!customMessage && tab === 'message') {
-      showToast('Tafadhali andika ujumbe', 'error')
+      showToast('Please write a message', 'error')
       return
     }
     setSending(true)
@@ -262,7 +262,7 @@ export default function SendSMS() {
             fail++
           }
         }
-        const summary = `Imekamilika: ${success} zilifanikiwa, ${fail} zilishindwa`
+        const summary = `Done: ${success} sent, ${fail} failed`
         if (errors.length > 0) {
           console.error('SMS errors:', errors)
           showToast(summary + ` - Kosa: ${errors[0]}`, 'warning')
@@ -282,11 +282,11 @@ export default function SendSMS() {
         })
         const result = await res.json()
         if (!res.ok) throw new Error(result.error || 'Failed to send SMS')
-        showToast(result.message || 'SMS zimetumwa', 'success')
+        showToast(result.message || 'SMS sent successfully', 'success')
       }
     } catch (err) {
       console.error('Send SMS error:', err)
-      showToast('Imeshindwa kutuma SMS: ' + (err.message || ''), 'error')
+      showToast('Failed to send SMS: ' + (err.message || ''), 'error')
     } finally {
       setSending(false)
     }

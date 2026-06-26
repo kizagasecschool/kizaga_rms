@@ -527,7 +527,7 @@ function Students() {
       if (level === 'A_LEVEL') {
         // ── A-Level: save combination + auto-populate subjects ──
         if (!selectedCombinationId) {
-          showToast('Tafadhali chagua combination kwanza', 'error')
+          showToast('Please select a combination first', 'error')
           return
         }
 
@@ -570,7 +570,7 @@ function Students() {
         }
 
         const combo = combinations.find((c) => c.id === selectedCombinationId)
-        showToast(`Combination ${combo?.code || ''} imehifadhiwa na masomo yamewekwa`, 'success')
+        showToast(`Combination ${combo?.code || ''} saved with subjects assigned`, 'success')
 
       } else {
         // ── O-Level: keep existing checkbox system ──
@@ -598,14 +598,14 @@ function Students() {
               { onConflict: 'student_id,subject_id' }
             )
         }
-        showToast('Masomo yamehifadhiwa', 'success')
+        showToast('Subjects saved', 'success')
       }
 
       setSubjectsOpen(false)
       setSubjectsStudent(null)
     } catch (err) {
       console.error('Save subjects error:', err)
-      showToast('Imeshindwa kuhifadhi. ' + (err.message || ''), 'error')
+      showToast('Failed to save. ' + (err.message || ''), 'error')
     } finally {
       setSavingSubjects(false)
     }
@@ -1705,7 +1705,7 @@ function Students() {
                   await assignOLevelAllSubjects(streamAssignSelected)
                 }
                 await fetchStudents()
-                showToast(`Wanafunzi ${streamAssignSelected.length} wamepewa stream`, 'success')
+                showToast(`${streamAssignSelected.length} student(s) assigned to stream`, 'success')
                 setStreamAssignOpen(false)
                 setStreamAssignClassId('')
                 setStreamAssignStreamId('')

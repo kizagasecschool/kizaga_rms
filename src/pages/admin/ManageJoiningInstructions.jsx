@@ -20,7 +20,7 @@ export default function ManageJoiningInstructions() {
       .from('joining_instructions')
       .select('*')
     if (error) {
-      setMessage({ type: 'error', text: 'Imeshindwa kupakia: ' + error.message })
+      setMessage({ type: 'error', text: 'Failed to load: ' + error.message })
     } else {
       const map = { O_LEVEL: null, A_LEVEL: null }
       ;(data || []).forEach(r => { map[r.level] = r })
@@ -56,11 +56,11 @@ export default function ManageJoiningInstructions() {
     const file = e.target.files?.[0]
     if (!file) return
     if (file.type !== 'application/pdf') {
-      setMessage({ type: 'error', text: 'Tafadhali chagua faili ya PDF tu' })
+      setMessage({ type: 'error', text: 'Please select a PDF file' })
       return
     }
     if (file.size > 10 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'Faili lazima iwe chini ya 10MB' })
+      setMessage({ type: 'error', text: 'File must be under 10MB' })
       return
     }
     setSaving(true)
@@ -87,9 +87,9 @@ export default function ManageJoiningInstructions() {
       }
 
       await loadRecords()
-      setMessage({ type: 'success', text: `${levelLabel(level)} PDF imepakiwa` })
+      setMessage({ type: 'success', text: `${levelLabel(level)} PDF uploaded successfully` })
     } catch (err) {
-      setMessage({ type: 'error', text: 'Imeshindwa: ' + (err.message || err) })
+      setMessage({ type: 'error', text: 'Failed: ' + (err.message || err) })
     } finally {
       setSaving(false)
       setUploadingLevel(null)
@@ -107,9 +107,9 @@ export default function ManageJoiningInstructions() {
       const { error } = await supabase.from('joining_instructions').delete().eq('id', rec.id)
       if (error) throw error
       await loadRecords()
-      setMessage({ type: 'success', text: `PDF ya ${levelLabel(level)} imefutwa` })
+      setMessage({ type: 'success', text: `${levelLabel(level)} PDF deleted` })
     } catch (err) {
-      setMessage({ type: 'error', text: 'Imeshindwa kufuta: ' + (err.message || err) })
+      setMessage({ type: 'error', text: 'Failed to delete: ' + (err.message || err) })
     } finally {
       setSaving(false)
     }

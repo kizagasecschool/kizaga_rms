@@ -88,11 +88,11 @@ export default function ManageEventsAnnouncements() {
     const isImage = file.type.startsWith('image/')
     const isPdf = file.type === 'application/pdf'
     if (!isImage && !isPdf) {
-      setMessage({ type: 'error', text: 'Tafadhali chagua picha au faili ya PDF' })
+      setMessage({ type: 'error', text: 'Please select an image or PDF file' })
       return
     }
     if (file.size > 10 * 1024 * 1024) {
-      setMessage({ type: 'error', text: 'Faili lazima iwe chini ya 10MB' })
+      setMessage({ type: 'error', text: 'File must be under 10MB' })
       return
     }
     setSaving(true)
@@ -100,9 +100,9 @@ export default function ManageEventsAnnouncements() {
       await removeOldFile(form.file_url)
       const { url, fileType } = await uploadFile(file)
       setForm(prev => ({ ...prev, file_url: url, file_type: fileType }))
-      setMessage({ type: 'success', text: 'Faili imepakiwa' })
+      setMessage({ type: 'success', text: 'File uploaded' })
     } catch (err) {
-      setMessage({ type: 'error', text: 'Imeshindwa kupakia: ' + (err.message || err) })
+      setMessage({ type: 'error', text: 'Upload failed: ' + (err.message || err) })
     } finally {
       setSaving(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -118,7 +118,7 @@ export default function ManageEventsAnnouncements() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!form.title) {
-      setMessage({ type: 'error', text: 'Tafadhali ingiza jina' })
+      setMessage({ type: 'error', text: 'Please enter a title' })
       return
     }
     setSaving(true)
@@ -138,18 +138,18 @@ export default function ManageEventsAnnouncements() {
           .update({ ...payload, updated_at: new Date().toISOString() })
           .eq('id', editing)
         if (error) throw error
-        setMessage({ type: 'success', text: 'Imesasishwa' })
+        setMessage({ type: 'success', text: 'Updated successfully' })
       } else {
         const { error } = await supabase
           .from('events_announcements')
           .insert(payload)
         if (error) throw error
-        setMessage({ type: 'success', text: 'Imeongezwa' })
+        setMessage({ type: 'success', text: 'Created successfully' })
       }
       resetForm()
       await loadItems()
     } catch (err) {
-      setMessage({ type: 'error', text: 'Imeshindwa: ' + (err.message || err) })
+      setMessage({ type: 'error', text: 'Failed to save: ' + (err.message || err) })
     } finally {
       setSaving(false)
     }
@@ -161,9 +161,9 @@ export default function ManageEventsAnnouncements() {
     if (item?.file_url) await removeOldFile(item.file_url)
     const { error } = await supabase.from('events_announcements').delete().eq('id', id)
     if (error) {
-      setMessage({ type: 'error', text: 'Imeshindwa kufuta: ' + error.message })
+      setMessage({ type: 'error', text: 'Failed to delete: ' + error.message })
     } else {
-      setMessage({ type: 'success', text: 'Imefutwa' })
+      setMessage({ type: 'success', text: 'Deleted successfully' })
       await loadItems()
     }
   }
