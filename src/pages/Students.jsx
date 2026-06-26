@@ -647,7 +647,8 @@ function Students() {
             errors.push(`Row ${i + 2}: class "${className}" haipo kwenye mfumo. Madarasa yaliyopo: ${available}`)
             return
           }
-          const csId = resolveClassStream(className, streamName)
+          const isOLevelClass = classes.find(c => c.id === cId)?.level !== 'A_LEVEL'
+          const csId = isOLevelClass ? null : resolveClassStream(className, streamName)
           valid.push({
             admission_number: row.admission_number?.trim() || '',
             first_name: row.first_name.trim(),
