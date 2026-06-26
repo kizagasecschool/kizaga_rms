@@ -257,7 +257,8 @@ function ReportCard({ student, ctx }) {
     const bestN = classLevel === 'A_LEVEL' ? 3 : 7
     const bestPoints = pts.slice(0, bestN)
     totalPtsSingle = bestPoints.reduce((s, p) => s + p, 0)
-    divisionSingle = calcDivision(totalPtsSingle, classLevel)
+    // Prefer division stored in DB after exam processing; fall back to frontend calc
+    divisionSingle = sr?.division || calcDivision(totalPtsSingle, classLevel)
   }
 
   const cData = mode === 'combined' ? computeCombinedData(s) : null

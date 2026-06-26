@@ -610,7 +610,7 @@ function Results() {
       const bestPoints = allPoints.slice(0, BEST_N)
       const totalPoints = bestPoints.reduce((s, p) => s + p, 0)
       const points = bestPoints.length > 0 ? totalPoints : null
-      const division = points ? calcDivision(points, classLevel) : '0'
+      const division = result?.division || (points ? calcDivision(points, classLevel) : '0')
       return { ...student, result, resultGrade, points, division }
     })
   }, [students, resultsMap, grades, subjects, markMap, selectedExam, classLevel])
