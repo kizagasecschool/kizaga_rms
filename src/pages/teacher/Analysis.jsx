@@ -114,18 +114,28 @@ function Analysis() {
       })
 
       const results = []
+      const processedGroups = new Set()
+
       for (const assignment of myAssignments) {
         const { subject_id, class_stream_id, subjects, class_streams } = assignment
         const level = class_streams.classes.level
+        const isOLevel = level !== 'A_LEVEL'
+        const classId = class_streams.class_id
+
+        // O-Level: deduplicate by class+subject (teacher may be assigned to multiple streams of same class)
+        const groupKey = isOLevel ? `${classId}_${subject_id}` : `${class_stream_id}_${subject_id}`
+        if (processedGroups.has(groupKey)) continue
+        processedGroups.add(groupKey)
+
         const grades = gradeMap[level] || []
         const hasPractical = subjects.has_practical && examHasPractical
         const maxMarks = hasPractical ? 150 : 100
 
-        const { data: students } = await supabase
-          .from('students')
-          .select('id, first_name, surname, gender')
-          .eq('class_stream_id', class_stream_id)
-          .eq('status', 'active')
+        const studentsQuery = isOLevel
+          ? supabase.from('students').select('id, first_name, surname, gender').eq('class_id', classId).eq('status', 'active')
+          : supabase.from('students').select('id, first_name, surname, gender').eq('class_stream_id', class_stream_id).eq('status', 'active')
+
+        const { data: students } = await studentsQuery
 
         if (!students || students.length === 0) continue
 
@@ -187,7 +197,9 @@ function Analysis() {
           subject: subjects,
           hasPractical,
           classStream: class_streams,
-          label: `${class_streams.classes.class_name} - ${class_streams.streams.stream_name}`,
+          label: isOLevel
+            ? class_streams.classes.class_name
+            : `${class_streams.classes.class_name} - ${class_streams.streams.stream_name}`,
           level,
           overallAvg,
           avgGrade: avgGradeObj?.grade || '-',
