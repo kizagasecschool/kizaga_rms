@@ -58,9 +58,53 @@ export default async function handler(req, res) {
         const existing = listData?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
         if (!existing) throw new Error(`Failed to create auth user: ${authError.message}`)
 
-        // Check if this auth user has a profile — if so, it's a real active user, not orphaned
-        const { data: profile } = await supabase.from('profiles').select('id').eq('id', existing.id).maybeSingle()
-        if (profile) throw new Error('A teacher with this email already exists.')
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, role')
+          .eq('id', existing.id)
+          .maybeSingle()
+
+        if (profile) {
+          // Email belongs to a non-teacher account
+          if (profile.role !== 'teacher') {
+            throw new Error(`This email is already used by a ${profile.role} account and cannot be registered as a teacher.`)
+          }
+
+          // Profile exists with role=teacher. Check if a teachers row also exists.
+          const { data: teacherRow } = await supabase
+            .from('teachers')
+            .select('id')
+            .eq('profile_id', existing.id)
+            .maybeSingle()
+
+          if (teacherRow) {
+            // Fully registered teacher — block duplicate
+            throw new Error('A teacher with this email is already registered. Edit the existing record instead.')
+          }
+
+          // Profile exists but teachers row is missing (partial previous deletion).
+          // Update the profile details and create only the missing teachers row.
+          await supabase.from('profiles').update({ full_name, email }).eq('id', existing.id)
+
+          const { data: newTeacher, error: tErr } = await supabase
+            .from('teachers')
+            .insert({
+              employee_number,
+              profile_id: existing.id,
+              qualification: qualification || null,
+              phone: phone || null,
+              status: 'active',
+            })
+            .select('id')
+            .single()
+          if (tErr) throw new Error(`Failed to create teacher record: ${tErr.message}`)
+
+          return res.status(201).json({
+            user_id: existing.id,
+            teacher_id: newTeacher.id,
+            employee_number,
+          })
+        }
 
         // No profile — orphaned auth user. Delete it and retry.
         const { error: delErr } = await supabase.auth.admin.deleteUser(existing.id)
