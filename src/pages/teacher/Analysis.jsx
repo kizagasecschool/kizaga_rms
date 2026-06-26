@@ -457,7 +457,7 @@ function Analysis() {
                       <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Absent</th>
                       <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Avg %</th>
                       <th className="border-r border-gray-300 px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Grade</th>
-                      <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">GPA</th>
+                      <th className="px-3 py-2 text-xs font-semibold text-gray-600 uppercase">Avg Pts</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-gray-200">
