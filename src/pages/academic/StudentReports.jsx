@@ -438,23 +438,29 @@ function ReportCard({ student, ctx }) {
         const g = mode === 'single' ? (sr?.grade || getGradeForPercentage(sr?.average_marks, grades)?.grade || '') : (cData?.gradeObj?.grade || '')
 
         let autoClass = 'Endelea kujitahidi katika masomo yako.'
-        let autoHead = 'Nawataka wazazi kuendelea kumhimiza mtoto wenu kusoma kwa bidii.'
+        let autoHead = 'Nawahimiza wazazi kuendelea kushirikiana na shule kwa ajili ya maendeleo ya mtoto wenu.'
 
         if (g === 'A') {
-          autoClass = 'Umefanya vizuri sana. Endelea kudumisha kiwango hiki cha juu cha ufaulu.'
-          autoHead = 'Napongeza juhudi za mwanafunzi huyu. Asanteni kwa ushirikiano wenu mkamilifu.'
+          autoClass = 'Hongera kwa ufaulu huu wa hali ya juu. Umeonyesha nidhamu ya kipekee na bidii ya kweli katika masomo yako. Endelea kudumisha kiwango hiki cha ubora na uwe mfano wa kuigwa kwa wenzako.'
+          autoHead = 'Napenda kuwapongeza sana kwa juhudi mlizozifanya kumfunza mtoto wenu. Mwanafunzi huyu ameonyesha uwezo wa kipekee na anastahili pongezi za dhati. Msaidieni kuendelea na kiwango hiki cha juu cha ufaulu.'
         } else if (g === 'B') {
-          autoClass = 'Umefanya vizuri. Endelea kujitahidi zaidi ili kufikia daraja la juu zaidi.'
-          autoHead = 'Nawataka wazazi kuendelea kumhimiza mtoto wenu kusoma kwa bidii ili kuboresha zaidi.'
+          autoClass = 'Umefanya vizuri sana na unaonyesha maendeleo ya kuridhisha. Ukizidi kuongeza bidii na kujishughulisha zaidi na masomo yako, unaweza kufikia daraja la A. Endelea kuwa makini na kujitahidi bila kupumzika.'
+          autoHead = 'Matokeo ya mtoto wenu yanaonyesha juhudi na uwezo wa kustahili pongezi. Nawahimiza mzidishe ushirikiano na walimu wa shule na kumhimiza mtoto wenu kusoma kwa bidii zaidi ili apige hatua kubwa zaidi katika ufaulu wake.'
         } else if (g === 'C') {
-          autoClass = 'Unaendelea wastani. Jitahidi zaidi ili kuboresha matokeo yako.'
-          autoHead = 'Nawataka wazazi kushirikiana nasi kumhimiza mtoto wenu kusoma kwa bidii zaidi.'
+          autoClass = 'Umefanya wastani katika mtihani huu na kuna nafasi kubwa ya kuboresha matokeo yako. Tafadhali zingatia zaidi masomo yako, fanya mazoezi ya kutosha na usisite kuuliza maswali pale unapokosa kuelewa. Uwezo wako ni mkubwa zaidi ya hili.'
+          autoHead = 'Matokeo ya mtoto wenu yanaweza kuboreshwa zaidi kwa juhudi na ushirikiano. Nashauri mzazi au mlezi kushirikiana nasi kwa karibu, kuhakikisha mtoto wenu anafanya mazoezi ya kutosha nyumbani na kuhudhuria masomo yote kwa wakati na makini.'
         } else if (g === 'D') {
-          autoClass = 'Unahitaji kuongeza juhudi zaidi katika masomo yako na kusoma kwa bidii.'
-          autoHead = 'Nawataka wazazi kuchukua hatua za dharura kumsaidia mtoto wenu kuboresha ufaulu wake.'
-        } else if (g === 'F' || g === 'E') {
-          autoClass = 'Unahitaji kusoma kwa bidii zaidi na kuhudhuria masomo yote kwa ukamilifu.'
-          autoHead = 'Nawataka wazazi kufuatilia kwa karibu zaidi maendeleo ya mtoto wenu na kushirikiana nasi.'
+          autoClass = 'Unahitaji juhudi kubwa zaidi katika masomo yako. Tafadhali zingatia mada ambazo una ugumu nazo, hudhuria masomo yote bila kukosa na ushirikiane na walimu wako ili kupata msaada unaohitajika. Bado una nafasi nzuri ya kuboresha ufaulu wako.'
+          autoHead = 'Matokeo ya mtoto wenu yanahitaji kuzingatiwa kwa makini zaidi na pande zote mbili. Nashauri mkutane na walimu wake hivi karibuni ili kupanga mkakati wa pamoja wa kumsaidia kuboresha utendaji wake wa kitaaluma. Msaada wenu wa nyumbani ni nguzo muhimu sana.'
+        } else if (g === 'E') {
+          autoClass = 'Umepita lakini kwa kiwango cha chini. Unahitaji kuongeza juhudi za ziada, kufanya mapitio ya kina ya masomo na kutumia vizuri muda wako wa kujisomea. Ninakuamini una uwezo wa kufanya vizuri zaidi — jitahidi kupiga hatua kubwa zaidi.'
+          autoHead = 'Mtoto wenu amepita lakini kwa kiwango cha chini cha ufaulu. Ninawahimiza sana kushirikiana nasi kwa karibu zaidi ili kumwezesha kuboresha ufaulu wake. Ushirikiano wenu na mwelekeo mzuri wa nyumbani ni nguzo muhimu sana wakati huu.'
+        } else if (g === 'S') {
+          autoClass = 'Unahitaji kurekebisha mkakati wako wa masomo kwa haraka na kwa makini. Tumia kila fursa unayopata kufanya mazoezi, elewa mada vizuri zaidi na usiache muda kupita bila kufanya kitu. Ninatarajia uonyeshe mabadiliko ya dhahiri katika kipindi kinachokuja.'
+          autoHead = 'Matokeo ya mtoto wenu yanalazimu uangalizi wa karibu na wa haraka. Nashauri mzazi au mlezi azungumze na walimu wa shule mara moja ili tuweze pamoja kupanga njia bora za kumsaidia mtoto wenu kupiga hatua muhimu za kimasomo.'
+        } else if (g === 'F') {
+          autoClass = 'Haujafaulu katika mtihani huu na hii ni ishara ya dharura inayohitaji hatua za haraka. Tafadhali ongea na mwalimu wako ili kupata msaada maalum, panga ratiba nzuri ya masomo na uambie wazazi wako ili wakusaidie. Usikate tamaa — mabadiliko ya kweli yanaweza kutokea ukijitahidi kwa dhati.'
+          autoHead = 'Matokeo ya mtoto wenu yanahitaji umakini wa haraka kutoka kwa pande zote. Ninawahimiza sana kuwasiliana nasi mara moja ili tuweze pamoja kuelewa changamoto anazopitia na kumwandalia mpango maalum wa msaada. Ushirikiano wenu ni muhimu zaidi kuliko wakati wowote sasa hivi.'
         }
 
         return (
