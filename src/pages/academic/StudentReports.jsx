@@ -575,6 +575,8 @@ function StudentReports() {
   const [activeTab, setActiveTab] = useState('list')
 
   const [reportHeading, setReportHeading] = useState('')
+  const [localHeading, setLocalHeading] = useState('')
+  const headingDebounceRef = useRef(null)
   const [schoolClosingDate, setSchoolClosingDate] = useState('')
   const [schoolOpeningDate, setSchoolOpeningDate] = useState('')
   const [parentGreeting, setParentGreeting] = useState('')
@@ -595,16 +597,28 @@ function StudentReports() {
       setLoading(true)
       setInitError(null)
       try {
-        const [eRes, cRes, stRes, schRes, yRes] = await Promise.all([
-          supabase.from('exams').select('*').order('created_at', { ascending: false }),
-          supabase.from('classes').select('*').order('sort_order'),
-          supabase.from('exam_classes').select('*'),
+        // Paginate exam_classes — it can grow to exams × classes rows
+        const fetchExamClassesPaged = async () => {
+          const PAGE = 1000; let from = 0; const all = []
+          while (true) {
+            const { data } = await supabase.from('exam_classes').select('*').range(from, from + PAGE - 1)
+            if (!data || !data.length) break
+            all.push(...data)
+            if (data.length < PAGE) break
+            from += PAGE
+          }
+          return all
+        }
+        const [eRes, cRes, schRes, yRes, ecAll] = await Promise.all([
+          supabase.from('exams').select('*').order('created_at', { ascending: false }).limit(500),
+          supabase.from('classes').select('*').order('sort_order').limit(50),
           supabase.from('school_settings').select('*').limit(1),
-          supabase.from('academic_years').select('*').order('year_name', { ascending: false }),
+          supabase.from('academic_years').select('*').order('year_name', { ascending: false }).limit(20),
+          fetchExamClassesPaged(),
         ])
         if (eRes.data) setExams(eRes.data)
         if (cRes.data) setClasses(cRes.data)
-        if (stRes.data) setExamClasses(stRes.data)
+        setExamClasses(ecAll)
         if (schRes.data && schRes.data.length > 0) setSchoolInfo(schRes.data[0])
         if (yRes.data) setAcademicYears(yRes.data)
       } catch (err) {
@@ -708,24 +722,30 @@ function StudentReports() {
 
         if (assignedSubjects.length > 0) {
           const subjectIds = assignedSubjects.map(s => s.id)
-          const queries = []
-          for (const eid of activeExamIds) {
-            queries.push(
-              supabase.from('marks').select('*').eq('exam_id', eid).in('subject_id', subjectIds)
-            )
-            queries.push(
-              supabase.from('student_results').select('*').eq('exam_id', eid)
-            )
+
+          // Paginated fetcher — marks can exceed 1000 rows (students × subjects per exam)
+          const fetchPaged = async (buildFn) => {
+            const PAGE = 1000; let from = 0; const all = []
+            while (true) {
+              const { data } = await buildFn().range(from, from + PAGE - 1)
+              if (!data || !data.length) break
+              all.push(...data)
+              if (data.length < PAGE) break
+              from += PAGE
+            }
+            return all
           }
 
-          const res = await Promise.all(queries)
           const mData = []
           const srData = []
           for (let i = 0; i < activeExamIds.length; i++) {
-            const marksIdx = i * 2
-            const srIdx = i * 2 + 1
-            if (res[marksIdx]?.data) mData.push(...res[marksIdx].data.map(m => ({ ...m, _exam_idx: i })))
-            if (res[srIdx]?.data) srData.push(...res[srIdx].data)
+            const eid = activeExamIds[i]
+            const [m, sr] = await Promise.all([
+              fetchPaged(() => supabase.from('marks').select('*').eq('exam_id', eid).in('subject_id', subjectIds)),
+              fetchPaged(() => supabase.from('student_results').select('*').eq('exam_id', eid)),
+            ])
+            m.forEach(mk => mData.push({ ...mk, _exam_idx: i }))
+            srData.push(...sr)
           }
 
           loadedMarks = mData.filter(m => m._exam_idx === 0)
@@ -966,6 +986,7 @@ function StudentReports() {
       .then(({ data, error }) => {
         if (error) console.warn('Report settings load error:', error)
         setReportHeading(data?.report_heading || '')
+        setLocalHeading(data?.report_heading || '')
         if (data?.exam_label_1) setExamLabel1(data.exam_label_1)
         else if (selectedExam?.name) setExamLabel1(selectedExam.name)
         else setExamLabel1('')
@@ -1358,7 +1379,18 @@ function StudentReports() {
                 <h4 className="text-sm font-semibold text-gray-800 mb-3">Mipangilio ya Ripoti</h4>
                 <div className="mb-3">
                   <label className="block text-xs font-medium text-gray-600 mb-1">Kichwa cha Ripoti <span className="text-gray-400">(bonyeza Enter kwa mstari mpya, hadi mistari 4)</span></label>
-                  <textarea value={reportHeading} onChange={e => setReportHeading(e.target.value)} placeholder="e.g. TAARIFA YA MATOKEO YA MTIHANI WA MWISHO WA MUHULA WA KWANZA 2025" rows={4} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500 resize-none" />
+                  <textarea
+                    value={localHeading}
+                    onChange={e => {
+                      const val = e.target.value
+                      setLocalHeading(val)
+                      clearTimeout(headingDebounceRef.current)
+                      headingDebounceRef.current = setTimeout(() => setReportHeading(val), 500)
+                    }}
+                    placeholder="e.g. TAARIFA YA MATOKEO YA MTIHANI WA MWISHO WA MUHULA WA KWANZA 2025"
+                    rows={4}
+                    className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500 resize-none"
+                  />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
                   <div>

@@ -101,11 +101,19 @@ export default function SchoolSettings() {
       setSaving(true)
       showMessage({ type: '', text: '' })
       const url = await uploadLogo(file, type)
-      setSettings(prev => ({
-        ...prev,
-        [type === 'school' ? 'logo_url' : 'national_logo_url']: url,
-      }))
-      showMessage({ type: 'success', text: 'Logo uploaded successfully' })
+      const field = type === 'school' ? 'logo_url' : 'national_logo_url'
+
+      // Immediately persist the URL to the DB so it survives page navigation
+      if (settings.id) {
+        const { error: saveErr } = await supabase
+          .from('school_settings')
+          .update({ [field]: url, updated_at: new Date().toISOString() })
+          .eq('id', settings.id)
+        if (saveErr) throw new Error('Uploaded but failed to save URL: ' + saveErr.message)
+      }
+
+      setSettings(prev => ({ ...prev, [field]: url }))
+      showMessage({ type: 'success', text: 'Logo uploaded and saved' })
     } catch (err) {
       showMessage({ type: 'error', text: 'Failed to upload logo: ' + (err.message || err) })
     } finally {
@@ -117,11 +125,23 @@ export default function SchoolSettings() {
     const field = type === 'school' ? 'logo_url' : 'national_logo_url'
     const url = settings[field]
     if (!url) return
-    const path = url.split('/school-logos/')[1]
-    if (path) {
-      await supabase.storage.from('school-logos').remove([path])
+    try {
+      const path = url.split('/school-logos/')[1]
+      if (path) {
+        await supabase.storage.from('school-logos').remove([path])
+      }
+      // Immediately persist the removal to DB
+      if (settings.id) {
+        await supabase
+          .from('school_settings')
+          .update({ [field]: null, updated_at: new Date().toISOString() })
+          .eq('id', settings.id)
+      }
+      setSettings(prev => ({ ...prev, [field]: '' }))
+      showMessage({ type: 'success', text: 'Logo removed' })
+    } catch (err) {
+      showMessage({ type: 'error', text: 'Failed to remove logo: ' + (err.message || err) })
     }
-    setSettings(prev => ({ ...prev, [field]: '' }))
   }
 
   const handleSave = async (e) => {

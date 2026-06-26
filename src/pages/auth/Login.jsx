@@ -78,15 +78,14 @@ function Login() {
         <div className="hidden lg:flex bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 items-center justify-center text-white relative overflow-hidden">
           <div className="absolute inset-0 bg-neutral-950/20" />
           <div className="relative z-10 text-center">
-            {schoolInfo?.logo_url ? (
-              <div className="w-32 h-32 mx-auto mb-6 bg-white rounded-2xl flex items-center justify-center p-3">
-                <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
-              </div>
-            ) : (
-              <div className="w-24 h-24 mx-auto mb-6 bg-white/10 backdrop-blur-sm rounded-2xl flex items-center justify-center border border-white/20">
-                <span className="text-3xl font-bold text-white">K</span>
-              </div>
-            )}
+            <div className="w-32 h-32 mx-auto mb-6 bg-white rounded-2xl flex items-center justify-center p-3 shadow-lg">
+              <img
+                src={schoolInfo?.logo_url || '/favicon.svg'}
+                alt="School Logo"
+                className="w-full h-full object-contain"
+                crossOrigin="anonymous"
+              />
+            </div>
             <h2 className="text-2xl font-bold mb-2">Kizaga Secondary School</h2>
             <p className="text-maroon-100 text-sm">Staff Portal</p>
           </div>
@@ -96,8 +95,8 @@ function Login() {
           <div className="w-full max-w-md">
             {/* Mobile banner */}
             <div className="lg:hidden text-center mb-8">
-              <div className="w-16 h-16 mx-auto mb-4 bg-maroon-100 rounded-2xl flex items-center justify-center">
-                <span className="text-xl font-bold text-maroon-600">K</span>
+              <div className="w-16 h-16 mx-auto mb-4 bg-white rounded-2xl flex items-center justify-center p-2 shadow-md border border-gray-100">
+                <img src={schoolInfo?.logo_url || '/favicon.svg'} alt="School Logo" className="w-full h-full object-contain" crossOrigin="anonymous" />
               </div>
               <h1 className="text-xl font-bold text-slate-900">Reset Password</h1>
               <p className="text-sm text-slate-500 mt-1">Enter your email to receive reset instructions</p>
@@ -184,15 +183,14 @@ function Login() {
       <div className="hidden lg:flex bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 items-center justify-center text-white relative overflow-hidden">
         <div className="absolute inset-0 bg-neutral-950/20" />
         <div className="relative z-10 text-center max-w-md">
-          {schoolInfo?.logo_url ? (
-            <div className="w-36 h-36 mx-auto mb-8 bg-white rounded-3xl flex items-center justify-center p-3">
-              <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
-            </div>
-          ) : (
-            <div className="w-28 h-28 mx-auto mb-8 bg-white/10 backdrop-blur-sm rounded-3xl flex items-center justify-center border border-white/20">
-              <span className="text-4xl font-bold text-white">K</span>
-            </div>
-          )}
+          <div className="w-36 h-36 mx-auto mb-8 bg-white rounded-3xl flex items-center justify-center p-3 shadow-xl">
+            <img
+              src={schoolInfo?.logo_url || '/favicon.svg'}
+              alt="School Logo"
+              className="w-full h-full object-contain"
+              crossOrigin="anonymous"
+            />
+          </div>
           <h2 className="text-3xl font-bold mb-3">Kizaga Secondary School</h2>
           <p className="text-maroon-100 text-base">Staff Portal</p>
           <div className="mt-12 space-y-4">
@@ -226,15 +224,14 @@ function Login() {
             <div className="bg-gradient-to-br from-maroon-800 via-maroon-900 to-neutral-950 rounded-2xl p-5 sm:p-8 text-white text-center relative overflow-hidden">
               <div className="absolute inset-0 bg-neutral-950/20" />
               <div className="relative z-10">
-                {schoolInfo?.logo_url ? (
-                  <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 bg-white rounded-2xl flex items-center justify-center p-2">
-                    <img src={schoolInfo.logo_url} alt="" className="w-full h-full object-contain" crossOrigin="anonymous" />
-                  </div>
-                ) : (
-                  <div className="w-14 h-14 sm:w-16 sm:h-16 mx-auto mb-3 sm:mb-4 bg-white/10 backdrop-blur rounded-2xl flex items-center justify-center border border-white/20">
-                    <span className="text-xl font-bold text-white">K</span>
-                  </div>
-                )}
+                <div className="w-16 h-16 sm:w-20 sm:h-20 mx-auto mb-3 sm:mb-4 bg-white rounded-2xl flex items-center justify-center p-2 shadow-md">
+                  <img
+                    src={schoolInfo?.logo_url || '/favicon.svg'}
+                    alt="School Logo"
+                    className="w-full h-full object-contain"
+                    crossOrigin="anonymous"
+                  />
+                </div>
                 <h2 className="text-lg font-bold">Kizaga Secondary School</h2>
                 <p className="text-maroon-100 text-xs">Staff Portal</p>
                 <div className="hidden sm:flex items-center justify-center gap-4 mt-4 text-maroon-100 text-xs">

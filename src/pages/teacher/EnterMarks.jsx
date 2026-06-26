@@ -367,7 +367,7 @@ function EnterMarks() {
           .select('*')
           .eq('exam_id', selectedExamId)
           .eq('subject_id', selectedSubjectId)
-          .limit(1000000)
+          .limit(500)
 
         let studsQuery = supabase.from('students').select('*').eq('status', 'active').order('surname')
 
@@ -552,7 +552,7 @@ function EnterMarks() {
   }
 
   return (
-    <div>
+    <div className={hasChanges ? 'pb-24 md:pb-0' : ''}>
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Enter Marks</h1>
@@ -668,7 +668,89 @@ function EnterMarks() {
               </div>
             </div>
 
-            <div className="overflow-x-auto">
+            {/* ── Mobile card layout (phones) ── */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {students.map((s, idx) => {
+                const m = marksData[s.id] || {}
+                const isAbsent = m.is_absent || false
+                return (
+                  <div key={s.id} className={`px-4 py-4 ${isAbsent ? 'bg-red-50/40' : ''}`}>
+                    <div className="flex items-center justify-between gap-3 mb-3">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-[10px] text-gray-400 mb-0.5 font-medium tracking-wide">#{idx + 1}</p>
+                        <p className={`text-sm font-semibold leading-snug ${isAbsent ? 'text-red-600 line-through' : 'text-gray-900'}`}>
+                          {[s.surname, s.first_name, s.middle_name].filter(Boolean).join(' ')}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        <span className="text-xs text-gray-500">Absent</span>
+                        <label className="relative inline-flex items-center cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isAbsent}
+                            onChange={(e) => {
+                              const checked = e.target.checked
+                              setMarksData(prev => {
+                                const cur = prev[s.id] || { student_id: s.id }
+                                return { ...prev, [s.id]: { ...cur, is_absent: checked, ...(checked ? { marks_obtained: '', practical_marks: '' } : {}) } }
+                              })
+                              setHasChanges(true)
+                            }}
+                            className="sr-only peer"
+                          />
+                          <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-maroon-300 rounded-full peer peer-checked:after:translate-x-full rtl:peer-checked:after:-translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:start-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-red-400" />
+                        </label>
+                      </div>
+                    </div>
+                    {isAbsent ? (
+                      <div className="flex items-center justify-center py-2.5 rounded-xl bg-red-100/60 border border-red-200/60">
+                        <span className="text-sm font-bold text-red-500 tracking-widest">ABSENT</span>
+                      </div>
+                    ) : (
+                      <div className={`grid gap-3 ${showPractical ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                        <div>
+                          <label className="text-xs font-medium text-gray-500 block mb-1.5">
+                            Theory <span className="font-normal text-gray-400">(0 – 100)</span>
+                          </label>
+                          <input
+                            type="number"
+                            min={0}
+                            max={100}
+                            step="0.5"
+                            inputMode="decimal"
+                            value={m.marks_obtained != null ? m.marks_obtained : ''}
+                            onChange={(e) => updateMark(s.id, 'marks_obtained', e.target.value)}
+                            className="w-full h-14 text-center text-2xl font-semibold bg-white border-2 border-gray-200 rounded-xl outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            placeholder="—"
+                          />
+                        </div>
+                        {showPractical && (
+                          <div>
+                            <label className="text-xs font-medium text-gray-500 block mb-1.5">
+                              Practical <span className="font-normal text-gray-400">(0 – 50)</span>
+                            </label>
+                            <input
+                              type="number"
+                              min={0}
+                              max={50}
+                              step="0.5"
+                              inputMode="decimal"
+                              value={m.practical_marks != null ? m.practical_marks : ''}
+                              onChange={(e) => updateMark(s.id, 'practical_marks', e.target.value)}
+                              className="w-full h-14 text-center text-2xl font-semibold bg-white border-2 border-gray-200 rounded-xl outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              placeholder="—"
+                            />
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* ── Desktop table layout ── */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full">
                 <thead>
                   <tr className="border-b border-gray-200 bg-gray-50">
@@ -679,9 +761,8 @@ function EnterMarks() {
                     {showPractical && <span className="block text-[10px] font-normal text-gray-400">marks</span>}
                   </th>
                   {showPractical && (
-                    <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[80px]">
-                      Pract <span className="text-[10px] font-normal text-gray-400">(50)</span>
-                      <span className="block text-[10px] font-normal text-gray-400">prac</span>
+                    <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[90px]">
+                      Practical <span className="text-[10px] font-normal text-gray-400">(50)</span>
                     </th>
                   )}
                   <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-14">Absent</th>
@@ -711,7 +792,7 @@ function EnterMarks() {
                             inputMode="decimal"
                             value={m.marks_obtained != null ? m.marks_obtained : ''}
                             onChange={(e) => updateMark(s.id, 'marks_obtained', e.target.value)}
-                            className="w-full max-w-[80px] sm:max-w-[90px] mx-auto py-2 sm:py-1.5 px-2 text-center text-sm bg-white border border-gray-200 rounded-lg outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                            className="w-full max-w-[100px] mx-auto py-2 px-2 text-center text-sm bg-white border border-gray-200 rounded-lg outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                             placeholder="--"
                           />
                         )}
@@ -729,7 +810,7 @@ function EnterMarks() {
                               inputMode="decimal"
                               value={m.practical_marks != null ? m.practical_marks : ''}
                               onChange={(e) => updateMark(s.id, 'practical_marks', e.target.value)}
-                              className="w-full max-w-[80px] sm:max-w-[90px] mx-auto py-2 sm:py-1.5 px-2 text-center text-sm bg-white border border-gray-200 rounded-lg outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-full max-w-[100px] mx-auto py-2 px-2 text-center text-sm bg-white border border-gray-200 rounded-lg outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               placeholder="--"
                             />
                           )}
@@ -758,7 +839,7 @@ function EnterMarks() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>{/* end desktop table */}
           <div className="px-4 sm:px-5 py-3 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center gap-3 justify-between">
             <span className="text-xs text-gray-500">
               {enteredCount + absentCount} of {students.length} students
@@ -779,6 +860,23 @@ function EnterMarks() {
       )}
     </>
   )}
+
+      {/* Sticky save bar — mobile only, shown when there are unsaved changes */}
+      {hasChanges && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50 p-3 bg-white/95 backdrop-blur-sm border-t border-gray-200 shadow-lg">
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            className="w-full py-4 bg-maroon-600 text-white font-bold rounded-xl text-base flex items-center justify-center gap-2 active:bg-maroon-700 transition disabled:opacity-50"
+          >
+            {saving ? (
+              <><span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+            ) : (
+              <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Save All Marks</>
+            )}
+          </button>
+        </div>
+      )}
     </div>
   )
 }

@@ -119,7 +119,18 @@ export default function ManageUniforms() {
     }
   }
 
-  const removeImage = () => {
+  const removeImage = async () => {
+    if (!form.image_url) return
+    try {
+      const path = form.image_url.split('/school-logos/')[1]
+      if (path) await supabase.storage.from('school-logos').remove([path])
+    } catch { /* best-effort */ }
+    // If editing an existing record, persist removal immediately so cancel doesn't leave a dead URL
+    if (editing) {
+      await supabase.from('uniforms')
+        .update({ image_url: '', updated_at: new Date().toISOString() })
+        .eq('id', editing)
+    }
     setForm(prev => ({ ...prev, image_url: '' }))
   }
 
@@ -206,7 +217,7 @@ export default function ManageUniforms() {
         <div className="flex items-center justify-between">
           <h2 className="font-semibold text-gray-900">{editing ? 'Hariri Sare' : 'Ongeza Sare Mpya'}</h2>
           {editing && (
-            <button type="button" onClick={resetForm} className="text-xs text-gray-500 hover:text-gray-700">Annulla</button>
+            <button type="button" onClick={resetForm} className="text-xs text-gray-500 hover:text-gray-700">Ghairi</button>
           )}
         </div>
 
@@ -317,22 +328,28 @@ export default function ManageUniforms() {
                 </div>
               )}
               <div className="p-4">
-                <div className="flex items-center gap-2 mb-1">
+                <div className="flex flex-wrap items-center gap-1.5 mb-1">
                   <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-maroon-100 text-maroon-700">{categoryLabels[u.category]}</span>
                   {u.class_level !== 'ALL' && (
                     <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-100 text-gray-600">{u.class_level}</span>
                   )}
+                  {u.gender && (
+                    <span className="px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-600">{u.gender === 'Male' ? 'Kiume' : 'Kike'}</span>
+                  )}
                 </div>
                 <h3 className="font-semibold text-gray-900 text-sm">{u.title}</h3>
-                {u.description && <p className="text-xs text-gray-500 mt-0.5">{u.description}</p>}
+                {u.description && <p className="text-xs text-gray-500 mt-0.5 line-clamp-2">{u.description}</p>}
                 {Array.isArray(u.items) && u.items.length > 0 && (
                   <ul className="mt-2 space-y-0.5">
-                    {u.items.map((item, i) => (
+                    {u.items.slice(0, 4).map((item, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-xs text-gray-600">
                         <span className="w-1 h-1 rounded-full bg-maroon-500 mt-1.5 shrink-0"></span>
                         {item}
                       </li>
                     ))}
+                    {u.items.length > 4 && (
+                      <li className="text-xs text-gray-400 pl-3">+{u.items.length - 4} zaidi</li>
+                    )}
                   </ul>
                 )}
                 <div className="flex gap-2 mt-3 pt-3 border-t border-gray-100">
