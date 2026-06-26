@@ -68,9 +68,10 @@ export default async function handler(req, res) {
       .eq('id', user_id)
     if (profileErr) throw new Error(`Failed to delete profile: ${profileErr.message}`)
 
-    // Finally delete the auth user
+    // Finally delete the auth user. "User not found" is acceptable — the profile
+    // row may have existed without a corresponding auth user (orphaned profile).
     const { error: authError } = await supabase.auth.admin.deleteUser(user_id)
-    if (authError) {
+    if (authError && !authError.message.toLowerCase().includes('user not found')) {
       throw new Error(`Failed to delete auth user: ${authError.message}`)
     }
 
