@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useNotification } from '../context/NotificationContext'
+import Modal from '../components/Modal'
 
 function ClassSubjects() {
   const { showToast } = useNotification()
@@ -13,6 +14,7 @@ function ClassSubjects() {
   const [combinations, setCombinations] = useState([])
   const [combinationSubjects, setCombinationSubjects] = useState([])
   const [classCombinations, setClassCombinations] = useState([])
+  const [streamCombinations, setStreamCombinations] = useState([])
 
   const [selectedClassId, setSelectedClassId] = useState(searchParams.get('classId') || '')
   const [students, setStudents] = useState([])
@@ -22,15 +24,22 @@ function ClassSubjects() {
   const [saving, setSaving] = useState(false)
   const [savingStudentId, setSavingStudentId] = useState(null) // track which student is being saved
   const [excludedSubjects, setExcludedSubjects] = useState(new Set())
+  const [bulkAssignOpen, setBulkAssignOpen] = useState(false)
+  const [bulkAssignSubectIds, setBulkAssignSubectIds] = useState(new Set())
+  const [bulkAssignStudentIds, setBulkAssignStudentIds] = useState(new Set())
+  const [bulkAssignMode, setBulkAssignMode] = useState('add') // 'add' or 'remove'
+  const [bulkAssigning, setBulkAssigning] = useState(false)
+  const loadIdRef = useRef(0)
 
   const fetchLookups = useCallback(async () => {
-    const [cRes, csRes, subRes, combRes, csSubRes, ccombRes] = await Promise.all([
+    const [cRes, csRes, subRes, combRes, csSubRes, ccombRes, scRes] = await Promise.all([
       supabase.from('classes').select('*').order('sort_order'),
-      supabase.from('class_streams').select('id, class_id'),
+      supabase.from('class_streams').select('id, class_id, stream_id, streams(stream_name)'),
       supabase.from('subjects').select('*').order('subject_name'),
       supabase.from('combinations').select('*').order('name'),
       supabase.from('combination_subjects').select('*'),
       supabase.from('class_combinations').select('*'),
+      supabase.from('stream_combinations').select('*'),
     ])
     if (cRes.data) setClasses(cRes.data)
     if (csRes.data) setClassStreams(csRes.data)
@@ -41,6 +50,7 @@ function ClassSubjects() {
     if (csSubRes.data) setCombinationSubjects(csSubRes.data)
     if (ccombRes.error) console.error('class_combinations fetch error:', ccombRes.error)
     if (ccombRes.data) setClassCombinations(ccombRes.data)
+    if (scRes.data) setStreamCombinations(scRes.data)
   }, [])
 
   useEffect(() => {
@@ -56,54 +66,61 @@ function ClassSubjects() {
 
   const loadClassData = useCallback(async (classId) => {
     if (!classId) return
+    const loadId = ++loadIdRef.current
     setLoading(true)
 
     const streamIds = classStreams
       .filter((cs) => cs.class_id === classId)
       .map((cs) => cs.id)
 
-    if (streamIds.length === 0) {
-      setStudents([])
-      setStudentSubjects({})
-      setStudentCombinations({})
-      setLoading(false)
-      return
+    // Fetch students by class_stream_id OR direct class_id
+    let studData
+    let studErr
+    if (streamIds.length > 0) {
+      const res = await supabase
+        .from('students')
+        .select('*')
+        .or(`class_stream_id.in.(${streamIds.map(id => `"${id}"`).join(',')}),class_id.eq."${classId}"`)
+        .order('surname')
+        .limit(1000000)
+      studData = res.data
+      studErr = res.error
+    } else {
+      const res = await supabase
+        .from('students')
+        .select('*')
+        .eq('class_id', classId)
+        .order('surname')
+        .limit(1000000)
+      studData = res.data
+      studErr = res.error
     }
-
-    const { data: studData, error: studErr } = await supabase
-      .from('students')
-      .select('*')
-      .in('class_stream_id', streamIds)
-      .order('surname')
     if (studErr) console.error('fetchStudents error:', studErr)
 
     if (studData) setStudents(studData)
 
-    const selectedClassForLoad = classes.find((c) => c.id === classId)
-    const oLevelSubjectIds = selectedClassForLoad?.level === 'O_LEVEL'
-      ? subjects
-          .filter((s) => s.level === 'O_LEVEL')
-          .map((s) => s.id)
+    // Auto-heal only COMPULSORY subjects — optional subjects removed by academic must stay removed
+    const cls = classes.find((c) => c.id === classId)
+    const oLevelCompulsoryIds = cls?.level === 'O_LEVEL'
+      ? (await supabase.from('subjects').select('id').eq('level', 'O_LEVEL').eq('subject_type', 'COMPULSORY')).data?.map((s) => s.id) || []
       : []
 
     const ssMap = {}
-    const scMap = {}
     if (studData && studData.length > 0) {
       const ids = studData.map((s) => s.id)
 
-      if (oLevelSubjectIds.length > 0) {
+      if (oLevelCompulsoryIds.length > 0) {
         const { data: existingSubs } = await supabase
           .from('student_subjects')
           .select('student_id, subject_id')
           .in('student_id', ids)
-          .in('subject_id', oLevelSubjectIds)
+          .in('subject_id', oLevelCompulsoryIds)
 
         const existingKeys = new Set((existingSubs || []).map((row) => `${row.student_id}:${row.subject_id}`))
         const missingSubs = []
         for (const student of studData) {
-          for (const subjectId of oLevelSubjectIds) {
-            const key = `${student.id}:${subjectId}`
-            if (!existingKeys.has(key)) {
+          for (const subjectId of oLevelCompulsoryIds) {
+            if (!existingKeys.has(`${student.id}:${subjectId}`)) {
               missingSubs.push({ student_id: student.id, subject_id: subjectId })
             }
           }
@@ -113,41 +130,47 @@ function ClassSubjects() {
           const { error: insertErr } = await supabase
             .from('student_subjects')
             .upsert(missingSubs, { onConflict: 'student_id,subject_id' })
-          if (insertErr) console.error('autoAssignOLevelSubjects error:', insertErr)
+          if (insertErr) console.error('autoAssignCompulsorySubjects error:', insertErr)
         }
       }
 
-      // Fetch student subjects
-      const { data: ssData } = await supabase
-        .from('student_subjects')
-        .select('*')
-        .in('student_id', ids)
-      if (ssData) {
-        ssData.forEach((row) => {
+      // Fetch student subjects — paginate in 1000-row pages (server-side db-max-rows cap)
+      let ssPage = 0
+      while (true) {
+        const { data: ssChunk } = await supabase
+          .from('student_subjects')
+          .select('student_id, subject_id')
+          .in('student_id', ids)
+          .range(ssPage * 1000, ssPage * 1000 + 999)
+        if (!ssChunk || ssChunk.length === 0) break
+        ssChunk.forEach((row) => {
           if (!ssMap[row.student_id]) ssMap[row.student_id] = []
           ssMap[row.student_id].push(row.subject_id)
         })
+        if (ssChunk.length < 1000) break
+        ssPage++
       }
 
       // Fetch student combinations (A-Level)
+      const scMap = {}
       const { data: scData } = await supabase
         .from('student_combinations')
         .select('student_id, combination_id')
         .in('student_id', ids)
-      if (scData) {
-        scData.forEach((row) => {
-          scMap[row.student_id] = row.combination_id
-        })
-      }
+      if (scData) scData.forEach((row) => { scMap[row.student_id] = row.combination_id })
+      setStudentCombinations(scMap)
+
     }
+    if (loadId !== loadIdRef.current) return // stale call — skip
+
     setStudentSubjects(ssMap)
-    setStudentCombinations(scMap)
 
     // Load excluded subjects for this class
     const { data: exclData } = await supabase
       .from('class_excluded_subjects')
       .select('subject_id')
       .eq('class_id', classId)
+    if (loadId !== loadIdRef.current) return
     setExcludedSubjects(new Set((exclData || []).map(r => r.subject_id)))
 
     setLoading(false)
@@ -187,26 +210,6 @@ function ClassSubjects() {
     return combinationSubjects
       .filter((cs) => comboIds.includes(cs.combination_id))
       .map((cs) => cs.subject_id)
-  }
-
-  // A-Level: get optional subjects for a specific student's combination
-  const getStudentOptionalSubjects = (studentId) => {
-    const combId = studentCombinations[studentId]
-    if (!combId) return []
-    return combinationSubjects
-      .filter((cs) => cs.combination_id === combId)
-      .map((cs) => subjects.find((s) => s.id === cs.subject_id))
-      .filter((s) => s && s.subject_type !== 'COMPULSORY')
-  }
-
-  // A-Level: get all subjects (compulsory + optional) for a student's combination
-  const getStudentComboSubjects = (studentId) => {
-    const combId = studentCombinations[studentId]
-    if (!combId) return []
-    return combinationSubjects
-      .filter((cs) => cs.combination_id === combId)
-      .map((cs) => subjects.find((s) => s.id === cs.subject_id))
-      .filter(Boolean)
   }
 
   // The actual subjects to display in the O-Level grid (excluded subjects hidden)
@@ -256,52 +259,57 @@ function ClassSubjects() {
     }
   }
 
-  // A-Level: assign/change combination for a student
-  const handleSetStudentCombination = async (studentId, newCombinationId) => {
-    if (!newCombinationId) return
-    setSavingStudentId(studentId)
+  // A-Level: assign a combination to a stream and auto-update all students in it
+  const handleSetStreamCombination = async (classStreamId, combinationId) => {
+    if (!combinationId) return
+    setSaving(true)
     try {
-      // 1. Upsert student_combinations
-      const { error: combErr } = await supabase
-        .from('student_combinations')
-        .upsert(
-          { student_id: studentId, combination_id: newCombinationId },
+      const { error: scErr } = await supabase
+        .from('stream_combinations')
+        .upsert({ class_stream_id: classStreamId, combination_id: combinationId }, { onConflict: 'class_stream_id' })
+      if (scErr) throw scErr
+
+      const streamStudents = students.filter((s) => s.class_stream_id === classStreamId)
+      if (streamStudents.length > 0) {
+        const aLevelSubjectIds = subjects.filter((s) => s.level === 'A_LEVEL').map((s) => s.id)
+        const newSubjectIds = combinationSubjects
+          .filter((cs) => cs.combination_id === combinationId)
+          .map((cs) => cs.subject_id)
+
+        await supabase.from('student_combinations').upsert(
+          streamStudents.map((s) => ({ student_id: s.id, combination_id: combinationId })),
           { onConflict: 'student_id' }
         )
-      if (combErr) throw combErr
 
-      // 2. Remove all old A-Level subjects from this student
-      const aLevelSubjectIds = subjects.filter((s) => s.level === 'A_LEVEL').map((s) => s.id)
-      if (aLevelSubjectIds.length > 0) {
-        await supabase
-          .from('student_subjects')
-          .delete()
-          .eq('student_id', studentId)
-          .in('subject_id', aLevelSubjectIds)
+        for (const student of streamStudents) {
+          if (aLevelSubjectIds.length > 0) {
+            await supabase.from('student_subjects').delete()
+              .eq('student_id', student.id)
+              .in('subject_id', aLevelSubjectIds)
+          }
+          if (newSubjectIds.length > 0) {
+            await supabase.from('student_subjects').upsert(
+              newSubjectIds.map((subject_id) => ({ student_id: student.id, subject_id })),
+              { onConflict: 'student_id,subject_id' }
+            )
+          }
+        }
       }
 
-      // 3. Insert ALL subjects from new combination (CORE, SUBSIDIARY, OPTIONAL)
-      const allSubjectIds = combinationSubjects
-        .filter((cs) => cs.combination_id === newCombinationId)
-        .map((cs) => cs.subject_id)
+      setStreamCombinations((prev) => {
+        const exists = prev.find((sc) => sc.class_stream_id === classStreamId)
+        if (exists) return prev.map((sc) => sc.class_stream_id === classStreamId ? { ...sc, combination_id: combinationId } : sc)
+        return [...prev, { class_stream_id: classStreamId, combination_id: combinationId }]
+      })
 
-      if (allSubjectIds.length > 0) {
-        await supabase.from('student_subjects').upsert(
-          allSubjectIds.map((subject_id) => ({ student_id: studentId, subject_id })),
-          { onConflict: 'student_id,subject_id' }
-        )
-      }
-
-      // Update local state
-      setStudentCombinations((prev) => ({ ...prev, [studentId]: newCombinationId }))
-      setStudentSubjects((prev) => ({ ...prev, [studentId]: allSubjectIds }))
-
-      const combo = combinations.find((c) => c.id === newCombinationId)
-      showToast(`Combination ${combo?.code || ''} imewekwa — masomo yote yamepelekwa`, 'success')
+      await loadClassData(selectedClassId)
+      const combo = combinations.find((c) => c.id === combinationId)
+      const suffix = streamStudents.length > 0 ? ` — ${streamStudents.length} student(s) updated` : ''
+      showToast(`${combo?.code || 'Combination'} assigned to stream${suffix}`, 'success')
     } catch (err) {
-      showToast('Failed to set combination: ' + (err.message || ''), 'error')
+      showToast('Failed: ' + (err.message || ''), 'error')
     } finally {
-      setSavingStudentId(null)
+      setSaving(false)
     }
   }
 
@@ -326,7 +334,7 @@ function ClassSubjects() {
       } else {
         const { error } = await supabase
           .from('student_subjects')
-          .insert({ student_id: studentId, subject_id: subjectId })
+          .upsert({ student_id: studentId, subject_id: subjectId }, { onConflict: 'student_id,subject_id' })
         if (error) throw error
 
         setStudentSubjects((prev) => ({
@@ -342,6 +350,45 @@ function ClassSubjects() {
     }
   }
 
+  const handleBulkAssign = async () => {
+    const subjectIds = [...bulkAssignSubectIds]
+    const studentIds = [...bulkAssignStudentIds]
+    if (subjectIds.length === 0 || studentIds.length === 0) {
+      showToast('Select at least one subject and one student', 'error')
+      return
+    }
+    setBulkAssigning(true)
+    try {
+      if (bulkAssignMode === 'add') {
+        const rows = []
+        for (const sid of studentIds) {
+          for (const subId of subjectIds) {
+            rows.push({ student_id: sid, subject_id: subId })
+          }
+        }
+        const { error } = await supabase
+          .from('student_subjects')
+          .upsert(rows, { onConflict: 'student_id,subject_id', ignoreDuplicates: true })
+        if (error) throw error
+      } else {
+        const { error } = await supabase
+          .from('student_subjects')
+          .delete()
+          .in('student_id', studentIds)
+          .in('subject_id', subjectIds)
+        if (error) throw error
+      }
+      setBulkAssignOpen(false)
+      showToast(bulkAssignMode === 'add' ? 'Subjects added' : 'Subjects removed', 'success')
+      // Reload all data from DB to ensure UI is in sync
+      await loadClassData(selectedClassId)
+    } catch (err) {
+      showToast('Failed: ' + (err.message || ''), 'error')
+    } finally {
+      setBulkAssigning(false)
+    }
+  }
+
   const allClassSubjects = classLevel === 'O_LEVEL' ? getClassSubjects() : []
   const compulsorySubjects = displaySubjects.filter((s) => s?.subject_type === 'COMPULSORY')
   const optionalSubjects = displaySubjects.filter((s) => s?.subject_type !== 'COMPULSORY')
@@ -354,17 +401,14 @@ function ClassSubjects() {
     ? combinations
     : []
 
-  // Combos offered by this class (subset of availableCombos)
-  const offeredCombos = combinations.filter((c) => classComboIds.includes(c.id))
-
   return (
-    <div>
+    <>
       <div className="mb-8 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Class Subject Assignments</h1>
           <p className="text-gray-500 mt-1">
             {classLevel === 'A_LEVEL'
-              ? 'Assign subject combinations (groups) to A-Level classes. Multiple combinations allowed per class.'
+              ? 'Assign a combination to each A-Level stream. Students enrolled in that stream automatically receive the combination subjects.'
               : 'Assign subjects to O-Level classes. All streams share the same subjects.'}
           </p>
         </div>
@@ -450,6 +494,132 @@ function ClassSubjects() {
         </div>
       )}
 
+      {/* A-Level: Stream Combination Assignments */}
+      {selectedClassId && classLevel === 'A_LEVEL' && streamIdsForClass.length > 0 && (
+        <div className="space-y-4 mb-6">
+          {streamIdsForClass.map((streamId) => {
+            const sc = streamCombinations.find((s) => s.class_stream_id === streamId)
+            const assignedCombId = sc?.combination_id || ''
+            const streamInfo = classStreams.find((cs) => cs.id === streamId)
+            const streamName = streamInfo?.streams?.stream_name || '—'
+            const streamStudents = students.filter((s) => s.class_stream_id === streamId)
+            const assignedCombo = combinations.find((c) => c.id === assignedCombId)
+            const syncedCount = assignedCombId
+              ? streamStudents.filter((s) => studentCombinations[s.id] === assignedCombId).length
+              : 0
+            const unsyncedCount = streamStudents.length - syncedCount
+
+            return (
+              <div key={streamId} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                {/* Stream header + combo picker */}
+                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex flex-wrap items-center gap-3">
+                  <div className="flex-1 min-w-[140px]">
+                    <p className="text-sm font-bold text-gray-900">Stream {streamName}</p>
+                    <p className="text-xs text-gray-400 mt-0.5">
+                      {streamStudents.length} student(s)
+                      {assignedCombId && (
+                        <>
+                          {' · '}
+                          <span className="text-emerald-600">{syncedCount} synced</span>
+                          {unsyncedCount > 0 && (
+                            <span className="text-amber-500 ml-1">{unsyncedCount} not assigned</span>
+                          )}
+                        </>
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={assignedCombId}
+                      onChange={(e) => e.target.value && handleSetStreamCombination(streamId, e.target.value)}
+                      disabled={saving}
+                      className="px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm outline-none focus:border-maroon-400 focus:ring-2 focus:ring-maroon-500/10 transition disabled:opacity-50"
+                    >
+                      <option value="">— Select combination —</option>
+                      {combinations.map((c) => (
+                        <option key={c.id} value={c.id}>{c.code} — {c.name}</option>
+                      ))}
+                    </select>
+                    {assignedCombo && (
+                      <span className="text-xs font-semibold text-violet-700 bg-violet-50 border border-violet-200 px-2.5 py-1 rounded-full whitespace-nowrap">
+                        {assignedCombo.code}
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Student list */}
+                {streamStudents.length === 0 ? (
+                  <p className="px-4 py-4 text-xs text-gray-400 text-center">No students enrolled in this stream.</p>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs">
+                      <thead>
+                        <tr className="border-b border-gray-100">
+                          <th className="text-left px-4 py-2 font-medium text-gray-400 w-8">#</th>
+                          <th className="text-left px-4 py-2 font-medium text-gray-500">Student</th>
+                          <th className="text-left px-4 py-2 font-medium text-gray-500">Adm. No.</th>
+                          <th className="text-left px-4 py-2 font-medium text-gray-500">Assigned Combination</th>
+                          <th className="text-left px-4 py-2 font-medium text-gray-500">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {streamStudents.map((student, idx) => {
+                          const studentComboId = studentCombinations[student.id]
+                          const studentCombo = combinations.find((c) => c.id === studentComboId)
+
+                          let statusBadge
+                          if (!assignedCombId) {
+                            statusBadge = <span className="text-gray-300">—</span>
+                          } else if (!studentComboId) {
+                            statusBadge = (
+                              <span className="px-2 py-0.5 rounded-full bg-amber-50 text-amber-600 border border-amber-200 font-medium">
+                                Not assigned
+                              </span>
+                            )
+                          } else if (studentComboId === assignedCombId) {
+                            statusBadge = (
+                              <span className="px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-medium">
+                                ✓ Synced
+                              </span>
+                            )
+                          } else {
+                            statusBadge = (
+                              <span className="px-2 py-0.5 rounded-full bg-red-50 text-red-600 border border-red-200 font-medium">
+                                ⚠ Mismatch
+                              </span>
+                            )
+                          }
+
+                          return (
+                            <tr key={student.id} className="hover:bg-gray-50/60 transition">
+                              <td className="px-4 py-2.5 text-gray-300">{idx + 1}</td>
+                              <td className="px-4 py-2.5 font-medium text-gray-800">
+                                {student.surname}, {student.first_name}
+                                {student.middle_name ? ` ${student.middle_name.charAt(0)}.` : ''}
+                              </td>
+                              <td className="px-4 py-2.5 text-gray-500 font-mono">{student.admission_number}</td>
+                              <td className="px-4 py-2.5 text-gray-600">
+                                {studentCombo ? (
+                                  <span className="font-medium">{studentCombo.code}</span>
+                                ) : (
+                                  <span className="text-gray-300">—</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-2.5">{statusBadge}</td>
+                            </tr>
+                          )
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            )
+          })}
+        </div>
+      )}
+
       {/* O-Level: Subject summary with lock/unlock */}
       {selectedClassId && classLevel === 'O_LEVEL' && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-6">
@@ -511,6 +681,98 @@ function ClassSubjects() {
                 )
               })}
             </div>
+            {students.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-gray-100 flex items-center gap-2">
+                <button
+                  onClick={async () => {
+                    setBulkAssignSubectIds(new Set())
+                    setBulkAssignStudentIds(new Set(students.map((s) => s.id)))
+                    setBulkAssignMode('add')
+                    setBulkAssignOpen(true)
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-500 hover:bg-amber-600 text-white text-xs font-medium rounded-lg transition"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                  </svg>
+                  Bulk Assign Optional
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!selectedClassId || students.length === 0) return
+                    setLoading(true)
+                    try {
+                      const { data: allSubs } = await supabase
+                        .from('subjects')
+                        .select('*')
+                        .eq('level', 'O_LEVEL')
+                      if (!allSubs || allSubs.length === 0) {
+                        showToast('No O-Level subjects found', 'error')
+                        return
+                      }
+                      // Fetch all students directly from DB
+                      const streamIds2 = classStreams
+                        .filter((cs) => cs.class_id === selectedClassId)
+                        .map((cs) => cs.id)
+                      let allStudents
+                      if (streamIds2.length > 0) {
+                        const res = await supabase
+                          .from('students')
+                          .select('*')
+                          .or(`class_stream_id.in.(${streamIds2.map(id => `"${id}"`).join(',')}),class_id.eq."${selectedClassId}"`)
+                          .limit(1000000)
+                        allStudents = res.data
+                      } else {
+                        const res = await supabase
+                          .from('students')
+                          .select('*')
+                          .eq('class_id', selectedClassId)
+                          .limit(1000000)
+                        allStudents = res.data
+                      }
+                      if (!allStudents || allStudents.length === 0) {
+                        showToast('No students found', 'error')
+                        return
+                      }
+                      const allSubIds = allSubs.map((s) => s.id)
+                      const rows = []
+                      for (const sid of allStudents.map((s) => s.id)) {
+                        for (const subId of allSubIds) {
+                          rows.push({ student_id: sid, subject_id: subId })
+                        }
+                      }
+                      const CHUNK = 500
+                      for (let i = 0; i < rows.length; i += CHUNK) {
+                        const { error } = await supabase
+                          .from('student_subjects')
+                          .upsert(rows.slice(i, i + CHUNK), { onConflict: 'student_id,subject_id' })
+                        if (error) throw error
+                      }
+
+                      // Directly update local state to avoid stale data from loadClassData
+                      const newSsMap = { ...studentSubjects }
+                      for (const sid of allStudents.map((s) => s.id)) {
+                        newSsMap[sid] = [...(new Set([...(newSsMap[sid] || []), ...allSubIds]))]
+                      }
+                      setStudentSubjects(newSsMap)
+
+                      showToast(`All ${allSubs.length} subjects assigned to ${allStudents.length} students`, 'success')
+                      await loadClassData(selectedClassId)
+                    } catch (err) {
+                      showToast('Failed: ' + (err.message || ''), 'error')
+                    } finally {
+                      setLoading(false)
+                    }
+                  }}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-medium rounded-lg transition"
+                >
+                  <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                  </svg>
+                  Assign All to All
+                </button>
+              </div>
+            )}
           </div>
         </div>
       )}
@@ -522,16 +784,50 @@ function ClassSubjects() {
         </div>
       )}
 
-      {selectedClassId && classLevel === 'O_LEVEL' && streamIdsForClass.length === 0 && (
+      {selectedClassId && !loading && classLevel === 'O_LEVEL' && streamIdsForClass.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
           No streams configured for this class.{' '}
-          {streamIdsForClass.length === 0 ? 'Click "Classes" in the sidebar to add streams.' : ''}
+          Click "Classes" in the sidebar to add streams.
         </div>
       )}
 
-      {selectedClassId && streamIdsForClass.length > 0 && loading && (
-        <div className="flex items-center justify-center py-20">
-          <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
+      {selectedClassId && loading && classLevel === 'O_LEVEL' && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="text-left px-3 py-3 min-w-[140px]">
+                    <div className="h-3 w-16 bg-gray-200 rounded" />
+                  </th>
+                  {[1,2,3,4,5].map((i) => (
+                    <th key={i} className="text-center px-1.5 py-3 min-w-[80px]">
+                      <div className="h-3 w-10 bg-gray-200 rounded mx-auto" />
+                      <div className="h-4 w-14 bg-gray-200 rounded mx-auto mt-1" />
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {[1,2,3,4].map((row) => (
+                  <tr key={row}>
+                    <td className="px-4 py-3">
+                      <div className="h-3 w-28 bg-gray-200 rounded mb-1.5" />
+                      <div className="h-2.5 w-20 bg-gray-100 rounded" />
+                    </td>
+                    {[1,2,3,4,5].map((col) => (
+                      <td key={col} className="text-center px-2 py-3">
+                        <div className="w-7 h-7 bg-gray-200 rounded-full mx-auto" />
+                      </td>
+                    ))}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
+            <div className="h-3 w-72 bg-gray-200 rounded" />
+          </div>
         </div>
       )}
 
@@ -539,165 +835,6 @@ function ClassSubjects() {
       {selectedClassId && !loading && classLevel === 'O_LEVEL' && displaySubjects.length === 0 && (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
           No O-Level subjects are currently available. Add subjects in Subject Management.
-        </div>
-      )}
-
-      {/* A-Level: no combos selected for class */}
-      {selectedClassId && !loading && classLevel === 'A_LEVEL' && getClassComboIds().length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
-          Select one or more combinations above to assign them to students.
-        </div>
-      )}
-
-      {/* A-Level: student combination & optional subjects grid */}
-      {selectedClassId && !loading && classLevel === 'A_LEVEL' && offeredCombos.length > 0 && students.length === 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 p-12 text-center text-sm text-gray-400">
-          No students enrolled in this class.
-        </div>
-      )}
-
-      {selectedClassId && !loading && classLevel === 'A_LEVEL' && offeredCombos.length > 0 && students.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-            <div>
-              <h2 className="text-sm font-semibold text-gray-800">Students — Combination &amp; Optional Subjects</h2>
-              <p className="text-xs text-gray-500 mt-0.5">
-                Assign each student a combination. Compulsory subjects are set automatically. You can add or remove OPTIONAL/ELECTIVE subjects per student.
-              </p>
-            </div>
-            <span className="text-xs text-gray-400">{students.length} student(s)</span>
-          </div>
-
-          <div className="divide-y divide-gray-100">
-            {students.map((student) => {
-              const studentCombId = studentCombinations[student.id]
-              const optionalSubs = getStudentOptionalSubjects(student.id)
-              const allComboSubs = getStudentComboSubjects(student.id)
-              const compulsorySubs = allComboSubs.filter((s) => s.subject_type === 'COMPULSORY')
-              const isSavingThis = savingStudentId === student.id
-
-              return (
-                <div key={student.id} className="p-4 hover:bg-gray-50/50 transition">
-                  {/* Student header row */}
-                  <div className="flex items-start gap-4 flex-wrap">
-                    {/* Student info */}
-                    <div className="min-w-[180px]">
-                      <p className="text-sm font-semibold text-gray-900">
-                        {student.surname}, {student.first_name}
-                      </p>
-                      <p className="text-xs text-gray-400">{student.admission_number}</p>
-                    </div>
-
-                    {/* Combination selector */}
-                    <div className="flex-1 min-w-[220px]">
-                      <label className="block text-[10px] font-medium text-gray-500 uppercase tracking-wider mb-1">
-                        Combination
-                      </label>
-                      <div className="flex items-center gap-2">
-                        <select
-                          value={studentCombId || ''}
-                          onChange={(e) => handleSetStudentCombination(student.id, e.target.value)}
-                          disabled={isSavingThis}
-                          className={`flex-1 px-3 py-1.5 bg-white border rounded-lg text-sm outline-none transition ${
-                            studentCombId
-                              ? 'border-violet-300 text-violet-800 focus:border-violet-400 focus:ring-2 focus:ring-violet-500/10'
-                              : 'border-gray-200 text-gray-500 focus:border-gray-400'
-                          } disabled:opacity-50`}
-                        >
-                          <option value="">-- Select Combination --</option>
-                          {offeredCombos.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.code} — {c.name}
-                            </option>
-                          ))}
-                        </select>
-                        {isSavingThis && (
-                          <span className="w-4 h-4 border-2 border-violet-300 border-t-violet-600 rounded-full animate-spin flex-shrink-0" />
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Compulsory subjects (locked) */}
-                    {studentCombId && compulsorySubs.length > 0 && (
-                      <div className="min-w-[200px]">
-                        <label className="block text-[10px] font-medium text-blue-500 uppercase tracking-wider mb-1">
-                          Compulsory (COMPULSORY)
-                        </label>
-                        <div className="flex flex-wrap gap-1">
-                          {compulsorySubs.map((sub) => (
-                            <span
-                              key={sub.id}
-                              className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100"
-                              title="Cannot be removed — compulsory subject"
-                            >
-                              <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-                              {sub.subject_code}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Optional subjects row */}
-                  {studentCombId && optionalSubs.length > 0 && (
-                    <div className="mt-3 pl-4 border-l-2 border-amber-200">
-                      <label className="block text-[10px] font-medium text-amber-600 uppercase tracking-wider mb-1.5">
-                        Optional / Elective — click to add or remove
-                      </label>
-                      <div className="flex flex-wrap gap-2">
-                        {optionalSubs.map((sub) => {
-                          const isAssigned = (studentSubjects[student.id] || []).includes(sub.id)
-                          return (
-                            <button
-                              key={sub.id}
-                              onClick={() => handleToggleSubject(student.id, sub.id, sub.subject_type, isAssigned)}
-                              disabled={isSavingThis}
-                              title={isAssigned ? 'Click to remove' : 'Click to add'}
-                              className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-xs font-medium transition disabled:opacity-50 ${
-                                isAssigned
-                                  ? 'border-amber-400 bg-amber-50 text-amber-700 hover:bg-red-50 hover:border-red-300 hover:text-red-600'
-                                  : 'border-gray-200 bg-white text-gray-500 hover:border-amber-300 hover:text-amber-600 hover:bg-amber-50'
-                              }`}
-                            >
-                              {isAssigned ? (
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" /></svg>
-                              ) : (
-                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" /></svg>
-                              )}
-                              {sub.subject_code}
-                              <span className="opacity-60 font-normal">
-                                {sub.subject_type === 'ELECTIVE' ? 'ELECTIVE' : 'OPT'}
-                              </span>
-                            </button>
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* No combination yet */}
-                  {!studentCombId && (
-                    <p className="mt-2 text-xs text-amber-600">
-                      ⚠️ No combination selected — choose one above
-                    </p>
-                  )}
-                </div>
-              )
-            })}
-          </div>
-
-          <div className="px-4 py-3 border-t border-gray-100 bg-gray-50">
-            <span className="text-xs text-gray-500">
-              {students.length} student(s) &middot;
-              <span className="text-violet-600 font-medium ml-1">
-                {Object.keys(studentCombinations).filter(id => students.some(s => s.id === id)).length}
-              </span> with combination &middot;
-              <span className="text-amber-600 font-medium ml-1">
-                {students.length - Object.keys(studentCombinations).filter(id => students.some(s => s.id === id)).length}
-              </span> not assigned
-            </span>
-          </div>
         </div>
       )}
 
@@ -710,6 +847,10 @@ function ClassSubjects() {
 
       {selectedClassId && !loading && classLevel === 'O_LEVEL' && displaySubjects.length > 0 && students.length > 0 && (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+          {/* Toolbar */}
+          <div className="px-4 py-2.5 border-b border-gray-100 bg-gray-50/50">
+            <span className="text-xs text-gray-500">{students.length} student(s)</span>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -792,7 +933,125 @@ function ClassSubjects() {
           </div>
         </div>
       )}
-    </div>
+
+      {/* Bulk Assign Optional Subjects Modal */}
+      <Modal isOpen={bulkAssignOpen} onClose={() => setBulkAssignOpen(false)} title="Bulk Assign Optional Subjects" className="max-w-xl">
+        <div className="space-y-4">
+          {/* Mode toggle */}
+          <div className="flex gap-2">
+            <button
+              onClick={() => setBulkAssignMode('add')}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border transition ${
+                bulkAssignMode === 'add'
+                  ? 'bg-emerald-50 border-emerald-300 text-emerald-700'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              + Add to students
+            </button>
+            <button
+              onClick={() => setBulkAssignMode('remove')}
+              className={`flex-1 px-4 py-2 rounded-lg text-sm font-medium border transition ${
+                bulkAssignMode === 'remove'
+                  ? 'bg-red-50 border-red-300 text-red-700'
+                  : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+              }`}
+            >
+              − Remove from students
+            </button>
+          </div>
+
+          {/* Subject selection */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Select Optional Subjects</label>
+            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+              {optionalSubjects.map((sub) => (
+                <label key={sub.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={bulkAssignSubectIds.has(sub.id)}
+                    onChange={() => {
+                      setBulkAssignSubectIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(sub.id)) next.delete(sub.id)
+                        else next.add(sub.id)
+                        return next
+                      })
+                    }}
+                    className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="font-medium text-gray-800">{sub.subject_name}</span>
+                  <span className="text-xs text-gray-400">({sub.subject_code})</span>
+                </label>
+              ))}
+              {optionalSubjects.length === 0 && (
+                <p className="text-sm text-gray-400 text-center py-4">No optional subjects available</p>
+              )}
+            </div>
+          </div>
+
+          {/* Student selection */}
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-2">Select Students</label>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="flex items-center gap-2 text-sm text-gray-600 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={bulkAssignStudentIds.size === students.length}
+                  onChange={() => {
+                    if (bulkAssignStudentIds.size === students.length) {
+                      setBulkAssignStudentIds(new Set())
+                    } else {
+                      setBulkAssignStudentIds(new Set(students.map((s) => s.id)))
+                    }
+                  }}
+                  className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                />
+                <span className="font-medium">Select All</span>
+              </label>
+              <span className="text-xs text-gray-400">({bulkAssignStudentIds.size} of {students.length} selected)</span>
+            </div>
+            <div className="max-h-40 overflow-y-auto border border-gray-200 rounded-lg p-2 space-y-1">
+              {students.map((student) => (
+                <label key={student.id} className="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer text-sm">
+                  <input
+                    type="checkbox"
+                    checked={bulkAssignStudentIds.has(student.id)}
+                    onChange={() => {
+                      setBulkAssignStudentIds((prev) => {
+                        const next = new Set(prev)
+                        if (next.has(student.id)) next.delete(student.id)
+                        else next.add(student.id)
+                        return next
+                      })
+                    }}
+                    className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="text-gray-800">{student.surname}, {student.first_name}</span>
+                  <span className="text-xs text-gray-400">({student.admission_number})</span>
+                </label>
+              ))}
+            </div>
+          </div>
+
+          {/* Action */}
+          <button
+            onClick={handleBulkAssign}
+            disabled={bulkAssigning || bulkAssignSubectIds.size === 0 || bulkAssignStudentIds.size === 0}
+            className={`w-full py-2.5 rounded-xl text-sm font-semibold text-white transition flex items-center justify-center gap-2 ${
+              bulkAssignMode === 'add'
+                ? 'bg-emerald-600 hover:bg-emerald-700 disabled:bg-emerald-300'
+                : 'bg-red-600 hover:bg-red-700 disabled:bg-red-300'
+            }`}
+          >
+            {bulkAssigning && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {bulkAssignMode === 'add'
+              ? `Add ${bulkAssignSubectIds.size} subject(s) to ${bulkAssignStudentIds.size} student(s)`
+              : `Remove ${bulkAssignSubectIds.size} subject(s) from ${bulkAssignStudentIds.size} student(s)`}
+          </button>
+        </div>
+      </Modal>
+    </>
   )
 }
 

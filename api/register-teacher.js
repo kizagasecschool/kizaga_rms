@@ -33,16 +33,49 @@ export default async function handler(req, res) {
       })
     }
 
-    // Step 1: Create auth user
-    const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+    // Step 1: Create auth user.
+    // Guard: if the email is already in auth.users but has no profile row (orphaned from
+    // a manual/dashboard delete), wipe the stale auth entry first so we can re-register.
+    let authData, authError
+    ;({ data: authData, error: authError } = await supabase.auth.admin.createUser({
       email,
       password,
       email_confirm: true,
       user_metadata: { full_name, role: 'teacher' },
-    })
+    }))
 
     if (authError) {
-      throw new Error(`Failed to create auth user: ${authError.message}`)
+      const isAlreadyRegistered =
+        authError.message?.toLowerCase().includes('already been registered') ||
+        authError.message?.toLowerCase().includes('already registered') ||
+        authError.code === 'email_exists'
+
+      if (isAlreadyRegistered) {
+        // Find the existing auth user by email
+        const { data: listData, error: listErr } = await supabase.auth.admin.listUsers({ page: 1, perPage: 1000 })
+        if (listErr) throw new Error(`Failed to create auth user: ${authError.message}`)
+
+        const existing = listData?.users?.find(u => u.email?.toLowerCase() === email.toLowerCase())
+        if (!existing) throw new Error(`Failed to create auth user: ${authError.message}`)
+
+        // Check if this auth user has a profile — if so, it's a real active user, not orphaned
+        const { data: profile } = await supabase.from('profiles').select('id').eq('id', existing.id).maybeSingle()
+        if (profile) throw new Error('A teacher with this email already exists.')
+
+        // No profile — orphaned auth user. Delete it and retry.
+        const { error: delErr } = await supabase.auth.admin.deleteUser(existing.id)
+        if (delErr) throw new Error(`Failed to create auth user: ${authError.message}`)
+
+        ;({ data: authData, error: authError } = await supabase.auth.admin.createUser({
+          email,
+          password,
+          email_confirm: true,
+          user_metadata: { full_name, role: 'teacher' },
+        }))
+        if (authError) throw new Error(`Failed to create auth user: ${authError.message}`)
+      } else {
+        throw new Error(`Failed to create auth user: ${authError.message}`)
+      }
     }
 
     const userId = authData.user.id

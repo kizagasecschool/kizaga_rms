@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import StudentsByClassTable from '../../components/StudentsByClassTable'
 
 function HeadmasterDashboard() {
   const { profile } = useAuth()
@@ -73,34 +74,11 @@ function HeadmasterDashboard() {
         ))}
       </div>
 
-      <div className="mt-8 bg-white rounded-xl border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4">Performance Overview</h2>
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <div key={i} className="h-8 bg-gray-100 rounded animate-pulse" />
-            ))}
-          </div>
-        ) : (
-          <div className="space-y-3">
-            <div className="flex items-center justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Enrolled Students</span>
-              <span className="text-sm font-semibold text-gray-900">{stats.students}</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Overall Pass Rate (≥40%)</span>
-              <span className="text-sm font-semibold text-gray-900">{stats.passRate}%</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-gray-100">
-              <span className="text-sm text-gray-600">Average Performance</span>
-              <span className="text-sm font-semibold text-gray-900">{stats.avgPerformance}%</span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-sm text-gray-600">Exams Conducted</span>
-              <span className="text-sm font-semibold text-gray-900">{stats.activeExams}</span>
-            </div>
-          </div>
-        )}
+      <div className="mt-8">
+        <div className="bg-white rounded-xl border border-gray-200 p-6">
+          <h2 className="text-lg font-semibold text-gray-900 mb-4">Wanafunzi kwa Darasa</h2>
+          <StudentsByClassTable />
+        </div>
       </div>
     </div>
   )

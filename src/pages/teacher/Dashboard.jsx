@@ -2,12 +2,14 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
+import StudentsByClassTable from '../../components/StudentsByClassTable'
 
 function TeacherDashboard() {
   const { profile } = useAuth()
   const [stats, setStats] = useState({ students: 0, subjects: 0, marks: 0, pending: 0 })
   const [loading, setLoading] = useState(true)
   const [schoolInfo, setSchoolInfo] = useState(null)
+  const [classStreamIds, setClassStreamIds] = useState([])
 
   useEffect(() => {
     supabase.from('school_settings').select('logo_url, school_name').limit(1).then(({ data }) => {
@@ -33,12 +35,13 @@ function TeacherDashboard() {
         .select('class_stream_id, subject_id')
         .eq('teacher_id', teacher.id)
 
-      const classStreamIds = [...new Set(assignments?.map((a) => a.class_stream_id) || [])]
+      const csIds = [...new Set(assignments?.map((a) => a.class_stream_id) || [])]
       const subjectIds = [...new Set(assignments?.map((a) => a.subject_id) || [])]
+      setClassStreamIds(csIds)
 
       const [sRes, subRes, mRes] = await Promise.all([
-        classStreamIds.length > 0
-          ? supabase.from('students').select('*', { count: 'exact', head: true }).in('class_stream_id', classStreamIds)
+        csIds.length > 0
+          ? supabase.from('students').select('*', { count: 'exact', head: true }).in('class_stream_id', csIds)
           : { count: 0 },
         subjectIds.length > 0
           ? supabase.from('subjects').select('*', { count: 'exact', head: true }).in('id', subjectIds)
@@ -107,6 +110,15 @@ function TeacherDashboard() {
                 Enter Marks
               </Link>
             </div>
+          </div>
+        </div>
+      )}
+
+      {!loading && classStreamIds.length > 0 && (
+        <div className="mt-8">
+          <div className="bg-white rounded-xl border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Wanafunzi kwa Darasa</h2>
+            <StudentsByClassTable classStreamIds={classStreamIds} />
           </div>
         </div>
       )}

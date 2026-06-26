@@ -107,6 +107,7 @@ function Students() {
   const [subjectsStudentId, setSubjectsStudentId] = useState('')
   const [studentSubjectIds, setStudentSubjectIds] = useState([])
   const [savingSubjects, setSavingSubjects] = useState(false)
+  const [excludedSubjectIds, setExcludedSubjectIds] = useState(new Set())
 
   // Bulk stream assignment states
   const [streamAssignOpen, setStreamAssignOpen] = useState(false)
@@ -119,6 +120,7 @@ function Students() {
   // A-Level combination states
   const [combinations, setCombinations] = useState([])
   const [combinationSubjects, setCombinationSubjects] = useState([])
+  const [streamCombinations, setStreamCombinations] = useState([])
   const [selectedCombinationId, setSelectedCombinationId] = useState('')
   const [currentStudentCombinationId, setCurrentStudentCombinationId] = useState(null)
 
@@ -134,13 +136,14 @@ function Students() {
   const [subjects, setSubjects] = useState([])
 
   const fetchLookups = useCallback(async () => {
-    const [cRes, sRes, csRes, subRes, comboRes, csbjRes] = await Promise.all([
+    const [cRes, sRes, csRes, subRes, comboRes, csbjRes, scRes] = await Promise.all([
       supabase.from('classes').select('*').order('sort_order'),
       supabase.from('streams').select('*').order('stream_name'),
       supabase.from('class_streams').select('*, classes(*), streams(*)'),
       supabase.from('subjects').select('*').order('subject_name'),
       supabase.from('combinations').select('*').order('code'),
       supabase.from('combination_subjects').select('*'),
+      supabase.from('stream_combinations').select('*'),
     ])
     if (cRes.data) setClasses(cRes.data)
     if (sRes.data) setStreams(sRes.data)
@@ -148,6 +151,7 @@ function Students() {
     if (subRes.data) setSubjects(subRes.data)
     if (comboRes.data) setCombinations(comboRes.data)
     if (csbjRes.data) setCombinationSubjects(csbjRes.data)
+    if (scRes.data) setStreamCombinations(scRes.data)
   }, [])
 
   useEffect(() => {
@@ -264,6 +268,32 @@ function Students() {
     if (error) throw error
   }
 
+  const assignStreamCombination = async (studentId, classStreamId) => {
+    const sc = streamCombinations.find((s) => s.class_stream_id === classStreamId)
+    if (!sc) return
+    const combinationId = sc.combination_id
+
+    await supabase.from('student_combinations')
+      .upsert({ student_id: studentId, combination_id: combinationId }, { onConflict: 'student_id' })
+
+    const aLevelSubjectIds = subjects.filter((s) => s.level === 'A_LEVEL').map((s) => s.id)
+    if (aLevelSubjectIds.length > 0) {
+      await supabase.from('student_subjects').delete()
+        .eq('student_id', studentId)
+        .in('subject_id', aLevelSubjectIds)
+    }
+
+    const newSubjectIds = combinationSubjects
+      .filter((cs) => cs.combination_id === combinationId)
+      .map((cs) => cs.subject_id)
+    if (newSubjectIds.length > 0) {
+      await supabase.from('student_subjects').upsert(
+        newSubjectIds.map((subject_id) => ({ student_id: studentId, subject_id })),
+        { onConflict: 'student_id,subject_id' }
+      )
+    }
+  }
+
   const handleSave = async (e) => {
     e.preventDefault()
     setSaving(true)
@@ -280,14 +310,25 @@ function Students() {
       if (editing) {
         const { error } = await supabase.from('students').update(payload).eq('id', editing.id)
         if (error) throw error
-        if (getClassLevelFromIds(payload.class_id, payload.class_stream_id) === 'O_LEVEL') {
-          await assignOLevelAllSubjects(editing.id)
+        const classChanged =
+          payload.class_id !== (editing.class_id || null) ||
+          payload.class_stream_id !== (editing.class_stream_id || null)
+        if (classChanged) {
+          const level = getClassLevelFromIds(payload.class_id, payload.class_stream_id)
+          if (level === 'O_LEVEL') {
+            await assignOLevelAllSubjects(editing.id)
+          } else if (level === 'A_LEVEL' && payload.class_stream_id) {
+            await assignStreamCombination(editing.id, payload.class_stream_id)
+          }
         }
       } else {
         const { data: inserted, error } = await supabase.from('students').insert(payload).select('id').single()
         if (error) throw error
-        if (getClassLevelFromIds(payload.class_id, payload.class_stream_id) === 'O_LEVEL') {
+        const level = getClassLevelFromIds(payload.class_id, payload.class_stream_id)
+        if (level === 'O_LEVEL') {
           await assignOLevelAllSubjects(inserted.id)
+        } else if (level === 'A_LEVEL' && payload.class_stream_id) {
+          await assignStreamCombination(inserted.id, payload.class_stream_id)
         }
       }
       await fetchStudents()
@@ -373,6 +414,24 @@ function Students() {
     setSubjectsStudent(student)
     setSubjectsStudentId(student.id)
     const level = getStudentLevel(student)
+
+    // Determine class ID and load excluded subjects
+    const studentClass = student.class_id
+      ? classes.find((c) => c.id === student.class_id)
+      : (() => {
+          const cs = classStreams.find((c) => c.id === student.class_stream_id)
+          return cs ? classes.find((c) => c.id === cs.class_id) : null
+        })()
+    const classId = studentClass?.id || ''
+    if (classId) {
+      const { data: exclData } = await supabase
+        .from('class_excluded_subjects')
+        .select('subject_id')
+        .eq('class_id', classId)
+      setExcludedSubjectIds(new Set((exclData || []).map(r => r.subject_id)))
+    } else {
+      setExcludedSubjectIds(new Set())
+    }
 
     if (level === 'A_LEVEL') {
       // Fetch current combination assignment
@@ -532,7 +591,10 @@ function Students() {
         if (toAdd.length > 0) {
           await supabase
             .from('student_subjects')
-            .insert(toAdd.map((subject_id) => ({ student_id: subjectsStudent.id, subject_id })))
+            .upsert(
+              toAdd.map((subject_id) => ({ student_id: subjectsStudent.id, subject_id })),
+              { onConflict: 'student_id,subject_id' }
+            )
         }
         showToast('Masomo yamehifadhiwa', 'success')
       }
@@ -628,6 +690,7 @@ function Students() {
     let admSeq = 0
     let admPrefix = ''
     const oLevelStudentIds = []
+    const aLevelStreamMap = {} // classStreamId -> [studentId]
     for (const row of csvData) {
       if (!row.admission_number) {
         if (!admPrefix) {
@@ -653,13 +716,22 @@ function Students() {
         failed++
       } else {
         imported++
-        if (getClassLevelFromIds(row.class_id, row.class_stream_id) === 'O_LEVEL') {
+        const level = getClassLevelFromIds(row.class_id, row.class_stream_id)
+        if (level === 'O_LEVEL') {
           oLevelStudentIds.push(inserted.id)
+        } else if (level === 'A_LEVEL' && row.class_stream_id) {
+          if (!aLevelStreamMap[row.class_stream_id]) aLevelStreamMap[row.class_stream_id] = []
+          aLevelStreamMap[row.class_stream_id].push(inserted.id)
         }
       }
     }
     try {
       await assignOLevelAllSubjects(oLevelStudentIds)
+      for (const [streamId, studentIds] of Object.entries(aLevelStreamMap)) {
+        for (const studentId of studentIds) {
+          await assignStreamCombination(studentId, streamId)
+        }
+      }
     } catch (err) {
       console.error('CSV subject assignment error:', err)
       showToast('Some students were imported, but subjects were not fully assigned.', 'warning')
@@ -687,7 +759,7 @@ function Students() {
         })()
     const studentClassLevel = studentClass?.level || ''
     
-    return subjects.filter((s) => s.level === studentClassLevel)
+    return subjects.filter((s) => s.level === studentClassLevel && !excludedSubjectIds.has(s.id))
   }
 
   if (loading) {
@@ -892,26 +964,36 @@ function Students() {
                         {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => openSubjects(s)}
-                        className="text-sm text-emerald-600 hover:text-emerald-800 font-medium mr-3"
-                        title="Assign subjects"
-                      >
-                        Subjects
-                      </button>
-                      <button
-                        onClick={() => openEdit(s)}
-                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm(s)}
-                        className="text-sm text-red-500 hover:text-red-700 font-medium"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openSubjects(s)}
+                          title="Manage subjects"
+                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 hover:text-emerald-800 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => openEdit(s)}
+                          title="Edit student"
+                          className="p-1.5 rounded-lg text-maroon-600 hover:bg-maroon-50 hover:text-maroon-800 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm(s)}
+                          title="Delete student"
+                          className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )

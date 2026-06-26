@@ -2,12 +2,24 @@
 import { defineConfig, loadEnv } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+import legacy from '@vitejs/plugin-legacy'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
 
   return {
-    plugins: [react(), tailwindcss()],
+    plugins: [
+      react(),
+      tailwindcss(),
+      legacy({
+        // Target Chrome 70+ (covers Chrome OS devices from ~2018 onwards)
+        targets: ['chrome >= 70', 'firefox >= 68', 'safari >= 12'],
+        renderLegacyChunks: true,
+      }),
+    ],
+    build: {
+      target: ['es2015', 'chrome70'],
+    },
     server: {
       proxy: {
         '/api/auth': {

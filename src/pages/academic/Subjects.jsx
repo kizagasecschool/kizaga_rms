@@ -44,6 +44,7 @@ const subjectTypeColor = (type, level) => {
 function AcademicSubjects() {
   const { showToast } = useNotification()
   const [activeLevel, setActiveLevel] = useState('O_LEVEL')
+  const [aLevelSubTab, setALevelSubTab] = useState('subjects')
   const [loading, setLoading] = useState(true)
 
   const [subjects, setSubjects] = useState([])
@@ -59,7 +60,6 @@ function AcademicSubjects() {
   const [formData, setFormData] = useState({})
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
-  const [pendingRoles, setPendingRoles] = useState({})
 
   const fetchSubjects = useCallback(async () => {
     const { data } = await supabase.from('subjects').select('*').order('subject_name')
@@ -114,8 +114,19 @@ function AcademicSubjects() {
     e.preventDefault()
     setSaving(true)
     try {
+      const code = formData.subject_code.toUpperCase()
+
+      // Client-side duplicate check
+      const duplicate = subjects.find(
+        (s) => s.subject_code === code && s.level === formData.level && s.id !== editingSubject?.id
+      )
+      if (duplicate) {
+        showToast(`Subject code "${code}" already exists at this level. Choose a different code.`, 'error')
+        return
+      }
+
       const payload = {
-        subject_code: formData.subject_code.toUpperCase(),
+        subject_code: code,
         subject_name: formData.subject_name,
         level: formData.level,
         subject_type: formData.subject_type,
@@ -133,7 +144,10 @@ function AcademicSubjects() {
       showToast(editingSubject ? 'Subject updated successfully' : 'Subject created successfully', 'success')
     } catch (err) {
       console.error('Save error:', err)
-      showToast('Failed to save. ' + (err.message || ''), 'error')
+      const msg = err?.code === '23505'
+        ? `Subject code "${formData.subject_code.toUpperCase()}" already exists at this level. Choose a different code.`
+        : (err.message || 'Unknown error')
+      showToast('Failed to save. ' + msg, 'error')
     } finally {
       setSaving(false)
     }
@@ -174,7 +188,6 @@ function AcademicSubjects() {
       const payload = {
         code: formData.code.toUpperCase(),
         name: formData.name,
-        description: formData.description,
       }
       if (editingCombo) {
         const { error } = await supabase
@@ -213,10 +226,21 @@ function AcademicSubjects() {
     }
   }
 
+  const subjectTypeToRole = (type) => {
+    if (type === 'COMPULSORY') return 'CORE'
+    if (type === 'ELECTIVE') return 'SUBSIDIARY'
+    return 'OPTIONAL'
+  }
+
+  const roleStyle = (role) => {
+    if (role === 'CORE') return { label: 'Principal', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    if (role === 'SUBSIDIARY') return { label: 'Subsidiary', cls: 'bg-violet-50 text-violet-700 border-violet-200' }
+    return { label: 'Optional', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+  }
+
   const openComboSubjects = (combo) => {
     setSelectedCombo(combo)
     setComboSubjectsModalOpen(true)
-    setPendingRoles({})
   }
 
   const getAssignedSubjects = (comboId) => {
@@ -307,7 +331,7 @@ function AcademicSubjects() {
                 : 'text-gray-600 hover:text-gray-900'
             }`}
           >
-            {l === 'O_LEVEL' ? 'O-Level Subjects' : 'A-Level Combinations'}
+            {l === 'O_LEVEL' ? 'O-Level Subjects' : 'A-Level'}
           </button>
         ))}
       </div>
@@ -356,19 +380,15 @@ function AcademicSubjects() {
                         {subjectTypeLabel(s.subject_type, 'O_LEVEL')}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => openSubjectEdit(s)}
-                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm({ type: 'subject', id: s.id, name: s.subject_name })}
-                        className="text-sm text-red-500 hover:text-red-700 font-medium"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button onClick={() => openSubjectEdit(s)} title="Edit subject" className="p-1.5 rounded-lg text-maroon-600 hover:bg-maroon-50 hover:text-maroon-800 transition">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                        </button>
+                        <button onClick={() => setDeleteConfirm({ type: 'subject', id: s.id, name: s.subject_name })} title="Delete subject" className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -381,22 +401,100 @@ function AcademicSubjects() {
 
       {activeLevel === 'A_LEVEL' && (
         <div>
+          {/* A-Level sub-tabs */}
+          <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-lg w-fit">
+            {[
+              { key: 'subjects', label: 'A-Level Subjects' },
+              { key: 'combinations', label: 'Combinations' },
+            ].map((sub) => (
+              <button
+                key={sub.key}
+                onClick={() => setALevelSubTab(sub.key)}
+                className={`px-5 py-2 text-sm font-medium rounded-md transition ${
+                  aLevelSubTab === sub.key
+                    ? 'bg-white text-maroon-700 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900'
+                }`}
+              >
+                {sub.label}
+              </button>
+            ))}
+          </div>
+
+          {/* ── A-Level Subjects list ── */}
+          {aLevelSubTab === 'subjects' && (
+            <div>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+                <p className="text-sm text-gray-500">{aLevelSubjects.length} A-Level subject(s)</p>
+                <button
+                  onClick={openSubjectCreate}
+                  className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
+                >
+                  + Add A-Level Subject
+                </button>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-gray-200 bg-gray-50">
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject Name</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
+                        <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-100">
+                      {aLevelSubjects.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-400">
+                            No A-Level subjects yet. Click &ldquo;+ Add A-Level Subject&rdquo; to create one.
+                          </td>
+                        </tr>
+                      )}
+                      {aLevelSubjects.map((s) => (
+                        <tr key={s.id} className="hover:bg-gray-50 transition">
+                          <td className="px-5 py-3.5">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 font-mono">
+                              {s.subject_code}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{s.subject_name}</td>
+                          <td className="px-5 py-3.5">
+                            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${subjectTypeColor(s.subject_type, 'A_LEVEL')}`}>
+                              {subjectTypeLabel(s.subject_type, 'A_LEVEL')}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3.5">
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => openSubjectEdit(s)} title="Edit subject" className="p-1.5 rounded-lg text-maroon-600 hover:bg-maroon-50 hover:text-maroon-800 transition">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                              </button>
+                              <button onClick={() => setDeleteConfirm({ type: 'subject', id: s.id, name: s.subject_name })} title="Delete subject" className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition">
+                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── Combinations grid ── */}
+          {aLevelSubTab === 'combinations' && (
+          <div>
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <p className="text-sm text-gray-500">{combinations.length} combination(s)</p>
-            <div className="flex items-center gap-2">
-              <button
-                onClick={openSubjectCreate}
-                className="px-4 py-2 bg-white text-maroon-700 text-sm font-medium rounded-lg border border-maroon-300 hover:bg-maroon-50 transition"
-              >
-                + Add A-Level Subject
-              </button>
-              <button
-                onClick={openComboCreate}
-                className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
-              >
-                + Add Combination
-              </button>
-            </div>
+            <button
+              onClick={openComboCreate}
+              className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
+            >
+              + Add Combination
+            </button>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -509,6 +607,8 @@ function AcademicSubjects() {
               )
             })}
           </div>
+          </div>
+          )}
         </div>
       )}
 
@@ -527,9 +627,19 @@ function AcademicSubjects() {
                 maxLength={6}
                 value={formData.subject_code || ''}
                 onChange={(e) => setFormData({ ...formData, subject_code: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+                className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition ${
+                  subjects.find(s => s.subject_code === (formData.subject_code || '').toUpperCase() && s.level === formData.level && s.id !== editingSubject?.id)
+                    ? 'border-red-400 focus:ring-red-500 focus:border-red-500 bg-red-50'
+                    : 'border-gray-300 focus:ring-maroon-500 focus:border-maroon-500'
+                }`}
                 placeholder="e.g. PHY"
               />
+              {subjects.find(s => s.subject_code === (formData.subject_code || '').toUpperCase() && s.level === formData.level && s.id !== editingSubject?.id) && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                  Code &ldquo;{(formData.subject_code || '').toUpperCase()}&rdquo; is already used at this level
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Subject Name</label>
@@ -565,8 +675,8 @@ function AcademicSubjects() {
             </button>
             <button
               type="submit"
-              disabled={saving}
-              className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition"
+              disabled={saving || !!subjects.find(s => s.subject_code === (formData.subject_code || '').toUpperCase() && s.level === formData.level && s.id !== editingSubject?.id)}
+              className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 disabled:cursor-not-allowed transition"
             >
               {saving ? 'Saving...' : editingSubject ? 'Update' : 'Create'}
             </button>
@@ -605,16 +715,6 @@ function AcademicSubjects() {
               />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input
-              type="text"
-              value={formData.description || ''}
-              onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-              placeholder="e.g. Medicine and Health Sciences"
-            />
-          </div>
           <div className="flex justify-end gap-3 pt-2">
             <button
               type="button"
@@ -636,12 +736,11 @@ function AcademicSubjects() {
 
       <Modal
         isOpen={comboSubjectsModalOpen}
-        onClose={() => { setComboSubjectsModalOpen(false); setPendingRoles({}) }}
-        title={`Subjects - ${comboName(selectedCombo) || ''}`}
+        onClose={() => setComboSubjectsModalOpen(false)}
+        title={`Subjects — ${comboName(selectedCombo) || ''}`}
       >
         <p className="text-xs text-gray-500 mb-4">
-          Select A-Level subjects and assign their role in this combination.
-          Each combination should have <strong>3 Core</strong>, <strong>1 Subsidiary</strong>, and any number of <strong>Optional</strong> subjects.
+          The role of each subject is set automatically from how it was registered (Principal / Subsidiary / Optional).
         </p>
         {aLevelSubjects.length === 0 && (
           <p className="text-sm text-gray-400 py-4 text-center">
@@ -652,9 +751,8 @@ function AcademicSubjects() {
           {aLevelSubjects.map((sub) => {
             const assigned = getAssignedSubjectIds(selectedCombo?.id || '')
             const isAssigned = assigned.includes(sub.id)
-            const currentRole = combinationSubjects.find(
-              (cs) => cs.combination_id === selectedCombo?.id && cs.subject_id === sub.id
-            )?.subject_role || 'OPTIONAL'
+            const role = subjectTypeToRole(sub.subject_type)
+            const { label, cls } = roleStyle(role)
 
             return (
               <div
@@ -667,49 +765,29 @@ function AcademicSubjects() {
               >
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-gray-900">{sub.subject_name}</p>
-                  <p className="text-xs text-gray-500">{sub.subject_code}</p>
+                  <p className="text-xs text-gray-500 font-mono">{sub.subject_code}</p>
                 </div>
+                <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${cls}`}>
+                  {label}
+                </span>
                 {isAssigned ? (
-                  <div className="flex items-center gap-2">
-                    <select
-                      value={currentRole}
-                      disabled={saving}
-                      onChange={(e) => updateComboSubjectRole(selectedCombo.id, sub.id, e.target.value)}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-maroon-500"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{r === 'CORE' ? 'Core' : r === 'SUBSIDIARY' ? 'Subsidiary' : 'Optional'}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => toggleComboSubject(selectedCombo.id, sub.id, currentRole)}
-                      className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition disabled:opacity-50"
-                    >
-                      Remove
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => toggleComboSubject(selectedCombo.id, sub.id, role)}
+                    className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition disabled:opacity-50"
+                  >
+                    Remove
+                  </button>
                 ) : (
-                  <div className="flex items-center gap-1.5">
-                    <select
-                      value={pendingRoles[sub.id] || 'CORE'}
-                      onChange={(e) => setPendingRoles((prev) => ({ ...prev, [sub.id]: e.target.value }))}
-                      className="px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-maroon-500"
-                    >
-                      {ROLES.map((r) => (
-                        <option key={r} value={r}>{r === 'CORE' ? 'Core' : r === 'SUBSIDIARY' ? 'Subsidiary' : 'Optional'}</option>
-                      ))}
-                    </select>
-                    <button
-                      type="button"
-                      disabled={saving}
-                      onClick={() => toggleComboSubject(selectedCombo.id, sub.id, pendingRoles[sub.id] || 'CORE')}
-                      className="px-2.5 py-1 text-xs font-medium text-maroon-600 bg-maroon-50 rounded-md hover:bg-maroon-100 transition disabled:opacity-50"
-                    >
-                      Add
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    disabled={saving}
+                    onClick={() => toggleComboSubject(selectedCombo.id, sub.id, role)}
+                    className="px-2.5 py-1 text-xs font-medium text-maroon-600 bg-maroon-50 rounded-md hover:bg-maroon-100 transition disabled:opacity-50"
+                  >
+                    Add
+                  </button>
                 )}
               </div>
             )

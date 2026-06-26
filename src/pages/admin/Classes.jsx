@@ -266,25 +266,36 @@ function AdminClasses() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-700">{c.sort_order}</td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => navigate(`/admin/class-subjects?classId=${c.id}`)}
-                        className="text-sm text-emerald-600 hover:text-emerald-800 font-medium mr-3"
-                      >
-                        Subjects
-                      </button>
-                      <button
-                        onClick={() => openEdit(c)}
-                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm({ type: 'classes', id: c.id, name: c.class_name })}
-                        className="text-sm text-red-500 hover:text-red-700 font-medium"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => navigate(`/admin/class-subjects?classId=${c.id}`)}
+                          title="Manage subjects"
+                          className="p-1.5 rounded-lg text-emerald-600 hover:bg-emerald-50 hover:text-emerald-800 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => openEdit(c)}
+                          title="Edit class"
+                          className="p-1.5 rounded-lg text-maroon-600 hover:bg-maroon-50 hover:text-maroon-800 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm({ type: 'classes', id: c.id, name: c.class_name })}
+                          title="Delete class"
+                          className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -330,19 +341,27 @@ function AdminClasses() {
                   <tr key={s.id} className="hover:bg-gray-50 transition">
                     <td className="px-5 py-3.5 text-sm text-gray-500">{i + 1}</td>
                     <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{s.stream_name}</td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => openEdit(s)}
-                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm({ type: 'streams', id: s.id, name: s.stream_name })}
-                        className="text-sm text-red-500 hover:text-red-700 font-medium"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openEdit(s)}
+                          title="Edit stream"
+                          className="p-1.5 rounded-lg text-maroon-600 hover:bg-maroon-50 hover:text-maroon-800 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm({ type: 'streams', id: s.id, name: s.stream_name })}
+                          title="Delete stream"
+                          className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))}

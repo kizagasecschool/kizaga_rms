@@ -59,7 +59,6 @@ function AdminSubjects() {
   const [formData, setFormData] = useState({})
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState(null)
-  const [pendingRoles, setPendingRoles] = useState({})
   const [subjectSearch, setSubjectSearch] = useState('')
 
   const fetchSubjects = useCallback(async () => {
@@ -123,8 +122,19 @@ function AdminSubjects() {
     e.preventDefault()
     setSaving(true)
     try {
+      const code = formData.subject_code.toUpperCase()
+
+      // Client-side duplicate check
+      const duplicate = subjects.find(
+        (s) => s.subject_code === code && s.level === formData.level && s.id !== editingSubject?.id
+      )
+      if (duplicate) {
+        showToast(`Subject code "${code}" already exists at this level. Choose a different code.`, 'error')
+        return
+      }
+
       const payload = {
-        subject_code: formData.subject_code.toUpperCase(),
+        subject_code: code,
         subject_name: formData.subject_name,
         level: formData.level,
         subject_type: formData.subject_type,
@@ -140,7 +150,10 @@ function AdminSubjects() {
       setSubjectModalOpen(false)
       showToast(editingSubject ? 'Subject updated' : 'Subject created', 'success')
     } catch (err) {
-      showToast('Failed to save. ' + (err.message || ''), 'error')
+      const msg = err?.code === '23505'
+        ? `Subject code "${formData.subject_code.toUpperCase()}" already exists at this level. Choose a different code.`
+        : (err.message || 'Unknown error')
+      showToast('Failed to save. ' + msg, 'error')
     } finally {
       setSaving(false)
     }
@@ -179,7 +192,7 @@ function AdminSubjects() {
     e.preventDefault()
     setSaving(true)
     try {
-      const payload = { code: formData.code.toUpperCase(), name: formData.name, description: formData.description }
+      const payload = { code: formData.code.toUpperCase(), name: formData.name }
       if (editingCombo) {
         const { error } = await supabase.from('combinations').update(payload).eq('id', editingCombo.id)
         if (error) throw error
@@ -211,9 +224,20 @@ function AdminSubjects() {
   }
 
   // ─── Combination Subjects ────────────────────────────────
+  const subjectTypeToRole = (type) => {
+    if (type === 'COMPULSORY') return 'CORE'
+    if (type === 'ELECTIVE') return 'SUBSIDIARY'
+    return 'OPTIONAL'
+  }
+
+  const roleStyle = (role) => {
+    if (role === 'CORE') return { label: 'Principal', cls: 'bg-emerald-50 text-emerald-700 border-emerald-200' }
+    if (role === 'SUBSIDIARY') return { label: 'Subsidiary', cls: 'bg-violet-50 text-violet-700 border-violet-200' }
+    return { label: 'Optional', cls: 'bg-amber-50 text-amber-700 border-amber-200' }
+  }
+
   const openComboSubjects = (combo) => {
     setSelectedCombo(combo)
-    setPendingRoles({})
     setComboSubjectsModalOpen(true)
   }
 
@@ -362,8 +386,14 @@ function AdminSubjects() {
                         </span>
                       </td>
                       <td className="px-5 py-3.5 text-right">
-                        <button onClick={() => openSubjectEdit(s)} className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3">Edit</button>
-                        <button onClick={() => setDeleteConfirm({ type: 'subject', id: s.id, name: s.subject_name })} className="text-sm text-red-500 hover:text-red-700 font-medium">Delete</button>
+                        <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => openSubjectEdit(s)} title="Edit subject" className="p-1.5 rounded-lg text-maroon-600 hover:bg-maroon-50 hover:text-maroon-800 transition">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+                          </button>
+                          <button onClick={() => setDeleteConfirm({ type: 'subject', id: s.id, name: s.subject_name })} title="Delete subject" className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition">
+                            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -671,8 +701,18 @@ function AdminSubjects() {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Subject Code <span className="text-red-500">*</span></label>
               <input type="text" required maxLength={6} value={formData.subject_code || ''} onChange={(e) => setFormData({ ...formData, subject_code: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+                className={`w-full px-3 py-2.5 border rounded-lg text-sm focus:outline-none focus:ring-2 transition ${
+                  subjects.find(s => s.subject_code === (formData.subject_code || '').toUpperCase() && s.level === formData.level && s.id !== editingSubject?.id)
+                    ? 'border-red-400 focus:ring-red-500 focus:border-red-500 bg-red-50'
+                    : 'border-gray-300 focus:ring-maroon-500 focus:border-maroon-500'
+                }`}
                 placeholder="e.g. PHY" />
+              {subjects.find(s => s.subject_code === (formData.subject_code || '').toUpperCase() && s.level === formData.level && s.id !== editingSubject?.id) && (
+                <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                  <svg className="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                  Code &ldquo;{(formData.subject_code || '').toUpperCase()}&rdquo; is already used at this level
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Subject Name <span className="text-red-500">*</span></label>
@@ -692,7 +732,9 @@ function AdminSubjects() {
           </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setSubjectModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">Cancel</button>
-            <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition">
+            <button type="submit"
+              disabled={saving || !!subjects.find(s => s.subject_code === (formData.subject_code || '').toUpperCase() && s.level === formData.level && s.id !== editingSubject?.id)}
+              className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 disabled:cursor-not-allowed transition">
               {saving ? 'Saving...' : editingSubject ? 'Update' : 'Create'}
             </button>
           </div>
@@ -716,12 +758,6 @@ function AdminSubjects() {
                 placeholder="e.g. Physics, Chemistry, Biology" />
             </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input type="text" value={formData.description || ''} onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-              placeholder="e.g. Medicine and Health Sciences" />
-          </div>
           <div className="flex justify-end gap-3 pt-2">
             <button type="button" onClick={() => setComboModalOpen(false)} className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">Cancel</button>
             <button type="submit" disabled={saving} className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition">
@@ -732,15 +768,12 @@ function AdminSubjects() {
       </Modal>
 
       {/* ==================== COMBINATION SUBJECTS MODAL ==================== */}
-      <Modal isOpen={comboSubjectsModalOpen} onClose={() => { setComboSubjectsModalOpen(false); setPendingRoles({}) }}
+      <Modal isOpen={comboSubjectsModalOpen} onClose={() => setComboSubjectsModalOpen(false)}
         title={`${selectedCombo?.code || ''} — ${selectedCombo?.name || ''} » Assign Subjects`}
         className="max-w-2xl">
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-4">
-          <p className="text-sm text-amber-800 font-medium">A-Level Combination Structure</p>
-          <p className="text-xs text-amber-700 mt-1">
-            Each combination should have <strong>3 Core</strong> (principal) subjects, <strong>1 Subsidiary</strong> subject, and any number of <strong>Optional</strong> subjects. Click "Add" to assign a subject with its role. Use the dropdown to change a subject's role.
-          </p>
-        </div>
+        <p className="text-xs text-gray-500 mb-4">
+          The role of each subject is set automatically from how it was registered (Principal / Subsidiary / Optional).
+        </p>
 
         {aLevelSubjects.length === 0 ? (
           <div className="text-center py-8">
@@ -750,7 +783,7 @@ function AdminSubjects() {
               onClick={() => { setComboSubjectsModalOpen(false); setALevelSubTab('subjects') }}
               className="text-sm font-medium text-maroon-600 hover:underline"
             >
-              Go to "A-Level Subjects" tab to add subjects first
+              Go to &ldquo;A-Level Subjects&rdquo; tab to add subjects first
             </button>
           </div>
         ) : (
@@ -758,9 +791,8 @@ function AdminSubjects() {
             {aLevelSubjects.map((sub) => {
               const assigned = getAssignedSubjectIds(selectedCombo?.id || '')
               const isAssigned = assigned.includes(sub.id)
-              const currentRole = combinationSubjects.find(
-                (cs) => cs.combination_id === selectedCombo?.id && cs.subject_id === sub.id
-              )?.subject_role || 'CORE'
+              const role = subjectTypeToRole(sub.subject_type)
+              const { label, cls } = roleStyle(role)
 
               return (
                 <div key={sub.id} className={`flex items-center gap-3 px-4 py-3 rounded-lg border transition ${
@@ -770,33 +802,21 @@ function AdminSubjects() {
                     <p className="text-sm font-medium text-gray-900">{sub.subject_name}</p>
                     <p className="text-xs text-gray-500 font-mono">{sub.subject_code}</p>
                   </div>
+                  <span className={`px-2 py-0.5 text-xs font-medium rounded-full border ${cls}`}>
+                    {label}
+                  </span>
                   {isAssigned ? (
-                    <div className="flex items-center gap-2">
-                      <select value={currentRole} disabled={saving}
-                        onChange={(e) => updateComboSubjectRole(selectedCombo.id, sub.id, e.target.value)}
-                        className={`px-2 py-1 text-xs border rounded-md focus:outline-none focus:ring-1 focus:ring-maroon-500 ${
-                          currentRole === 'CORE' ? 'border-emerald-300 bg-emerald-50 text-emerald-700' :
-                          currentRole === 'SUBSIDIARY' ? 'border-violet-300 bg-violet-50 text-violet-700' :
-                          'border-amber-300 bg-amber-50 text-amber-700'
-                        }`}>
-                        {ROLES.map((r) => (<option key={r} value={r}>{r === 'CORE' ? 'Core' : r === 'SUBSIDIARY' ? 'Subsidiary' : 'Optional'}</option>))}
-                      </select>
-                      <button type="button" disabled={saving} onClick={() => toggleComboSubject(selectedCombo.id, sub.id, currentRole)}
-                        className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition disabled:opacity-50">
-                        Remove
-                      </button>
-                    </div>
+                    <button type="button" disabled={saving}
+                      onClick={() => toggleComboSubject(selectedCombo.id, sub.id, role)}
+                      className="px-2.5 py-1 text-xs font-medium text-red-600 bg-red-50 rounded-md hover:bg-red-100 transition disabled:opacity-50">
+                      Remove
+                    </button>
                   ) : (
-                    <div className="flex items-center gap-1.5">
-                      <select value={pendingRoles[sub.id] || 'CORE'} onChange={(e) => setPendingRoles((prev) => ({ ...prev, [sub.id]: e.target.value }))}
-                        className="px-2 py-1 text-xs border border-gray-300 rounded-md focus:outline-none focus:ring-1 focus:ring-maroon-500">
-                        {ROLES.map((r) => (<option key={r} value={r}>{r === 'CORE' ? 'Core' : r === 'SUBSIDIARY' ? 'Subsidiary' : 'Optional'}</option>))}
-                      </select>
-                      <button type="button" disabled={saving} onClick={() => toggleComboSubject(selectedCombo.id, sub.id, pendingRoles[sub.id] || 'CORE')}
-                        className="px-2.5 py-1 text-xs font-medium text-maroon-600 bg-maroon-50 rounded-md hover:bg-maroon-100 transition disabled:opacity-50">
-                        Add
-                      </button>
-                    </div>
+                    <button type="button" disabled={saving}
+                      onClick={() => toggleComboSubject(selectedCombo.id, sub.id, role)}
+                      className="px-2.5 py-1 text-xs font-medium text-maroon-600 bg-maroon-50 rounded-md hover:bg-maroon-100 transition disabled:opacity-50">
+                      Add
+                    </button>
                   )}
                 </div>
               )
@@ -805,7 +825,7 @@ function AdminSubjects() {
         )}
 
         <div className="flex justify-end pt-4 border-t border-gray-100 mt-4">
-          <button type="button" onClick={() => { setComboSubjectsModalOpen(false); setPendingRoles({}) }}
+          <button type="button" onClick={() => setComboSubjectsModalOpen(false)}
             className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 transition">
             Done
           </button>

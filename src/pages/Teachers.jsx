@@ -18,6 +18,8 @@ function Teachers() {
   const [assignments, setAssignments] = useState([])
   const [classCombinations, setClassCombinations] = useState([])
   const [combinationSubjects, setCombinationSubjects] = useState([])
+  const [streamCombinations, setStreamCombinations] = useState([])
+  const [combinations, setCombinations] = useState([])
 
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
@@ -33,6 +35,7 @@ function Teachers() {
 
   const [assignClassId, setAssignClassId] = useState('')
   const [assignStreamIds, setAssignStreamIds] = useState([])
+  const [assignALevelStreamId, setAssignALevelStreamId] = useState('')
   const [assignSubjectIds, setAssignSubjectIds] = useState([])
 
   const fetchTeachers = useCallback(async () => {
@@ -44,13 +47,15 @@ function Teachers() {
   }, [])
 
   const fetchLookups = useCallback(async () => {
-    const [cRes, sRes, csRes, subRes, cs2Res, ccRes] = await Promise.all([
+    const [cRes, sRes, csRes, subRes, cs2Res, ccRes, scRes, combRes] = await Promise.all([
       supabase.from('classes').select('*').order('sort_order'),
       supabase.from('streams').select('*').order('stream_name'),
       supabase.from('class_streams').select('*, classes(*), streams(*)'),
       supabase.from('subjects').select('*').order('subject_name'),
       supabase.from('combination_subjects').select('*'),
       supabase.from('class_combinations').select('*'),
+      supabase.from('stream_combinations').select('*'),
+      supabase.from('combinations').select('*').order('code'),
     ])
     if (cRes.data) setClasses(cRes.data)
     if (sRes.data) setStreams(sRes.data)
@@ -58,6 +63,8 @@ function Teachers() {
     if (subRes.data) setSubjects(subRes.data)
     if (cs2Res.data) setCombinationSubjects(cs2Res.data)
     if (ccRes.data) setClassCombinations(ccRes.data)
+    if (scRes.data) setStreamCombinations(scRes.data)
+    if (combRes.data) setCombinations(combRes.data)
   }, [])
 
   const fetchAssignments = useCallback(async () => {
@@ -111,6 +118,16 @@ function Teachers() {
       return subjects.filter(s => subjectIds.includes(s.id))
     }
     return []
+  }
+
+  const getStreamSubjects = (classStreamId) => {
+    if (!classStreamId) return []
+    const sc = streamCombinations.find((sc) => sc.class_stream_id === classStreamId)
+    if (!sc) return []
+    const subjectIds = combinationSubjects
+      .filter((cs) => cs.combination_id === sc.combination_id)
+      .map((cs) => cs.subject_id)
+    return subjects.filter((s) => subjectIds.includes(s.id))
   }
 
   const openCreate = () => {
@@ -242,6 +259,7 @@ function Teachers() {
     setAssignTeacher(teacher)
     setAssignClassId('')
     setAssignStreamIds([])
+    setAssignALevelStreamId('')
     setAssignSubjectIds([])
     setAssignOpen(true)
   }
@@ -251,18 +269,24 @@ function Teachers() {
       showToast('Teacher not selected', 'error')
       return
     }
-    if (!assignClassId || assignStreamIds.length === 0 || assignSubjectIds.length === 0) {
-      showToast('Please select streams and subjects', 'error')
+    const assignClass = classes.find((c) => c.id === assignClassId)
+    const isALevel = assignClass?.level === 'A_LEVEL'
+    // O-Level: auto-expand to all streams of the class; A-Level: single selected stream
+    const effectiveStreamIds = isALevel
+      ? (assignALevelStreamId ? [assignALevelStreamId] : [])
+      : classStreams.filter((cs) => cs.class_id === assignClassId).map((cs) => cs.id)
+    if (!assignClassId || effectiveStreamIds.length === 0 || assignSubjectIds.length === 0) {
+      showToast(isALevel ? 'Please select a stream and subjects' : 'Please select subjects', 'error')
       return
     }
     setSaving(true)
     try {
       const existing = assignments.filter(
-        (a) => a.teacher_id === assignTeacher.id && assignStreamIds.includes(a.class_stream_id) && assignSubjectIds.includes(a.subject_id)
+        (a) => a.teacher_id === assignTeacher.id && effectiveStreamIds.includes(a.class_stream_id) && assignSubjectIds.includes(a.subject_id)
       )
 
       const toInsert = []
-      assignStreamIds.forEach(sid => {
+      effectiveStreamIds.forEach(sid => {
         assignSubjectIds.forEach(subId => {
           if (!existing.find(e => e.class_stream_id === sid && e.subject_id === subId)) {
             toInsert.push({
@@ -386,13 +410,13 @@ function Teachers() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Employee #</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Full Name</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Qualification</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
-                <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Employee #</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Full Name</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Qualification</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Status</th>
+                <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
@@ -406,19 +430,19 @@ function Teachers() {
               {filtered.map((t) => {
                 return (
                   <tr key={t.id} className="hover:bg-gray-50 transition">
-                    <td className="px-5 py-3.5">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                    <td className="px-4 py-3.5">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 whitespace-nowrap">
                         {t.employee_number}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5">
+                    <td className="px-4 py-3.5">
                       <p className="text-sm font-medium text-gray-900">{t.profiles?.full_name || 'Unknown'}</p>
                     </td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600">{t.profiles?.email || '-'}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600">{t.qualification || '-'}</td>
-                    <td className="px-5 py-3.5 text-sm text-gray-600">{t.phone || '-'}</td>
-                    <td className="px-5 py-3.5">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    <td className="px-4 py-3.5 text-sm text-gray-600 max-w-[180px] truncate">{t.profiles?.email || '-'}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-600 hidden lg:table-cell">{t.qualification || '-'}</td>
+                    <td className="px-4 py-3.5 text-sm text-gray-600 whitespace-nowrap">{t.phone || '-'}</td>
+                    <td className="px-4 py-3.5">
+                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${
                         t.status === 'active' ? 'bg-emerald-50 text-emerald-700' :
                         t.status === 'on_leave' ? 'bg-amber-50 text-amber-700' :
                         'bg-gray-100 text-gray-600'
@@ -426,26 +450,36 @@ function Teachers() {
                         {t.status === 'on_leave' ? 'On Leave' : t.status.charAt(0).toUpperCase() + t.status.slice(1)}
                       </span>
                     </td>
-                    <td className="px-5 py-3.5 text-right">
-                      <button
-                        onClick={() => openAssign(t)}
-                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
-                        title="Assign subjects & classes"
-                      >
-                        Assign
-                      </button>
-                      <button
-                        onClick={() => openEdit(t)}
-                        className="text-sm text-maroon-600 hover:text-maroon-800 font-medium mr-3"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => setDeleteConfirm(t)}
-                        className="text-sm text-red-500 hover:text-red-700 font-medium"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center justify-end gap-1">
+                        <button
+                          onClick={() => openAssign(t)}
+                          title="Assign subjects"
+                          className="p-1.5 rounded-lg text-maroon-600 hover:bg-maroon-50 hover:text-maroon-800 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => openEdit(t)}
+                          title="Edit teacher"
+                          className="p-1.5 rounded-lg text-maroon-600 hover:bg-maroon-50 hover:text-maroon-800 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                        </button>
+                        <button
+                          onClick={() => setDeleteConfirm(t)}
+                          title="Delete teacher"
+                          className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 hover:text-red-700 transition"
+                        >
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                          </svg>
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 )
@@ -615,8 +649,8 @@ function Teachers() {
       >
         <div className="space-y-6">
           <div className="bg-maroon-50 border border-maroon-200 rounded-lg p-4 text-sm text-maroon-800">
-            <p className="font-medium mb-1">Bulk assign subjects to this teacher</p>
-            <p className="text-xs">Select a class, choose streams and subjects, then click Assign.</p>
+            <p className="font-medium mb-1">Assign subjects to this teacher</p>
+            <p className="text-xs">O-Level: select a class and subjects. A-Level: select a class, choose a stream, then subjects.</p>
           </div>
 
           <div className="bg-gray-50/50 rounded-xl p-5 border border-gray-100">
@@ -635,6 +669,7 @@ function Teachers() {
                   const newClassId = e.target.value
                   setAssignClassId(newClassId)
                   setAssignSubjectIds([])
+                  setAssignALevelStreamId('')
                   const allStreamIds = classStreams
                     .filter(cs => cs.class_id === newClassId)
                     .map(cs => cs.id)
@@ -657,134 +692,144 @@ function Teachers() {
               </select>
             </div>
 
-            {assignClassId && (
-              <>
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-gray-600">Streams</label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const allIds = classStreams.filter(cs => cs.class_id === assignClassId).map(cs => cs.id)
-                        setAssignStreamIds(prev => prev.length === allIds.length ? [] : allIds)
-                      }}
-                      className="text-xs text-maroon-600 hover:text-maroon-800 font-medium"
-                    >
-                      {assignStreamIds.length === classStreams.filter(cs => cs.class_id === assignClassId).length ? 'Deselect All' : 'Select All'}
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {classStreams.filter(cs => cs.class_id === assignClassId).map(cs => {
-                      const str = streams.find(s => s.id === cs.stream_id)
-                      const checked = assignStreamIds.includes(cs.id)
-                      return (
-                        <label
-                          key={cs.id}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition ${
-                            checked ? 'border-maroon-400 bg-maroon-50 text-maroon-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              setAssignStreamIds(prev =>
-                                prev.includes(cs.id) ? prev.filter(id => id !== cs.id) : [...prev, cs.id]
-                              )
-                            }}
-                            className="sr-only"
-                          />
-                          {checked ? (
-                            <svg className="w-3.5 h-3.5 text-maroon-600" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          ) : (
-                            <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          )}
-                          {str?.stream_name || '?'}
-                        </label>
-                      )
-                    })}
-                    {classStreams.filter(cs => cs.class_id === assignClassId).length === 0 && (
-                      <span className="text-xs text-gray-400">No streams found for this class</span>
-                    )}
-                  </div>
-                </div>
+            {assignClassId && (() => {
+              const assignClass = classes.find((c) => c.id === assignClassId)
+              const isALevel = assignClass?.level === 'A_LEVEL'
+              const classStreamList = classStreams.filter(cs => cs.class_id === assignClassId)
+              const streamSubjects = isALevel ? getStreamSubjects(assignALevelStreamId) : getClassSubjects(assignClassId)
+              const selectedStreamCombo = isALevel && assignALevelStreamId
+                ? streamCombinations.find(sc => sc.class_stream_id === assignALevelStreamId)
+                : null
+              const selectedCombo = selectedStreamCombo
+                ? combinations.find(c => c.id === selectedStreamCombo.combination_id)
+                : null
 
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-xs font-medium text-gray-600">Subjects</label>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const classSubjects = getClassSubjects(assignClassId)
-                        setAssignSubjectIds(prev => prev.length === classSubjects.length ? [] : classSubjects.map(s => s.id))
-                      }}
-                      className="text-xs text-maroon-600 hover:text-maroon-800 font-medium"
-                    >
-                      {assignSubjectIds.length === getClassSubjects(assignClassId).length ? 'Deselect All' : 'Select All'}
-                    </button>
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {getClassSubjects(assignClassId).map(sub => {
-                      const checked = assignSubjectIds.includes(sub.id)
-                      return (
-                        <label
-                          key={sub.id}
-                          className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition ${
-                            checked ? 'border-maroon-400 bg-maroon-50 text-maroon-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
-                          }`}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={checked}
-                            onChange={() => {
-                              setAssignSubjectIds(prev =>
-                                prev.includes(sub.id) ? prev.filter(id => id !== sub.id) : [...prev, sub.id]
-                              )
-                            }}
-                            className="sr-only"
-                          />
-                          {checked ? (
-                            <svg className="w-3.5 h-3.5 text-maroon-600" fill="currentColor" viewBox="0 0 20 20">
-                              <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                            </svg>
-                          ) : (
-                            <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                              <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                            </svg>
-                          )}
-                          {sub.subject_name} ({sub.subject_code})
-                        </label>
-                      )
-                    })}
-                    {getClassSubjects(assignClassId).length === 0 && (
-                      <span className="text-xs text-gray-400">No subjects assigned to this class</span>
-                    )}
-                  </div>
-                </div>
-
-                <button
-                  type="button"
-                  disabled={saving || assignStreamIds.length === 0 || assignSubjectIds.length === 0}
-                  onClick={handleAssign}
-                  className="w-full px-5 py-2.5 text-sm font-medium text-white bg-maroon-600 rounded-xl hover:bg-maroon-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
-                >
-                  {saving ? (
-                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Assigning...</>
-                  ) : (
-                    <>Assign {assignSubjectIds.length} subject(s) × {assignStreamIds.length} stream(s)</>
+              return (
+                <>
+                  {isALevel && (
+                    /* A-Level: single stream dropdown */
+                    <div className="mb-4">
+                      <label className="block text-xs font-medium text-gray-600 mb-1.5">Stream</label>
+                      <select
+                        value={assignALevelStreamId}
+                        onChange={(e) => {
+                          setAssignALevelStreamId(e.target.value)
+                          setAssignSubjectIds([])
+                        }}
+                        className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
+                      >
+                        <option value="">-- Select Stream --</option>
+                        {classStreamList.map(cs => {
+                          const str = streams.find(s => s.id === cs.stream_id)
+                          const sc = streamCombinations.find(sc => sc.class_stream_id === cs.id)
+                          const combo = sc ? combinations.find(c => c.id === sc.combination_id) : null
+                          return (
+                            <option key={cs.id} value={cs.id}>
+                              {str?.stream_name || '?'}{combo ? ` — ${combo.code} (${combo.name})` : ' — No combination assigned'}
+                            </option>
+                          )
+                        })}
+                        {classStreamList.length === 0 && (
+                          <option disabled>No streams found</option>
+                        )}
+                      </select>
+                      {assignALevelStreamId && !selectedStreamCombo && (
+                        <p className="mt-1.5 text-xs text-amber-600">
+                          No combination assigned to this stream. Go to Class Subjects to assign one first.
+                        </p>
+                      )}
+                      {selectedCombo && (
+                        <p className="mt-1.5 text-xs text-emerald-600 font-medium">
+                          Combination: {selectedCombo.code} — {selectedCombo.name}
+                        </p>
+                      )}
+                    </div>
                   )}
-                </button>
-              </>
-            )}
+                  {/* Subjects — shown for O-Level always, A-Level only after stream selected */}
+                  {(!isALevel || assignALevelStreamId) && (
+                    <div className="mb-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-xs font-medium text-gray-600">
+                          Subjects {isALevel && selectedCombo ? <span className="text-gray-400 font-normal">({selectedCombo.code})</span> : ''}
+                        </label>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setAssignSubjectIds(prev =>
+                              prev.length === streamSubjects.length ? [] : streamSubjects.map(s => s.id)
+                            )
+                          }}
+                          className="text-xs text-maroon-600 hover:text-maroon-800 font-medium"
+                        >
+                          {assignSubjectIds.length === streamSubjects.length && streamSubjects.length > 0 ? 'Deselect All' : 'Select All'}
+                        </button>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        {streamSubjects.map(sub => {
+                          const checked = assignSubjectIds.includes(sub.id)
+                          return (
+                            <label
+                              key={sub.id}
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm cursor-pointer transition ${
+                                checked ? 'border-maroon-400 bg-maroon-50 text-maroon-700' : 'border-gray-200 bg-white text-gray-600 hover:border-gray-300'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={checked}
+                                onChange={() => {
+                                  setAssignSubjectIds(prev =>
+                                    prev.includes(sub.id) ? prev.filter(id => id !== sub.id) : [...prev, sub.id]
+                                  )
+                                }}
+                                className="sr-only"
+                              />
+                              {checked ? (
+                                <svg className="w-3.5 h-3.5 text-maroon-600" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                              ) : (
+                                <svg className="w-3.5 h-3.5 text-gray-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                              )}
+                              {sub.subject_name} ({sub.subject_code})
+                            </label>
+                          )
+                        })}
+                        {streamSubjects.length === 0 && (
+                          <span className="text-xs text-gray-400">
+                            {isALevel && assignALevelStreamId && !selectedStreamCombo
+                              ? 'Assign a combination to this stream first'
+                              : 'No subjects found'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  <button
+                    type="button"
+                    disabled={saving || assignSubjectIds.length === 0 || (isALevel && !assignALevelStreamId)}
+                    onClick={handleAssign}
+                    className="w-full px-5 py-2.5 text-sm font-medium text-white bg-maroon-600 rounded-xl hover:bg-maroon-700 disabled:opacity-50 transition flex items-center justify-center gap-2"
+                  >
+                    {saving ? (
+                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Assigning...</>
+                    ) : isALevel ? (
+                      <>Assign {assignSubjectIds.length} subject(s) to this stream</>
+                    ) : (
+                      <>Assign {assignSubjectIds.length} subject(s) to {assignClass?.class_name}</>
+                    )}
+                  </button>
+                </>
+              )
+            })()}
           </div>
 
           <div>
             <h3 className="text-sm font-semibold text-gray-900 mb-3">
-              Current Assignments ({teacherAssignments.length} stream entries)
+              Current Assignments
             </h3>
             {teacherAssignments.length === 0 ? (
               <div className="bg-gray-50 rounded-xl p-6 text-center text-sm text-gray-400 border border-gray-100">
@@ -794,34 +839,52 @@ function Teachers() {
               <div className="space-y-2">
                 {Object.entries(getAssignmentsByClassSubject()).map(([classId, subjectMap]) => {
                   const cls = classes.find(c => c.id === classId)
-                  const streamNames = classStreams
-                    .filter(cs => cs.class_id === classId)
-                    .map(cs => streams.find(s => s.id === cs.stream_id)?.stream_name)
-                    .filter(Boolean)
+                  const isALevel = cls?.level === 'A_LEVEL'
+                  const allClassStreamIds = classStreams.filter(cs => cs.class_id === classId).map(cs => cs.id)
                   return (
                     <div key={classId} className="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-sm font-semibold text-gray-700">
-                          {cls?.class_name || 'Unknown'}
-                          <span className="text-xs font-normal text-gray-400 ml-2">
-                            ({streamNames.join(', ')})
-                          </span>
-                        </p>
-                      </div>
+                      <p className="text-sm font-semibold text-gray-700 mb-2">
+                        {cls?.class_name || 'Unknown'}
+                        <span className={`text-xs font-normal ml-2 px-1.5 py-0.5 rounded ${isALevel ? 'bg-violet-100 text-violet-600' : 'bg-blue-100 text-blue-600'}`}>
+                          {isALevel ? 'A-Level' : 'O-Level'}
+                        </span>
+                      </p>
                       <div className="flex flex-wrap gap-2">
-                        {Object.entries(subjectMap).map(([subjectId]) => {
+                        {Object.entries(subjectMap).map(([subjectId, assignmentRows]) => {
                           const sub = subjects.find(s => s.id === subjectId)
+                          const assignedStreamIds = assignmentRows.map(a => a.class_stream_id)
+                          // For A-Level: show stream name. For O-Level: warn if not all streams covered.
+                          const assignedStreamNames = assignedStreamIds.map(id => {
+                            const cs = classStreams.find(c => c.id === id)
+                            return streams.find(s => s.id === cs?.stream_id)?.stream_name
+                          }).filter(Boolean).sort()
+                          const missingCount = !isALevel ? allClassStreamIds.filter(id => !assignedStreamIds.includes(id)).length : 0
                           return (
                             <span
                               key={subjectId}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-white border border-gray-200 text-gray-700"
+                              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border ${
+                                missingCount > 0
+                                  ? 'bg-amber-50 border-amber-200 text-amber-800'
+                                  : 'bg-white border-gray-200 text-gray-700'
+                              }`}
                             >
                               {sub?.subject_name || 'Unknown'} ({sub?.subject_code || '?'})
+                              {isALevel && (
+                                <span className="text-violet-500 font-normal">· {assignedStreamNames.join(', ')}</span>
+                              )}
+                              {!isALevel && missingCount > 0 && (
+                                <span
+                                  className="text-amber-600 font-normal"
+                                  title={`Only streams ${assignedStreamNames.join(', ')} — use the form above to assign the missing ${missingCount} stream(s)`}
+                                >
+                                  · {assignedStreamNames.join(', ')} only ⚠
+                                </span>
+                              )}
                               <button
                                 type="button"
                                 onClick={() => handleUnassignClassSubject(classId, subjectId)}
                                 className="text-red-400 hover:text-red-600 ml-0.5"
-                                title="Remove"
+                                title="Remove from all streams"
                               >
                                 <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                                   <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
@@ -831,6 +894,11 @@ function Teachers() {
                           )
                         })}
                       </div>
+                      {!isALevel && Object.values(subjectMap).some(rows => allClassStreamIds.filter(id => !rows.map(r => r.class_stream_id).includes(id)).length > 0) && (
+                        <p className="mt-2 text-xs text-amber-600">
+                          ⚠ Some subjects cover only partial streams. Select this class above and re-assign those subjects to fill the missing streams.
+                        </p>
+                      )}
                     </div>
                   )
                 })}

@@ -13,6 +13,65 @@ const Placeholder = ({ title, msg }) => (
   </div>
 )
 
+const SkeletonBlock = ({ className }) => (
+  <div className={`bg-gray-200 rounded-lg animate-pulse ${className}`} />
+)
+
+const FilterSkeleton = () => (
+  <div className="animate-pulse space-y-6">
+    <div className="bg-white rounded-xl border border-gray-200 p-4 sm:p-5">
+      <div className="space-y-3 sm:space-y-0 sm:grid sm:grid-cols-3 sm:gap-4">
+        {[1, 2, 3].map(i => (
+          <div key={i}>
+            <SkeletonBlock className="h-3 w-16 mb-1.5" />
+            <SkeletonBlock className="h-[42px] w-full rounded-xl" />
+          </div>
+        ))}
+      </div>
+    </div>
+    <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+      <div className="px-4 sm:px-5 py-3">
+        <SkeletonBlock className="h-4 w-32" />
+      </div>
+      <div className="px-4 sm:px-5 pb-4 space-y-3">
+        {[1, 2, 3, 4, 5].map(i => (
+          <div key={i} className="flex items-center gap-3">
+            <SkeletonBlock className="h-4 w-6 rounded" />
+            <SkeletonBlock className="h-5 flex-1 rounded" />
+            <SkeletonBlock className="h-5 w-16 rounded" />
+            <SkeletonBlock className="h-9 w-20 rounded-lg" />
+            <SkeletonBlock className="h-6 w-10 rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  </div>
+)
+
+const TableSkeleton = () => (
+  <div className="bg-white rounded-xl border border-gray-200 overflow-hidden animate-pulse">
+    <div className="px-4 sm:px-5 py-3 bg-gray-50 border-b border-gray-100 flex items-center gap-3">
+      <SkeletonBlock className="h-4 w-24" />
+      <SkeletonBlock className="h-4 w-20" />
+      <SkeletonBlock className="h-4 w-16" />
+    </div>
+    <div className="divide-y divide-gray-100 px-4 sm:px-5 py-2">
+      {[1, 2, 3, 4, 5].map(i => (
+        <div key={i} className="flex items-center gap-3 py-2.5">
+          <SkeletonBlock className="h-4 w-6 rounded" />
+          <SkeletonBlock className="h-5 flex-1 rounded" />
+          <SkeletonBlock className="h-5 w-16 rounded" />
+          <SkeletonBlock className="h-9 w-20 rounded-lg" />
+          <SkeletonBlock className="h-6 w-10 rounded-full" />
+        </div>
+      ))}
+    </div>
+    <div className="px-4 sm:px-5 py-3 bg-gray-50 border-t border-gray-100">
+      <SkeletonBlock className="h-4 w-40" />
+    </div>
+  </div>
+)
+
 function EnterMarks() {
   const { profile } = useAuth()
   const { showToast } = useNotification()
@@ -248,21 +307,36 @@ function EnterMarks() {
     setHasChanges(false)
     if (!selectedExamId || !selectedSubjectId || !selectedStreamId) return
 
+    const isClassWide = selectedStreamId.startsWith('__class__')
+    const classWideClassId = isClassWide ? selectedStreamId.replace('__class__', '') : null
+
     const loadStudentsAndMarks = async () => {
       setLoading(true)
       setNoAssignMsg('')
       try {
+        // Determine class_id and stream IDs
+        let classId
+        let streamIds
+
+        if (isClassWide) {
+          classId = classWideClassId
+          streamIds = streamOptions.filter(cs => cs.class_id === classWideClassId).map(cs => cs.id)
+        } else {
+          const { data: csRow } = await supabase
+            .from('class_streams')
+            .select('class_id')
+            .eq('id', selectedStreamId)
+            .single()
+          classId = csRow?.class_id
+          streamIds = [selectedStreamId]
+        }
+
         // Check if subject is excluded for this class
-        const { data: csRow } = await supabase
-          .from('class_streams')
-          .select('class_id')
-          .eq('id', selectedStreamId)
-          .single()
-        if (csRow?.class_id) {
+        if (classId) {
           const { data: excl } = await supabase
             .from('class_excluded_subjects')
             .select('id')
-            .eq('class_id', csRow.class_id)
+            .eq('class_id', classId)
             .eq('subject_id', selectedSubjectId)
             .maybeSingle()
           if (excl) {
@@ -275,8 +349,8 @@ function EnterMarks() {
         }
 
         const [ssRes, mRes] = await Promise.all([
-          supabase.from('student_subjects').select('student_id').eq('subject_id', selectedSubjectId),
-          supabase.from('marks').select('*').eq('exam_id', selectedExamId).eq('subject_id', selectedSubjectId),
+          supabase.from('student_subjects').select('student_id').eq('subject_id', selectedSubjectId).limit(1000000),
+          supabase.from('marks').select('*').eq('exam_id', selectedExamId).eq('subject_id', selectedSubjectId).limit(1000000),
         ])
 
         const assignedIds = (ssRes.data || []).map(r => r.student_id)
@@ -294,13 +368,20 @@ function EnterMarks() {
           }
         }
 
-        const { data: studs } = await supabase
+        if (isClassWide) {
+          const sample = streamOptions.slice(0, 2).map(cs => ({ id: cs.id, class_id: cs.class_id, stream_id: cs.stream_id }))
+          console.log('🐛 WholeClass debug:', JSON.stringify({ classWideClassId, streamOptionsLen: streamOptions.length, sample, streamIds, assignedIdsLen: assignedIds.length }))
+        }
+        const { data: studs, error: studsErr } = await supabase
           .from('students')
           .select('*')
-          .eq('class_stream_id', selectedStreamId)
+          .in('class_stream_id', streamIds)
           .eq('status', 'active')
           .in('id', assignedIds)
           .order('surname')
+        if (isClassWide) {
+          console.log('🐛 students query result:', JSON.stringify({ count: studs?.length, firstErr: studsErr?.message }))
+        }
 
         setStudents(studs || [])
 
@@ -314,7 +395,7 @@ function EnterMarks() {
       }
     }
     loadStudentsAndMarks()
-  }, [selectedStreamId, selectedSubjectId, selectedExamId])
+  }, [selectedStreamId, selectedSubjectId, selectedExamId, streamOptions])
 
   // ------- Helpers -------
   const getStreamLabel = (cs) => {
@@ -325,10 +406,16 @@ function EnterMarks() {
     return 'Unknown'
   }
 
-  const selectedStream = streamOptions.find(s => s.id === selectedStreamId)
-  const contextClass = selectedStream ? classes.find(c => c.id === selectedStream.class_id) : null
-  const contextStr = selectedExam && selectedSubject && selectedStream
-    ? `${contextClass?.class_name || '?'} ${streams.find(s => s.id === selectedStream.stream_id)?.stream_name || ''} › ${selectedSubject.subject_name} › ${selectedExam.name}`
+  const isClassWide = selectedStreamId.startsWith('__class__')
+  const classWideClassId = isClassWide ? selectedStreamId.replace('__class__', '') : null
+  const selectedStream = isClassWide ? null : streamOptions.find(s => s.id === selectedStreamId)
+  const contextClass = isClassWide
+    ? classes.find(c => c.id === classWideClassId)
+    : selectedStream ? classes.find(c => c.id === selectedStream.class_id) : null
+  const contextStr = selectedExam && selectedSubject && (isClassWide || selectedStream)
+    ? isClassWide
+      ? `${contextClass?.class_name || '?'} (All Streams) › ${selectedSubject.subject_name} › ${selectedExam.name}`
+      : `${contextClass?.class_name || '?'} ${streams.find(s => s.id === selectedStream.stream_id)?.stream_name || ''} › ${selectedSubject.subject_name} › ${selectedExam.name}`
     : ''
 
   const updateMark = (studentId, field, value) => {
@@ -432,8 +519,11 @@ function EnterMarks() {
 
   if (loading && !selectedExamId && !selectedStreamId) {
     return (
-      <div className="flex items-center justify-center py-20">
-        <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
+      <div>
+        <div className="mb-6">
+          <SkeletonBlock className="h-7 w-36 mb-2" />
+        </div>
+        <FilterSkeleton />
       </div>
     )
   }
@@ -488,9 +578,30 @@ function EnterMarks() {
               className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">-- Select Stream --</option>
-              {streamOptions.map(cs => (
-                <option key={cs.id} value={cs.id}>{getStreamLabel(cs)}</option>
-              ))}
+              {(() => {
+                const groups = {}
+                streamOptions.forEach(cs => {
+                  if (!groups[cs.class_id]) {
+                    const cls = classes.find(c => c.id === cs.class_id)
+                    groups[cs.class_id] = { className: cls?.class_name || cs.class_id.slice(0, 8), streams: [] }
+                  }
+                  groups[cs.class_id].streams.push(cs)
+                })
+                const items = []
+                for (const [cid, g] of Object.entries(groups)) {
+                  if (g.streams.length > 1) {
+                    items.push(
+                      <option key={`wc-${cid}`} value={`__class__${cid}`}>
+                        📋 Whole Class ({g.className})
+                      </option>
+                    )
+                  }
+                  g.streams.forEach(cs => {
+                    items.push(<option key={cs.id} value={cs.id}>{getStreamLabel(cs)}</option>)
+                  })
+                }
+                return items
+              })()}
             </select>
           </div>
         </div>
@@ -507,59 +618,52 @@ function EnterMarks() {
       {/* No stream selected */}
       {!selectedStreamId && <Placeholder title="Select filters above" msg="Choose an exam, subject, and class stream to begin entering marks." />}
 
-      {selectedStreamId && loading && (
-        <div className="flex items-center justify-center py-16">
-          <div className="w-8 h-8 border-3 border-gray-200 border-t-maroon-600 rounded-full animate-spin" />
-        </div>
-      )}
+      {selectedStreamId && loading && <TableSkeleton />}
 
-      {selectedStreamId && !loading && students.length === 0 && (
-        <Placeholder title="No students found" msg="There are no active students in this class stream." />
-      )}
-
-      {/* Marks Entry */}
-      {selectedStreamId && !loading && students.length > 0 && (
-        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-          {/* Summary bar */}
-          <div className="px-4 sm:px-5 py-3 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center gap-2 justify-between">
-            <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
-              <span className="font-medium text-gray-700">{students.length} students</span>
-              {enteredCount > 0 && <span className="text-emerald-600">{enteredCount} entered</span>}
-              {absentCount > 0 && <span className="text-red-500">{absentCount} absent</span>}
-              {hasChanges && <span className="text-amber-600 font-medium">Unsaved</span>}
-            </div>
-            <div className="flex items-center gap-2">
-              {hasChanges && (
-                <button
-                  onClick={handleSave}
-                  disabled={saving}
-                  className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition flex items-center gap-2"
-                >
-                  {saving ? (
-                    <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
-                  ) : (
-                    <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>Save</>
-                  )}
-                </button>
-              )}
-            </div>
-          </div>
-
+      {selectedStreamId && !loading && (
+        <>
           {noAssignMsg ? (
             <div className="flex flex-col items-center justify-center py-16 text-center">
               <svg className="w-12 h-12 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 9.75l4.5 4.5m0-4.5l-4.5 4.5M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
               <p className="text-sm text-gray-500">{noAssignMsg}</p>
               <p className="text-xs text-gray-400 mt-1">Assign students to this subject first in the Students or Class Subjects page.</p>
             </div>
+          ) : students.length === 0 ? (
+            <Placeholder title="No students found" msg="There are no active students in this class stream." />
           ) : (
-          /* Table: same on mobile & desktop */
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-gray-200 bg-gray-50">
-                  <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
-                  <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[120px]">Student Name</th>
-                  <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">Adm No</th>
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            {/* Summary bar */}
+            <div className="px-4 sm:px-5 py-3 bg-gray-50 border-b border-gray-100 flex flex-wrap items-center gap-2 justify-between">
+              <div className="flex flex-wrap items-center gap-3 text-xs text-gray-500">
+                <span className="font-medium text-gray-700">{students.length} students</span>
+                {enteredCount > 0 && <span className="text-emerald-600">{enteredCount} entered</span>}
+                {absentCount > 0 && <span className="text-red-500">{absentCount} absent</span>}
+                {hasChanges && <span className="text-amber-600 font-medium">Unsaved</span>}
+              </div>
+              <div className="flex items-center gap-2">
+                {hasChanges && (
+                  <button
+                    onClick={handleSave}
+                    disabled={saving}
+                    className="px-4 py-2 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 disabled:opacity-50 transition flex items-center gap-2"
+                  >
+                    {saving ? (
+                      <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Saving...</>
+                    ) : (
+                      <><svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg>Save</>
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-gray-200 bg-gray-50">
+                    <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
+                    <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[120px]">Student Name</th>
+                    <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">Adm No</th>
                   <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[80px]">
                     Theory <span className="text-[10px] font-normal text-gray-400">(100)</span>
                     {showPractical && <span className="block text-[10px] font-normal text-gray-400">marks</span>}
@@ -648,7 +752,6 @@ function EnterMarks() {
               </tbody>
             </table>
           </div>
-          )}
           <div className="px-4 sm:px-5 py-3 bg-gray-50 border-t border-gray-100 flex flex-wrap items-center gap-3 justify-between">
             <span className="text-xs text-gray-500">
               {enteredCount + absentCount} of {students.length} students
@@ -667,6 +770,8 @@ function EnterMarks() {
           </div>
         </div>
       )}
+    </>
+  )}
     </div>
   )
 }
