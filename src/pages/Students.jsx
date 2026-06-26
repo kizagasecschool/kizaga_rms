@@ -298,10 +298,12 @@ function Students() {
     e.preventDefault()
     setSaving(true)
     try {
+      const selectedClass = classes.find(c => c.id === formData.class_id)
       const payload = {
         ...formData,
         class_id: formData.class_id || null,
-        class_stream_id: formData.class_stream_id || null,
+        // O-Level students never have a stream
+        class_stream_id: selectedClass?.level === 'A_LEVEL' ? (formData.class_stream_id || null) : null,
         middle_name: formData.middle_name || null,
         parent_name: formData.parent_name || null,
         parent_phone: formData.parent_phone || null,
@@ -1074,19 +1076,7 @@ function Students() {
               </svg>
               <span className="text-sm font-semibold text-gray-800">Student Information</span>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Admission Number <span className="text-red-500">*</span></label>
-                <input
-                  type="text"
-                  required
-                  readOnly={!editing}
-                  value={formData.admission_number || ''}
-                  onChange={(e) => setFormData({ ...formData, admission_number: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition placeholder:text-gray-400 read-only:bg-gray-50 read-only:cursor-not-allowed"
-                  placeholder="Auto-generated"
-                />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Gender <span className="text-red-500">*</span></label>
                 <select
@@ -1144,26 +1134,33 @@ function Students() {
                   ))}
                 </select>
               </div>
-              <div className="col-span-1">
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Stream</label>
-                <select
-                  value={formData.class_stream_id || ''}
-                  onChange={(e) => setFormData({ ...formData, class_stream_id: e.target.value })}
-                  className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
-                >
-                  <option value="">-- No Stream --</option>
-                  {classStreams
-                    .filter(cs => cs.class_id === formData.class_id)
-                    .map(cs => {
-                      const str = streams.find(s => s.id === cs.stream_id)
-                      return (
-                        <option key={cs.id} value={cs.id}>
-                          {str ? `Stream ${str.stream_name}` : cs.id}
-                        </option>
-                      )
-                    })}
-                </select>
-              </div>
+              {(() => {
+                const selectedClass = classes.find(c => c.id === formData.class_id)
+                const isALevel = selectedClass?.level === 'A_LEVEL'
+                if (!isALevel) return null // O-Level: no stream selection
+                return (
+                  <div className="col-span-1">
+                    <label className="block text-xs font-medium text-gray-600 mb-1.5">Stream <span className="text-red-500">*</span></label>
+                    <select
+                      value={formData.class_stream_id || ''}
+                      onChange={(e) => setFormData({ ...formData, class_stream_id: e.target.value })}
+                      className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
+                    >
+                      <option value="">-- Select Stream --</option>
+                      {classStreams
+                        .filter(cs => cs.class_id === formData.class_id)
+                        .map(cs => {
+                          const str = streams.find(s => s.id === cs.stream_id)
+                          return (
+                            <option key={cs.id} value={cs.id}>
+                              {str ? `Stream ${str.stream_name}` : cs.id}
+                            </option>
+                          )
+                        })}
+                    </select>
+                  </div>
+                )
+              })()}
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1.5">Admission Date</label>
                 <input

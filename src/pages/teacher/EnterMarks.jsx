@@ -252,7 +252,7 @@ function EnterMarks() {
     loadSubjects()
   }, [selectedExamId, exams, examClassesMap, teacherAssignments, isAcademic, classes])
 
-  // ------- When subject changes, load streams -------
+  // ------- When subject changes, load class/stream options -------
   useEffect(() => {
     setSelectedStreamId('')
     setStudents([])
@@ -267,38 +267,49 @@ function EnterMarks() {
     const classIds = examClassesMap[selectedExamId] || []
     if (classIds.length === 0) return
 
-    const loadStreams = async () => {
+    const buildOptions = (classStreamRows) => {
+      // For O-Level classes → one synthetic class-wide entry per class
+      // For A-Level classes → individual stream rows
+      const seen = new Set()
+      const opts = []
+      classStreamRows.forEach(cs => {
+        const cls = classes.find(c => c.id === cs.class_id) || cs.classes
+        const isOLevel = cls?.level !== 'A_LEVEL'
+        if (isOLevel) {
+          if (!seen.has(cs.class_id)) {
+            seen.add(cs.class_id)
+            opts.push({ id: `__class__${cs.class_id}`, class_id: cs.class_id, _isOLevel: true })
+          }
+        } else {
+          opts.push(cs)
+        }
+      })
+      return opts
+    }
+
+    const loadOptions = async () => {
       try {
+        let rows = []
         if (!isAcademic) {
-          const streamSet = new Map()
           teacherAssignments
             .filter(a => a.subject_id === selectedSubjectId && classIds.includes(a.class_streams?.class_id))
-            .forEach(a => {
-              if (a.class_streams && !streamSet.has(a.class_streams.id)) {
-                streamSet.set(a.class_streams.id, a.class_streams)
-              }
-            })
-          setStreamOptions([...streamSet.values()])
+            .forEach(a => { if (a.class_streams) rows.push(a.class_streams) })
         } else {
-          let streamQuery = supabase
-            .from('class_streams')
-            .select('*, classes(*), streams(*)')
-            .in('class_id', classIds)
-            .order('class_id')
-
-          if (sub?.level) {
-            streamQuery = streamQuery.eq('classes.level', sub.level)
-          }
-
-          const { data: cs } = await streamQuery
-          setStreamOptions(cs || [])
+          let q = supabase.from('class_streams').select('*, classes(*), streams(*)').in('class_id', classIds).order('class_id')
+          if (sub?.level) q = q.eq('classes.level', sub.level)
+          const { data: cs } = await q
+          rows = cs || []
         }
+        const opts = buildOptions(rows)
+        setStreamOptions(opts)
+        // Auto-select when there is only one option
+        if (opts.length === 1) setSelectedStreamId(opts[0].id)
       } catch (err) {
-        console.error('Load streams error:', err)
+        console.error('Load class/stream options error:', err)
       }
     }
-    loadStreams()
-  }, [selectedSubjectId, selectedExamId, examClassesMap, subjectOptions, teacherAssignments, isAcademic])
+    loadOptions()
+  }, [selectedSubjectId, selectedExamId, examClassesMap, subjectOptions, teacherAssignments, isAcademic, classes])
 
   // ------- When stream changes, load students & marks -------
   useEffect(() => {
@@ -316,17 +327,18 @@ function EnterMarks() {
       try {
         // Determine class_id and stream IDs
         let classId
-        let streamIds
+        let streamIds = []
 
         if (isClassWide) {
           classId = classWideClassId
-          streamIds = streamOptions.filter(cs => cs.class_id === classWideClassId).map(cs => cs.id)
+          // A-Level "whole class" needs stream IDs; O-Level will query by class_id directly
+          streamIds = streamOptions.filter(cs => cs.class_id === classWideClassId && !cs._isOLevel).map(cs => cs.id)
+          if (streamIds.length === 0 && classes.find(c => c.id === classWideClassId)?.level === 'A_LEVEL') {
+            const { data: csRows } = await supabase.from('class_streams').select('id').eq('class_id', classWideClassId)
+            streamIds = (csRows || []).map(r => r.id)
+          }
         } else {
-          const { data: csRow } = await supabase
-            .from('class_streams')
-            .select('class_id')
-            .eq('id', selectedStreamId)
-            .single()
+          const { data: csRow } = await supabase.from('class_streams').select('class_id').eq('id', selectedStreamId).single()
           classId = csRow?.class_id
           streamIds = [selectedStreamId]
         }
@@ -348,40 +360,48 @@ function EnterMarks() {
           }
         }
 
-        const [ssRes, mRes] = await Promise.all([
-          supabase.from('student_subjects').select('student_id').eq('subject_id', selectedSubjectId).limit(1000000),
-          supabase.from('marks').select('*').eq('exam_id', selectedExamId).eq('subject_id', selectedSubjectId).limit(1000000),
-        ])
+        const isOLevel = classes.find(c => c.id === classId)?.level !== 'A_LEVEL'
 
-        const assignedIds = (ssRes.data || []).map(r => r.student_id)
+        const mRes = await supabase
+          .from('marks')
+          .select('*')
+          .eq('exam_id', selectedExamId)
+          .eq('subject_id', selectedSubjectId)
+          .limit(1000000)
 
-        if (assignedIds.length === 0) {
-          const { count } = await supabase
-            .from('student_subjects')
-            .select('*', { count: 'exact', head: true })
-            .limit(1)
-          if (count > 0) {
-            setStudents([])
-            setMarksData({})
-            setNoAssignMsg('No students have been assigned to this subject.')
-            return
+        let studsQuery = supabase.from('students').select('*').eq('status', 'active').order('surname')
+
+        if (isClassWide && isOLevel) {
+          // O-Level: all students in the class take all O-Level subjects — filter by class_id only
+          studsQuery = studsQuery.eq('class_id', classId)
+        } else {
+          // A-Level / individual stream: filter by stream then by subject assignment
+          studsQuery = studsQuery.in('class_stream_id', streamIds)
+          // Fetch student IDs in these streams to keep the subject assignment filter small
+          const streamStudentIds = streamIds.length > 0
+            ? ((await supabase.from('students').select('id').in('class_stream_id', streamIds).eq('status', 'active').limit(500)).data || []).map(r => r.id)
+            : []
+          const { data: ssRows } = streamStudentIds.length > 0
+            ? await supabase.from('student_subjects').select('student_id').eq('subject_id', selectedSubjectId).in('student_id', streamStudentIds)
+            : { data: [] }
+          const assignedIds = (ssRows || []).map(r => r.student_id)
+          if (assignedIds.length === 0) {
+            const { count } = await supabase
+              .from('student_subjects').select('*', { count: 'exact', head: true })
+              .eq('subject_id', selectedSubjectId).limit(1)
+            if (count > 0) {
+              setStudents([])
+              setMarksData({})
+              setNoAssignMsg('No students have been assigned to this subject.')
+              setLoading(false)
+              return
+            }
+          } else {
+            studsQuery = studsQuery.in('id', assignedIds)
           }
         }
 
-        if (isClassWide) {
-          const sample = streamOptions.slice(0, 2).map(cs => ({ id: cs.id, class_id: cs.class_id, stream_id: cs.stream_id }))
-          console.log('🐛 WholeClass debug:', JSON.stringify({ classWideClassId, streamOptionsLen: streamOptions.length, sample, streamIds, assignedIdsLen: assignedIds.length }))
-        }
-        const { data: studs, error: studsErr } = await supabase
-          .from('students')
-          .select('*')
-          .in('class_stream_id', streamIds)
-          .eq('status', 'active')
-          .in('id', assignedIds)
-          .order('surname')
-        if (isClassWide) {
-          console.log('🐛 students query result:', JSON.stringify({ count: studs?.length, firstErr: studsErr?.message }))
-        }
+        const { data: studs } = await studsQuery
 
         setStudents(studs || [])
 
@@ -412,9 +432,12 @@ function EnterMarks() {
   const contextClass = isClassWide
     ? classes.find(c => c.id === classWideClassId)
     : selectedStream ? classes.find(c => c.id === selectedStream.class_id) : null
+  const contextIsOLevel = contextClass?.level !== 'A_LEVEL'
   const contextStr = selectedExam && selectedSubject && (isClassWide || selectedStream)
     ? isClassWide
-      ? `${contextClass?.class_name || '?'} (All Streams) › ${selectedSubject.subject_name} › ${selectedExam.name}`
+      ? contextIsOLevel
+        ? `${contextClass?.class_name || '?'} › ${selectedSubject.subject_name} › ${selectedExam.name}`
+        : `${contextClass?.class_name || '?'} (All Streams) › ${selectedSubject.subject_name} › ${selectedExam.name}`
       : `${contextClass?.class_name || '?'} ${streams.find(s => s.id === selectedStream.stream_id)?.stream_name || ''} › ${selectedSubject.subject_name} › ${selectedExam.name}`
     : ''
 
@@ -570,38 +593,26 @@ function EnterMarks() {
             </select>
           </div>
           <div>
-            <label className="block text-xs font-medium text-gray-600 mb-1.5">Class Stream</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1.5">
+              {selectedSubject?.level === 'O_LEVEL' ? 'Class' : 'Class / Stream'}
+            </label>
             <select
               value={selectedStreamId}
               onChange={(e) => setSelectedStreamId(e.target.value)}
               disabled={!selectedSubjectId}
               className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <option value="">-- Select Stream --</option>
-              {(() => {
-                const groups = {}
-                streamOptions.forEach(cs => {
-                  if (!groups[cs.class_id]) {
-                    const cls = classes.find(c => c.id === cs.class_id)
-                    groups[cs.class_id] = { className: cls?.class_name || cs.class_id.slice(0, 8), streams: [] }
+              <option value="">
+                {selectedSubject?.level === 'O_LEVEL' ? '-- Select Class --' : '-- Select Stream --'}
+              </option>
+              {streamOptions.map(opt => (
+                <option key={opt.id} value={opt.id}>
+                  {opt._isOLevel
+                    ? classes.find(c => c.id === opt.class_id)?.class_name || '?'
+                    : getStreamLabel(opt)
                   }
-                  groups[cs.class_id].streams.push(cs)
-                })
-                const items = []
-                for (const [cid, g] of Object.entries(groups)) {
-                  if (g.streams.length > 1) {
-                    items.push(
-                      <option key={`wc-${cid}`} value={`__class__${cid}`}>
-                        📋 Whole Class ({g.className})
-                      </option>
-                    )
-                  }
-                  g.streams.forEach(cs => {
-                    items.push(<option key={cs.id} value={cs.id}>{getStreamLabel(cs)}</option>)
-                  })
-                }
-                return items
-              })()}
+                </option>
+              ))}
             </select>
           </div>
         </div>
@@ -615,8 +626,8 @@ function EnterMarks() {
         )}
       </div>
 
-      {/* No stream selected */}
-      {!selectedStreamId && <Placeholder title="Select filters above" msg="Choose an exam, subject, and class stream to begin entering marks." />}
+      {/* No class/stream selected */}
+      {!selectedStreamId && <Placeholder title="Select filters above" msg="Choose an exam, subject, and class to begin entering marks." />}
 
       {selectedStreamId && loading && <TableSkeleton />}
 
@@ -663,7 +674,6 @@ function EnterMarks() {
                   <tr className="border-b border-gray-200 bg-gray-50">
                     <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-8">#</th>
                     <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[120px]">Student Name</th>
-                    <th className="text-left px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-16">Adm No</th>
                   <th className="text-center px-2 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider min-w-[80px]">
                     Theory <span className="text-[10px] font-normal text-gray-400">(100)</span>
                     {showPractical && <span className="block text-[10px] font-normal text-gray-400">marks</span>}
@@ -688,9 +698,6 @@ function EnterMarks() {
                         <p className="text-sm font-medium text-gray-900 whitespace-nowrap">
                           {[s.surname, s.first_name, s.middle_name].filter(Boolean).join(' ')}
                         </p>
-                      </td>
-                      <td className="px-3 py-2 align-middle">
-                        <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">{s.admission_number}</span>
                       </td>
                       <td className="px-3 py-2 text-center align-middle">
                         {isAbsent ? (

@@ -25,16 +25,33 @@ function MyStudents() {
 
         if (!assignments || assignments.length === 0) return
 
-        const streamIds = [...new Set(assignments.map(a => a.class_stream_id))]
         const subjectIds = [...new Set(assignments.map(a => a.subject_id))]
 
-        const [sRes, ssRes, subRes] = await Promise.all([
-          supabase.from('students').select('*').in('class_stream_id', streamIds).eq('status', 'active').order('surname'),
-          supabase.from('student_subjects').select('student_id, subject_id').in('subject_id', subjectIds),
+        // Separate O-Level (query by class_id) and A-Level (query by class_stream_id)
+        const oLevelClassIds = [...new Set(
+          assignments
+            .filter(a => a.class_streams?.classes?.level !== 'A_LEVEL')
+            .map(a => a.class_streams?.class_id).filter(Boolean)
+        )]
+        const aLevelStreamIds = [...new Set(
+          assignments
+            .filter(a => a.class_streams?.classes?.level === 'A_LEVEL')
+            .map(a => a.class_stream_id).filter(Boolean)
+        )]
+
+        const fetchPromises = []
+        if (oLevelClassIds.length > 0)
+          fetchPromises.push(supabase.from('students').select('*').in('class_id', oLevelClassIds).eq('status', 'active').order('surname'))
+        if (aLevelStreamIds.length > 0)
+          fetchPromises.push(supabase.from('students').select('*').in('class_stream_id', aLevelStreamIds).eq('status', 'active').order('surname'))
+
+        const [ssRes, subRes, ...studentResults] = await Promise.all([
+          supabase.from('student_subjects').select('student_id, subject_id').in('subject_id', subjectIds).limit(2000),
           supabase.from('subjects').select('*').in('id', subjectIds),
+          ...fetchPromises,
         ])
 
-        const students = sRes.data || []
+        const students = studentResults.flatMap(r => r.data || [])
         const studentSubs = ssRes.data || []
         const subjects = subRes.data || []
 
@@ -47,32 +64,38 @@ function MyStudents() {
           studentSubMap[ss.student_id].push(ss.subject_id)
         })
 
-        const streamSubMap = {}
-        assignments.forEach(a => {
-          if (!streamSubMap[a.class_stream_id]) streamSubMap[a.class_stream_id] = new Set()
-          streamSubMap[a.class_stream_id].add(a.subject_id)
-        })
-
         const grouped = []
         const processed = new Set()
 
         assignments.forEach(a => {
           const cs = a.class_streams
-          const key = cs.id
-          if (processed.has(key)) return
-          processed.add(key)
+          const isOLevel = cs.classes?.level !== 'A_LEVEL'
+          // For O-Level group by class; A-Level group by stream
+          const groupKey = isOLevel ? `class_${cs.class_id}` : cs.id
+          if (processed.has(groupKey)) return
+          processed.add(groupKey)
 
           const cls = cs.classes
           const str = cs.streams
-          const label = cls && str ? `${cls.class_name} - ${str.stream_name}` : 'Unknown'
+          const label = isOLevel
+            ? (cls?.class_name || 'Unknown')
+            : (cls && str ? `${cls.class_name} - ${str.stream_name}` : 'Unknown')
 
-          const streamSubjectIds = [...(streamSubMap[cs.id] || [])]
+          const groupSubjectIds = isOLevel
+            ? [...new Set(assignments.filter(a2 => a2.class_streams?.class_id === cs.class_id).map(a2 => a2.subject_id))]
+            : [...new Set(assignments.filter(a2 => a2.class_stream_id === cs.id).map(a2 => a2.subject_id))]
+
+          const subjectNames = groupSubjectIds.map(sid => subMap[sid]?.subject_name || '?').join(', ')
 
           const studentList = students
-            .filter(s => s.class_stream_id === cs.id)
+            .filter(s => isOLevel ? s.class_id === cs.class_id : s.class_stream_id === cs.id)
             .map(s => {
+              if (isOLevel) {
+                // O-Level: all students take the same class subjects
+                return { ...s, subjects: subjectNames, subjectCount: groupSubjectIds.length }
+              }
               const ssIds = studentSubMap[s.id] || []
-              const matchingSubs = streamSubjectIds.filter(sid => ssIds.includes(sid))
+              const matchingSubs = groupSubjectIds.filter(sid => ssIds.includes(sid))
               return {
                 ...s,
                 subjects: matchingSubs.map(sid => subMap[sid]?.subject_name || '?').join(', '),
@@ -82,7 +105,7 @@ function MyStudents() {
             .filter(s => s.subjectCount > 0)
 
           if (studentList.length > 0) {
-            grouped.push({ id: cs.id, label, students: studentList, subjectCount: streamSubjectIds.length })
+            grouped.push({ id: groupKey, label, students: studentList, subjectCount: groupSubjectIds.length })
           }
         })
 
