@@ -312,18 +312,18 @@ function ReportCard({ student, ctx }) {
             <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'left' }}>Somo</th>
             {mode === 'combined' ? (
               <>
-                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{(examLabel1 || selectedExam?.name || 'Mth. 1')}</th>
-                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{(examLabel2 || selectedExam2?.name || 'Mth. 2')}</th>
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || selectedExam?.name || 'Mth. 1'} (%)</th>
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel2 || selectedExam2?.name || 'Mth. 2'} (%)</th>
               </>
             ) : selectedExam?.has_practical ? (
               <>
-                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || 'Nadharia'}</th>
-                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel2 || 'Vitendo'}</th>
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>Nadharia</th>
+                <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>Vitendo</th>
               </>
             ) : (
-              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>{examLabel1 || 'Alama'}</th>
+              <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '10%' }}>Alama</th>
             )}
-            <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '8%' }}>Wastani</th>
+            <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '8%' }}>Wastani %</th>
             <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '7%' }}>Daraja</th>
             <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '6%' }}>Nafasi</th>
             <th style={{ border: '1px solid #000', padding: '2px 3px', textAlign: 'center', width: '18%' }}>Sahihi ya Mwalimu</th>
@@ -335,7 +335,7 @@ function ReportCard({ student, ctx }) {
             const hp = subjectHasPractical(subject, selectedExam)
             const theoryMark = mark?.marks_obtained ?? null
             const practicalMark = hp ? (mark?.practical_marks ?? null) : null
-            const total = (theoryMark || 0) + (practicalMark || 0)
+            const total = (theoryMark ?? 0) + (practicalMark ?? 0)
             const max = hp ? 150 : 100
             const pct = mark && !mark.is_absent ? (total / max) * 100 : null
             const gradeObj = getGradeForPercentage(pct, grades)
@@ -347,20 +347,22 @@ function ReportCard({ student, ctx }) {
                 <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{subject.subject_name}</td>
                 {selectedExam?.has_practical ? (
                   <>
+                    {/* Theory column: always show marks_obtained for subjects with or without practical */}
                     <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                      {isAbsent ? '-' : theoryMark != null ? theoryMark : '-'}
+                      {isAbsent ? 'ABS' : theoryMark != null ? theoryMark : '-'}
                     </td>
+                    {/* Practical column: only science subjects have hp=true, others show dash */}
                     <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                      {isAbsent ? '-' : practicalMark != null ? practicalMark : '-'}
+                      {isAbsent ? '-' : hp ? (practicalMark != null ? practicalMark : '-') : '-'}
                     </td>
                   </>
                 ) : (
                   <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                    {isAbsent ? '-' : theoryMark != null ? theoryMark : '-'}
+                    {isAbsent ? 'ABS' : theoryMark != null ? theoryMark : '-'}
                   </td>
                 )}
                 <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                  {isAbsent ? '-' : pct != null ? `${pct.toFixed(0)}` : '-'}
+                  {isAbsent ? '-' : pct != null ? pct.toFixed(1) : '-'}
                 </td>
                 <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
                   {isAbsent ? '-' : gradeObj?.grade || '-'}
@@ -374,30 +376,40 @@ function ReportCard({ student, ctx }) {
               </tr>
             )
           })}
-          {mode === 'combined' && cData?.entries.map((entry, idx) => (
-            <tr key={entry.subject.id}>
-              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{idx + 1}</td>
-              <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{entry.subject.subject_name}</td>
-              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                {entry.isAbsent1 ? '-' : entry.exam1Total != null ? entry.exam1Total : '-'}
-              </td>
-              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                {entry.isAbsent2 ? '-' : entry.exam2Total != null ? entry.exam2Total : '-'}
-              </td>
-              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                {entry.combinedPct != null ? `${entry.combinedPct.toFixed(0)}` : '-'}
-              </td>
-              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
-                {entry.gradeObj?.grade || '-'}
-              </td>
-              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
-                {entry.isAbsent1 && entry.isAbsent2 ? '-' : subjectRanks[`${s.id}_${entry.subject.id}`] || '-'}
-              </td>
-              <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                {teacherSubjects[entry.subject.id] || ''}
-              </td>
-            </tr>
-          ))}
+          {mode === 'combined' && cData?.entries.map((entry, idx) => {
+            // Show percentage for each exam column so science subjects (max 150) and
+            // non-science (max 100) are comparable — e.g. 135/150 shows as 90, not 135
+            const e1Pct = entry.exam1Pct != null ? entry.exam1Pct.toFixed(1) : null
+            const e2Pct = entry.exam2Pct != null ? entry.exam2Pct.toFixed(1) : null
+            const combinedPct = entry.combinedPct != null ? entry.combinedPct.toFixed(1) : null
+            return (
+              <tr key={entry.subject.id}>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>{idx + 1}</td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px' }}>{entry.subject.subject_name}</td>
+                {/* Exam 1 column: show percentage (theory+practical)/max*100, not raw total */}
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {entry.isAbsent1 ? 'ABS' : e1Pct != null ? e1Pct : '-'}
+                </td>
+                {/* Exam 2 column: same — percentage so values are on same scale */}
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {entry.isAbsent2 ? 'ABS' : e2Pct != null ? e2Pct : '-'}
+                </td>
+                {/* Wastani: combined average percentage across both exams */}
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {combinedPct != null ? combinedPct : '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', fontWeight: 'bold' }}>
+                  {entry.gradeObj?.grade || '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center' }}>
+                  {entry.isAbsent1 && entry.isAbsent2 ? '-' : subjectRanks[`${s.id}_${entry.subject.id}`] || '-'}
+                </td>
+                <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
+                  {teacherSubjects[entry.subject.id] || ''}
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
 
