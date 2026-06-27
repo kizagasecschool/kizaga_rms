@@ -30,6 +30,7 @@ function Landing() {
   const [schoolInfo, setSchoolInfo] = useState(null)
   const [currentSlide, setCurrentSlide] = useState(0)
   const [uniforms, setUniforms] = useState([])
+  const [joiningInstructions, setJoiningInstructions] = useState([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   useEffect(() => {
@@ -41,6 +42,12 @@ function Landing() {
   useEffect(() => {
     supabase.from('uniforms').select('*').order('sort_order').order('created_at').then(({ data }) => {
       if (data) setUniforms(data)
+    })
+  }, [])
+
+  useEffect(() => {
+    supabase.from('joining_instructions').select('*').order('level').then(({ data }) => {
+      if (data) setJoiningInstructions(data)
     })
   }, [])
 
@@ -77,9 +84,8 @@ function Landing() {
               <a href="#about" className="text-sm text-gray-600 hover:text-maroon-600 transition">About</a>
               <a href="#academics" className="text-sm text-gray-600 hover:text-maroon-600 transition">Academics</a>
               <a href="#facilities" className="text-sm text-gray-600 hover:text-maroon-600 transition">Facilities</a>
+              <Link to="/joining-instructions" className="text-sm text-gray-600 hover:text-maroon-600 transition">Joining Instructions</Link>
               <a href="#uniforms" className="text-sm text-gray-600 hover:text-maroon-600 transition">Sare</a>
-              <Link to="/school-rules" className="text-sm text-gray-600 hover:text-maroon-600 transition">Rules</Link>
-              <Link to="/joining-instructions" className="text-sm text-gray-600 hover:text-maroon-600 transition">Join</Link>
               <Link to="/events-announcements" className="text-sm text-gray-600 hover:text-maroon-600 transition">Events</Link>
               <Link to="/track-application" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition">Fuatilia Ombi</Link>
               <a href="#contact" className="text-sm text-gray-600 hover:text-maroon-600 transition">Contact</a>
@@ -138,7 +144,6 @@ function Landing() {
               { href: '#about', label: 'About' },
               { href: '#academics', label: 'Academics' },
               { href: '#facilities', label: 'Facilities' },
-              { href: '#uniforms', label: 'Sare za Shule' },
               { href: '#contact', label: 'Contact' },
             ].map(item => (
               <a
@@ -150,8 +155,8 @@ function Landing() {
                 {item.label}
               </a>
             ))}
-            <Link to="/school-rules" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">School Rules</Link>
             <Link to="/joining-instructions" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Joining Instructions</Link>
+            <a href="#uniforms" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Sare za Shule</a>
             <Link to="/events-announcements" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Events &amp; Announcements</Link>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 px-1">
               <Link to="/track-application" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center py-3.5 text-base font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl">
@@ -462,70 +467,74 @@ function Landing() {
         </div>
       </section>
 
-      {/* ========== RESULTS ========== */}
-      <section id="results" className="py-16 sm:py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      {/* ========== JOINING INSTRUCTIONS ========== */}
+      <section id="joining-instructions" className="py-16 sm:py-20 bg-white">
+        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Student Results &amp; Academic Performance Tracking</h2>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Joining Instructions</h2>
             <div className="w-16 h-1 bg-maroon-600 mx-auto rounded-full mb-4" />
             <p className="text-gray-500 max-w-2xl mx-auto">
-              Track and manage student academic performance, examination results, and generate comprehensive reports
-              through our online school management system.
+              Download joining instructions for O-Level and A-Level students. All required documents are available below.
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
-              <div className="w-12 h-12 bg-emerald-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          {joiningInstructions.length === 0 ? (
+            <div className="bg-gray-50 rounded-2xl border border-gray-200 p-12 text-center">
+              <div className="w-14 h-14 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-3">
+                <svg className="w-7 h-7 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
                 </svg>
               </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Real-Time Student Performance Tracking</h3>
-              <p className="text-xs text-gray-500">Monitor student progress and academic performance throughout the year</p>
+              <p className="text-sm text-gray-500">Joining instructions will appear here once published.</p>
             </div>
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
-              <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Academic Report Generation</h3>
-              <p className="text-xs text-gray-500">Generate comprehensive student academic reports and transcripts instantly</p>
+          ) : (
+            <div className="space-y-6">
+              {joiningInstructions.map(rec => {
+                const isOLevel = rec.level === 'O_LEVEL'
+                const badgeClass = isOLevel ? 'bg-blue-100 text-blue-700' : 'bg-purple-100 text-purple-700'
+                const badgeLabel = isOLevel ? 'O-Level' : 'A-Level'
+                return (
+                  <div key={rec.id} className="bg-gray-50 rounded-2xl border border-gray-200 p-6">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold uppercase ${badgeClass}`}>
+                        {badgeLabel}
+                      </span>
+                    </div>
+                    <h3 className="text-lg font-semibold text-gray-900 mb-2">{rec.title}</h3>
+                    {rec.description && (
+                      <p className="text-sm text-gray-500 mb-4">{rec.description}</p>
+                    )}
+                    {rec.pdf_url ? (
+                      <a
+                        href={rec.pdf_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-2 px-5 py-3 bg-maroon-600 text-white text-sm font-semibold rounded-xl hover:bg-maroon-700 transition"
+                      >
+                        <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                        </svg>
+                        Open PDF
+                      </a>
+                    ) : (
+                      <p className="text-sm text-gray-400 italic">PDF not yet uploaded</p>
+                    )}
+                  </div>
+                )
+              })}
             </div>
-            <div className="bg-gray-50 rounded-xl border border-gray-200 p-6 text-center">
-              <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mx-auto mb-3">
-                <svg className="w-6 h-6 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z" />
-                </svg>
-              </div>
-              <h3 className="text-sm font-semibold text-gray-900 mb-1">Performance Analytics &amp; Insights</h3>
-              <p className="text-xs text-gray-500">Analyze class and individual student performance trends with data-driven insights</p>
-            </div>
-          </div>
+          )}
 
-          <div className="text-center">
-            {user && profile ? (
-              <Link
-                to={profile.role === 'teacher' ? '/teacher' : '/academic'}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-maroon-600 text-white font-semibold rounded-xl hover:bg-maroon-700 transition text-sm"
-              >
-                Go to Dashboard
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                </svg>
-              </Link>
-            ) : (
-              <Link
-                to="/login"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-maroon-600 text-white font-semibold rounded-xl hover:bg-maroon-700 transition text-sm"
-              >
-                Staff Login &mdash; Access Student Results
-                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
-                </svg>
-              </Link>
-            )}
+          <div className="text-center mt-10">
+            <Link
+              to="/joining-instructions"
+              className="inline-flex items-center gap-2 px-6 py-3 border border-maroon-300 text-maroon-600 font-semibold rounded-xl hover:bg-maroon-50 transition text-sm"
+            >
+              View Full Page
+              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 4.5L21 12m0 0l-7.5 7.5M21 12H3" />
+              </svg>
+            </Link>
           </div>
         </div>
       </section>
@@ -637,11 +646,6 @@ function Landing() {
               </div>
             </div>
           )}
-          <div className="text-center mt-8">
-            <Link to="/school-rules" className="text-sm text-maroon-600 hover:text-maroon-700 font-medium">
-              Tazama kanuni kamili za shule &rarr;
-            </Link>
-          </div>
         </div>
       </section>
 
@@ -796,7 +800,6 @@ function Landing() {
                 <li><a href="#facilities" className="text-sm text-gray-400 hover:text-white transition">Facilities</a></li>
                 <li><a href="#uniforms" className="text-sm text-gray-400 hover:text-white transition">Sare za Shule</a></li>
                 <li><Link to="/apply" className="text-sm text-gray-400 hover:text-white transition">Tuma Ombi</Link></li>
-                <li><Link to="/school-rules" className="text-sm text-gray-400 hover:text-white transition">Kanuni za Shule</Link></li>
                 <li><Link to="/joining-instructions" className="text-sm text-gray-400 hover:text-white transition">Maelekezo ya Kujiunga</Link></li>
                 <li><Link to="/events-announcements" className="text-sm text-gray-400 hover:text-white transition">Matukio na Matangazo</Link></li>
                 <li><Link to="/track-application" className="text-sm text-gray-400 hover:text-white transition">Fuatilia Ombi</Link></li>

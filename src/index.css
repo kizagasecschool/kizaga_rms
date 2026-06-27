@@ -13,6 +13,10 @@
   --color-maroon-900: #3f0d12;
 }
 
+a, button, [role="button"], select, label[for], summary {
+  cursor: pointer;
+}
+
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px); }
   to   { opacity: 1; transform: translateY(0); }

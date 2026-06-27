@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import { useNotification } from '../../context/NotificationContext'
+import { sortSubjectsByNectaCode } from '../../lib/subjectUtils'
 
 const Placeholder = ({ title, msg }) => (
   <div className="bg-white rounded-xl border border-gray-200 p-8 sm:p-10 text-center">
@@ -243,7 +244,8 @@ function EnterMarks() {
             .select('*')
             .in('level', examLevels)
             .order('subject_name')
-          setSubjectOptions(subs || [])
+          const level = examLevels[0] || 'O_LEVEL'
+          setSubjectOptions(sortSubjectsByNectaCode(subs || [], level))
         }
       } catch (err) {
         console.error('Load subjects error:', err)

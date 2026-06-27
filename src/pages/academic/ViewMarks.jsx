@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { sortSubjectsByNectaCode } from '../../lib/subjectUtils'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
@@ -85,7 +86,10 @@ function ViewMarks() {
           supabase.from('class_excluded_subjects').select('subject_id').eq('class_id', selectedClassId),
         ])
         const excludedIds = new Set((exclRes.data || []).map(r => r.subject_id))
-        const assignedSubjects = (sRes.data || []).filter(s => !excludedIds.has(s.id))
+        const assignedSubjects = sortSubjectsByNectaCode(
+          (sRes.data || []).filter(s => !excludedIds.has(s.id)),
+          classLevel
+        )
         setSubjects(assignedSubjects)
 
         let loadedStudents = []

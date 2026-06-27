@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import Modal from '../../components/Modal'
 import { useNotification } from '../../context/NotificationContext'
+import { getNectaCode } from '../../lib/subjectUtils'
 
 const LEVELS = ['O_LEVEL', 'A_LEVEL']
 const SUBJECT_TYPES = ['COMPULSORY', 'OPTIONAL', 'ELECTIVE']
@@ -92,6 +93,7 @@ function AcademicSubjects() {
     setEditingSubject(null)
     setFormData({
       subject_code: '',
+      short_name: '',
       subject_name: '',
       level: activeLevel,
       subject_type: 'COMPULSORY',
@@ -103,6 +105,7 @@ function AcademicSubjects() {
     setEditingSubject(subject)
     setFormData({
       subject_code: subject.subject_code,
+      short_name: subject.short_name || '',
       subject_name: subject.subject_name,
       level: subject.level,
       subject_type: subject.subject_type,
@@ -127,6 +130,7 @@ function AcademicSubjects() {
 
       const payload = {
         subject_code: code,
+        short_name: (formData.short_name || '').toUpperCase() || null,
         subject_name: formData.subject_name,
         level: formData.level,
         subject_type: formData.subject_type,
@@ -354,6 +358,7 @@ function AcademicSubjects() {
               <thead>
                 <tr className="border-b border-gray-200 bg-gray-50">
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">NECTA Code</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject Name</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                   <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -362,7 +367,7 @@ function AcademicSubjects() {
               <tbody className="divide-y divide-gray-100">
                 {oLevelSubjects.length === 0 && (
                   <tr>
-                    <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-400">
+                    <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-400">
                       No O-Level subjects found. Click "+ Add Subject" to create one.
                     </td>
                   </tr>
@@ -370,8 +375,13 @@ function AcademicSubjects() {
                 {oLevelSubjects.map((s) => (
                   <tr key={s.id} className="hover:bg-gray-50 transition">
                     <td className="px-5 py-3.5">
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 font-mono">
                         {s.subject_code}
+                      </span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-maroon-50 text-maroon-700 font-mono">
+                        {getNectaCode(s, 'O_LEVEL')}
                       </span>
                     </td>
                     <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{s.subject_name}</td>
@@ -439,6 +449,7 @@ function AcademicSubjects() {
                     <thead>
                       <tr className="border-b border-gray-200 bg-gray-50">
                         <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
+                        <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">NECTA Code</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject Name</th>
                         <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Type</th>
                         <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
@@ -447,7 +458,7 @@ function AcademicSubjects() {
                     <tbody className="divide-y divide-gray-100">
                       {aLevelSubjects.length === 0 && (
                         <tr>
-                          <td colSpan={4} className="px-5 py-10 text-center text-sm text-gray-400">
+                          <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-400">
                             No A-Level subjects yet. Click &ldquo;+ Add A-Level Subject&rdquo; to create one.
                           </td>
                         </tr>
@@ -457,6 +468,11 @@ function AcademicSubjects() {
                           <td className="px-5 py-3.5">
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-700 font-mono">
                               {s.subject_code}
+                            </span>
+                          </td>
+                          <td className="px-5 py-3.5">
+                            <span className="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-maroon-50 text-maroon-700 font-mono">
+                              {getNectaCode(s, 'A_LEVEL')}
                             </span>
                           </td>
                           <td className="px-5 py-3.5 text-sm font-medium text-gray-900">{s.subject_name}</td>
@@ -620,7 +636,7 @@ function AcademicSubjects() {
         <form onSubmit={handleSaveSubject} className="space-y-4">
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subject Code</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Subject Code <span className="text-red-500">*</span></label>
               <input
                 type="text"
                 required
@@ -632,7 +648,7 @@ function AcademicSubjects() {
                     ? 'border-red-400 focus:ring-red-500 focus:border-red-500 bg-red-50'
                     : 'border-gray-300 focus:ring-maroon-500 focus:border-maroon-500'
                 }`}
-                placeholder="e.g. PHY"
+                placeholder="e.g. PHY_O"
               />
               {subjects.find(s => s.subject_code === (formData.subject_code || '').toUpperCase() && s.level === formData.level && s.id !== editingSubject?.id) && (
                 <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
@@ -642,16 +658,28 @@ function AcademicSubjects() {
               )}
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Subject Name</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">NECTA Code</label>
               <input
                 type="text"
-                required
-                value={formData.subject_name || ''}
-                onChange={(e) => setFormData({ ...formData, subject_name: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-                placeholder="e.g. Physics"
+                maxLength={8}
+                value={formData.short_name || ''}
+                onChange={(e) => setFormData({ ...formData, short_name: e.target.value })}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 uppercase"
+                placeholder="e.g. PHY"
               />
+              <p className="mt-1 text-xs text-gray-400">Used to display &amp; sort subjects. Leave blank to auto-detect.</p>
             </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Subject Name <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              required
+              value={formData.subject_name || ''}
+              onChange={(e) => setFormData({ ...formData, subject_name: e.target.value })}
+              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+              placeholder="e.g. Physics"
+            />
           </div>
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>

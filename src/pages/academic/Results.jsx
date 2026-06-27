@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
+import { sortSubjectsByNectaCode } from '../../lib/subjectUtils'
 import * as XLSX from 'xlsx'
 import domtoimage from 'dom-to-image-more'
 import jsPDF from 'jspdf'
@@ -9,6 +10,7 @@ import { useNotification } from '../../context/NotificationContext'
 import { useAuth } from '../../context/AuthContext'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
+
 
 function subjectHasPractical(subject, exam) {
   if (!exam?.has_practical) return false
@@ -106,7 +108,7 @@ function DivisionSummary({ summary, title }) {
   )
 }
 
-function SubjectGradeMatrix({ subjects, matrix, grades, subjectAverages }) {
+function SubjectGradeMatrix({ subjects, matrix, grades, subjectAverages, classLevel }) {
   const gradeKeys = grades.map(g => g.grade)
   if (!gradeKeys.length) return null
 
@@ -481,7 +483,10 @@ function Results() {
         ])
         setGrades(gRes.data || [])
         const excludedIds = new Set((exclRes.data || []).map(r => r.subject_id))
-        const assignedSubjects = (sRes.data || []).filter(s => !excludedIds.has(s.id))
+        const assignedSubjects = sortSubjectsByNectaCode(
+          (sRes.data || []).filter(s => !excludedIds.has(s.id)),
+          classLevel
+        )
         setSubjects(assignedSubjects)
 
         let loadedStudents = []
@@ -1304,7 +1309,7 @@ function Results() {
                 {/* Subject Grade Analysis */}
                 <div className="flex justify-center mb-6">
                   <div className="w-full">
-                    <SubjectGradeMatrix subjects={subjects} matrix={subjectGradeMatrix} grades={grades} subjectAverages={subjectAverages} />
+                    <SubjectGradeMatrix subjects={subjects} matrix={subjectGradeMatrix} grades={grades} subjectAverages={subjectAverages} classLevel={classLevel} />
                   </div>
                 </div>
 

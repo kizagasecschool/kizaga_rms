@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { sortSubjectsByNectaCode } from '../../lib/subjectUtils'
 import domtoimage from 'dom-to-image-more'
 import jsPDF from 'jspdf'
 
@@ -705,7 +706,10 @@ function StudentReports() {
         ])
         setGrades(gRes.data || [])
         const excludedIds = new Set((exclRes.data || []).map(r => r.subject_id))
-        const assignedSubjects = (sRes.data || []).filter(s => !excludedIds.has(s.id))
+        const assignedSubjects = sortSubjectsByNectaCode(
+          (sRes.data || []).filter(s => !excludedIds.has(s.id)),
+          classLevel
+        )
         setSubjects(assignedSubjects)
         const tsMap = {}
         ;(tsRes.data || []).forEach(ts => {
