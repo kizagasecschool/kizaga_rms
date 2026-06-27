@@ -19,6 +19,7 @@ function Login() {
   const navigate = useNavigate()
 
   useEffect(() => {
+    document.title = 'Staff Login | Kizaga Secondary School'
     supabase.from('school_settings').select('logo_url, national_logo_url, school_name').limit(1).then(({ data }) => {
       if (data?.[0]) setSchoolInfo(data[0])
     })

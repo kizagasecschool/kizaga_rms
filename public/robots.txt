@@ -1,7 +1,6 @@
 # robots.txt for Kizaga Secondary School
 User-agent: *
 Allow: /
-Disallow: /login
 Disallow: /admin
 Disallow: /teacher
 Disallow: /academic

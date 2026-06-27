@@ -1,6 +1,10 @@
+import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 
 export default function SchoolRules() {
+  useEffect(() => {
+    document.title = 'School Rules & Regulations | Kizaga Secondary School'
+  }, [])
   const rules = [
     {
       title: 'Mahudhurio',

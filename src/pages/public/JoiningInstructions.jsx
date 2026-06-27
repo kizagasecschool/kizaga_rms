@@ -7,6 +7,10 @@ export default function JoiningInstructions() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    document.title = 'Joining Instructions | Kizaga Secondary School'
+  }, [])
+
+  useEffect(() => {
     supabase.from('joining_instructions').select('*').order('level').then(({ data, error }) => {
       if (!error) setRecords(data || [])
       setLoading(false)

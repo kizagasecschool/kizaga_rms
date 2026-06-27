@@ -3,6 +3,10 @@ import { supabase } from '../../lib/supabase'
 import { Link } from 'react-router-dom'
 
 export default function TrackApplication() {
+  useEffect(() => {
+    document.title = 'Track Application Status | Kizaga Secondary School'
+  }, [])
+
   const [appNo, setAppNo] = useState('')
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(false)

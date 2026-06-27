@@ -28,6 +28,7 @@ export default function EventsAnnouncements() {
   }
 
   useEffect(() => {
+    document.title = 'Events & Announcements | Kizaga Secondary School'
     loadItems()
     supabase.from('school_settings').select('school_name').limit(1).then(({ data }) => {
       if (data?.[0]) setSchoolInfo(data[0])

@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { Link } from 'react-router-dom'
 
 export default function AdmissionForm() {
+  useEffect(() => {
+    document.title = 'Apply for Admission | Kizaga Secondary School'
+  }, [])
   const [form, setForm] = useState({
     first_name: '', middle_name: '', surname: '',
     gender: '', date_of_birth: '',
