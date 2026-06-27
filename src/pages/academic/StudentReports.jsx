@@ -585,9 +585,11 @@ function ReportCard({ student, ctx }) {
 function StudentReports() {
   const reportRef = useRef(null)
   const bulkContainerRef = useRef(null)
+  const singlePdfRef = useRef(null)
 
   const [generatingPDF, setGeneratingPDF] = useState(false)
   const [generatingBulkPDF, setGeneratingBulkPDF] = useState(false)
+  const [singlePdfStudent, setSinglePdfStudent] = useState(null)
 
   const [mode, setMode] = useState('single')
 
@@ -933,19 +935,41 @@ function StudentReports() {
     setActiveTab('list')
   }, [])
 
-  const handleDownloadPDF = useCallback(async () => {
-    if (!selectedStudent) return
+  const handleDownloadPDF = useCallback(() => {
+    if (!selectedStudent || generatingPDF) return
     setGeneratingPDF(true)
-    try {
-      const name = `${selectedStudent.first_name} ${selectedStudent.middle_name || ''} ${selectedStudent.surname}`.replace(/\s+/g, ' ').trim()
-      const filename = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_report`
-      await generatePDF(reportRef.current, filename)
-    } catch (err) {
-      console.error('PDF generation error:', err)
-    } finally {
-      setGeneratingPDF(false)
-    }
-  }, [selectedStudent])
+    setSinglePdfStudent(selectedStudent)
+  }, [selectedStudent, generatingPDF])
+
+  // Single PDF: render student in off-screen 794px container then capture — same
+  // approach as bulk so layout matches regardless of screen/sidebar width
+  useEffect(() => {
+    if (!singlePdfStudent) return
+    const timer = setTimeout(async () => {
+      try {
+        const el = singlePdfRef.current
+        if (!el || !el.firstChild) return
+        const name = `${singlePdfStudent.first_name} ${singlePdfStudent.middle_name || ''} ${singlePdfStudent.surname}`.replace(/\s+/g, ' ').trim()
+        const filename = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_report`
+        const canvas = await captureElementWithRetry(el.firstChild)
+        const imgData = canvas.toDataURL('image/jpeg', 0.95)
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const margin = 8
+        const usableWidth = pdfWidth - margin * 2
+        const ratio = usableWidth / canvas.width
+        const scaledHeight = canvas.height * ratio
+        addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight)
+        pdf.save(`${filename}.pdf`)
+      } catch (err) {
+        console.error('Single PDF error:', err)
+      } finally {
+        setSinglePdfStudent(null)
+        setGeneratingPDF(false)
+      }
+    }, 400)
+    return () => clearTimeout(timer)
+  }, [singlePdfStudent, reportContext])
 
   const handleDownloadClassPDF = useCallback(() => {
     const studentList = mode === 'single'
@@ -1598,6 +1622,14 @@ function StudentReports() {
               </div>
             </div>
           )}
+
+          {/* Single PDF off-screen container — fixed 794px (A4 width) so layout
+              is identical to bulk PDF and independent of screen/sidebar width */}
+          <div ref={singlePdfRef} style={{ position: 'absolute', left: '-99999px', top: 0, width: '794px', background: '#fff', zIndex: -1 }}>
+            {singlePdfStudent && (
+              <ReportCard student={singlePdfStudent} ctx={reportContext} />
+            )}
+          </div>
 
           {/* Bulk container — off-screen for dom-to-image-more capture */}
           <div ref={bulkContainerRef} style={{ position: 'absolute', left: '-99999px', top: 0, width: '794px', background: '#fff', zIndex: -1 }}>
