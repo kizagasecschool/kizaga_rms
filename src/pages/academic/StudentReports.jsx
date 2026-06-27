@@ -6,6 +6,16 @@ import jsPDF from 'jspdf'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
+function groupExamsByType(examList) {
+  const groups = {}
+  examList.forEach(exam => {
+    const type = exam.exam_type || 'OTHER'
+    if (!groups[type]) groups[type] = []
+    groups[type].push(exam)
+  })
+  return Object.entries(groups)
+}
+
 function subjectHasPractical(subject, exam) {
   if (!exam?.has_practical) return false
   return subject?.has_practical || SCIENCE_SUBJECTS.includes(subject?.subject_code)
@@ -1118,8 +1128,9 @@ function StudentReports() {
       </div>
 
       <div className="no-print bg-white rounded-xl border border-gray-200 p-5 mb-6">
-        <div className="flex items-center gap-4 mb-4">
-          <span className="text-sm font-medium text-gray-700">Aina ya Ripoti:</span>
+        {/* Report type toggle */}
+        <div className="flex items-center gap-3 mb-5">
+          <span className="text-sm font-medium text-gray-700">Report Type:</span>
           <div className="flex gap-2">
             <button
               onClick={() => { setMode('single'); resetSelections() }}
@@ -1127,7 +1138,7 @@ function StudentReports() {
                 mode === 'single' ? 'bg-maroon-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              Mtihani Mmoja
+              Single Exam
             </button>
             <button
               onClick={() => { setMode('combined'); resetSelections() }}
@@ -1135,63 +1146,49 @@ function StudentReports() {
                 mode === 'combined' ? 'bg-maroon-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
               }`}
             >
-              Ripoti Mchanganyiko
+              Combined Report
             </button>
           </div>
           {mode === 'combined' && (
-            <span className="text-xs text-gray-400">Chagua mitihani miwili kuunganisha (mf. Midterm + Terminal)</span>
+            <span className="text-xs text-gray-400 hidden sm:inline">Merge two written exams into one report (e.g. Mid-Term + End-Term)</span>
           )}
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {mode === 'single' ? 'Mwaka wa Masomo' : 'Mwaka wa Mtihani 1'}
-            </label>
-            <select
-              value={selectedYearId}
-              onChange={(e) => { setSelectedYearId(e.target.value); setSelectedExamId(''); resetSelections() }}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-            >
-              <option value="">Miaka Yote</option>
-              {academicYears.map((y) => (
-                <option key={y.id} value={y.id}>{y.year_name}</option>
-              ))}
-            </select>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              {mode === 'single' ? 'Chagua Mtihani' : 'Chagua Mtihani 1'}
-            </label>
-            <select
-              value={selectedExamId}
-              onChange={(e) => { setSelectedExamId(e.target.value); resetSelections() }}
-              className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-            >
-              <option value="">Chagua mtihani...</option>
-              {(selectedYearId ? exams.filter(e => e.academic_year_id === selectedYearId) : exams).map((exam) => (
-                <option key={exam.id} value={exam.id}>
-                  {exam.name} ({exam.exam_type?.replace('_', ' ')})
-                </option>
-              ))}
-            </select>
-          </div>
-          {mode === 'combined' && (
+        {/* ── Single mode ── */}
+        {mode === 'single' && (
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Mwaka wa Mtihani 2</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
               <select
-                value={selectedYear2Id}
-                onChange={(e) => { setSelectedYear2Id(e.target.value); setSelectedExam2Id(''); resetSelections() }}
+                value={selectedYearId}
+                onChange={(e) => { setSelectedYearId(e.target.value); setSelectedExamId(''); resetSelections() }}
                 className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
               >
-                <option value="">Miaka Yote</option>
+                <option value="">All Years</option>
                 {academicYears.map((y) => (
                   <option key={y.id} value={y.id}>{y.year_name}</option>
                 ))}
               </select>
             </div>
-          )}
-          {mode === 'single' && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam</label>
+              <select
+                value={selectedExamId}
+                onChange={(e) => { setSelectedExamId(e.target.value); resetSelections() }}
+                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
+              >
+                <option value="">Choose an exam...</option>
+                {groupExamsByType(selectedYearId ? exams.filter(e => e.academic_year_id === selectedYearId) : exams).map(([type, typeExams]) => (
+                  <optgroup key={type} label={type.replace(/_/g, ' ')}>
+                    {typeExams.map((exam) => (
+                      <option key={exam.id} value={exam.id}>
+                        {exam.name}{exam.has_practical ? ' (+ Practical)' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))}
+              </select>
+            </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
               <select
@@ -1206,56 +1203,160 @@ function StudentReports() {
                 ))}
               </select>
             </div>
-          )}
-          {mode === 'combined' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam 2</label>
-                <select
-                  value={selectedExam2Id}
-                  onChange={(e) => { setSelectedExam2Id(e.target.value) }}
-                  className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
-                >
-                  <option value="">Choose an exam...</option>
-                  {(selectedYear2Id ? exams.filter(e => e.academic_year_id === selectedYear2Id && e.id !== selectedExamId) : exams.filter(e => e.id !== selectedExamId)).map((exam) => (
-                    <option key={exam.id} value={exam.id}>
-                      {exam.name} ({exam.exam_type?.replace('_', ' ')})
-                    </option>
-                  ))}
-                </select>
+          </div>
+        )}
+        {mode === 'single' && selectedExam && (
+          <div className="mt-3 flex items-center gap-3 text-sm text-gray-500">
+            <span>Status: <span className="font-medium text-gray-700 capitalize">{selectedExam.status?.replace(/_/g, ' ')}</span></span>
+            {selectedExam.has_practical && (
+              <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-200 rounded text-xs font-medium">Includes Practical Marks</span>
+            )}
+          </div>
+        )}
+
+        {/* ── Combined mode ── */}
+        {mode === 'combined' && (() => {
+          const writtenExams = exams.filter(e => e.exam_type !== 'PRACTICAL')
+          const exam1List = selectedYearId ? writtenExams.filter(e => e.academic_year_id === selectedYearId) : writtenExams
+          const exam2List = (selectedYear2Id ? writtenExams.filter(e => e.academic_year_id === selectedYear2Id) : writtenExams)
+            .filter(e => e.id !== selectedExamId)
+          const practicalMismatch = selectedExam && selectedExam2 && selectedExam.has_practical !== selectedExam2.has_practical
+          return (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {/* Exam 1 card */}
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-bold text-white bg-maroon-600 px-2 py-0.5 rounded">Exam 1</span>
+                    {selectedExam?.has_practical && (
+                      <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">+ Practical</span>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Academic Year</label>
+                      <select
+                        value={selectedYearId}
+                        onChange={(e) => { setSelectedYearId(e.target.value); setSelectedExamId(''); resetSelections() }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 bg-white"
+                      >
+                        <option value="">All Years</option>
+                        {academicYears.map((y) => (
+                          <option key={y.id} value={y.id}>{y.year_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Select Exam</label>
+                      <select
+                        value={selectedExamId}
+                        onChange={(e) => { setSelectedExamId(e.target.value); resetSelections() }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 bg-white"
+                      >
+                        <option value="">Choose an exam...</option>
+                        {groupExamsByType(exam1List).map(([type, typeExams]) => (
+                          <optgroup key={type} label={type.replace(/_/g, ' ')}>
+                            {typeExams.map((exam) => (
+                              <option key={exam.id} value={exam.id}>
+                                {exam.name}{exam.has_practical ? ' (+ Practical)' : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Exam 2 card */}
+                <div className="rounded-lg border border-gray-200 bg-gray-50 p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-bold text-white bg-gray-600 px-2 py-0.5 rounded">Exam 2</span>
+                    {selectedExam2?.has_practical && (
+                      <span className="text-xs text-blue-700 bg-blue-50 border border-blue-200 px-2 py-0.5 rounded">+ Practical</span>
+                    )}
+                  </div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Academic Year</label>
+                      <select
+                        value={selectedYear2Id}
+                        onChange={(e) => { setSelectedYear2Id(e.target.value); setSelectedExam2Id(''); resetSelections() }}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 bg-white"
+                      >
+                        <option value="">All Years</option>
+                        {academicYears.map((y) => (
+                          <option key={y.id} value={y.id}>{y.year_name}</option>
+                        ))}
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Select Exam</label>
+                      <select
+                        value={selectedExam2Id}
+                        onChange={(e) => { setSelectedExam2Id(e.target.value) }}
+                        disabled={!selectedExamId}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 bg-white disabled:bg-gray-100 disabled:text-gray-400"
+                      >
+                        <option value="">{selectedExamId ? 'Choose an exam...' : 'Select Exam 1 first'}</option>
+                        {groupExamsByType(exam2List).map(([type, typeExams]) => (
+                          <optgroup key={type} label={type.replace(/_/g, ' ')}>
+                            {typeExams.map((exam) => (
+                              <option key={exam.id} value={exam.id}>
+                                {exam.name}{exam.has_practical ? ' (+ Practical)' : ''}
+                              </option>
+                            ))}
+                          </optgroup>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
               </div>
-              <div>
+
+              {/* Class selector */}
+              <div className="max-w-xs">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
                 <select
                   value={selectedClassId}
                   onChange={(e) => setSelectedClassId(e.target.value)}
-                  disabled={activeExamIds.length === 0 || filteredClasses.length === 0}
+                  disabled={activeExamIds.length < 2 || filteredClasses.length === 0}
                   className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500 disabled:bg-gray-50 disabled:text-gray-400"
                 >
-                  <option value="">Choose a class...</option>
+                  <option value="">{activeExamIds.length < 2 ? 'Select both exams first' : 'Choose a class...'}</option>
                   {filteredClasses.map((c) => (
                     <option key={c.id} value={c.id}>{c.class_name}</option>
                   ))}
                 </select>
               </div>
-            </>
-          )}
-        </div>
-        {mode === 'combined' && selectedExam && selectedExam2 && (
-          <div className="mt-3 flex items-center gap-3 text-sm text-gray-500">
-            <span>Exam 1: <span className="font-medium text-gray-700">{selectedExam.name} ({selectedExam.status})</span></span>
-            <span className="text-gray-300">|</span>
-            <span>Exam 2: <span className="font-medium text-gray-700">{selectedExam2.name} ({selectedExam2.status})</span></span>
-          </div>
-        )}
-        {mode === 'single' && selectedExam && (
-          <div className="mt-3 flex items-center gap-3 text-sm text-gray-500">
-            <span>Status: <span className="font-medium text-gray-700">{selectedExam.status?.replace('_', ' ')}</span></span>
-            {selectedExam.has_practical && (
-              <span className="px-2 py-0.5 bg-blue-50 text-blue-600 rounded text-xs font-medium">Has Practical</span>
-            )}
-          </div>
-        )}
+
+              {/* Practical mismatch warning */}
+              {practicalMismatch && (
+                <div className="flex items-start gap-2.5 rounded-lg bg-amber-50 border border-amber-200 px-4 py-3 text-sm text-amber-800">
+                  <svg className="w-4 h-4 mt-0.5 shrink-0 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+                  </svg>
+                  <span>
+                    <strong>Practical mismatch:</strong> {selectedExam.name} {selectedExam.has_practical ? 'includes' : 'does not include'} practical marks, while {selectedExam2.name} {selectedExam2.has_practical ? 'includes' : 'does not include'} practical marks. Science subject totals will be weighted differently between the two exams.
+                  </span>
+                </div>
+              )}
+
+              {/* Combined summary row */}
+              {selectedExam && selectedExam2 && (
+                <div className="flex items-center gap-2 text-sm text-gray-500 pt-1">
+                  <span className="font-medium text-gray-800">{selectedExam.name}</span>
+                  <span className="text-gray-400">+</span>
+                  <span className="font-medium text-gray-800">{selectedExam2.name}</span>
+                  <span className="text-gray-300 mx-1">|</span>
+                  <span>Exam 1 status: <span className="capitalize font-medium text-gray-700">{selectedExam.status?.replace(/_/g, ' ')}</span></span>
+                  <span className="text-gray-300 mx-1">·</span>
+                  <span>Exam 2 status: <span className="capitalize font-medium text-gray-700">{selectedExam2.status?.replace(/_/g, ' ')}</span></span>
+                </div>
+              )}
+            </div>
+          )
+        })()}
       </div>
 
       {loadingData && (
