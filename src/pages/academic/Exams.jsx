@@ -57,6 +57,8 @@ function AcademicExams() {
   const [processConfirm, setProcessConfirm] = useState(null)
   const [processing, setProcessing] = useState(false)
   const [processProgress, setProcessProgress] = useState('')
+  const [reopenConfirm, setReopenConfirm] = useState(null)
+  const [reopening, setReopening] = useState(false)
 
   const [attendanceModal, setAttendanceModal] = useState(null)
   const [printingAttendance, setPrintingAttendance] = useState(false)
@@ -173,6 +175,21 @@ function AcademicExams() {
       showToast(`Status changed to ${newStatus.replace(/_/g,' ')}`, 'success')
     } catch (err) { showToast('Failed. ' + (err.message||''), 'error') }
     finally { setSaving(false) }
+  }
+
+  const handleReopen = async (exam) => {
+    setReopening(true)
+    try {
+      const { error } = await supabase.from('exams').update({ status: 'entering_marks' }).eq('id', exam.id)
+      if (error) throw error
+      await fetchExams()
+      setReopenConfirm(null)
+      showToast(`"${exam.name}" re-opened for mark entry`, 'success')
+    } catch (err) {
+      showToast('Failed to re-open. ' + (err.message || ''), 'error')
+    } finally {
+      setReopening(false)
+    }
   }
 
   const executeProcess = async (exam, reprocess = false) => {
@@ -469,6 +486,18 @@ function AcademicExams() {
                     </button>
                   )}
 
+                  {/* Re-open for mark entry */}
+                  {['processed','published'].includes(exam.status) && (
+                    <button
+                      disabled={saving || processing || reopening}
+                      onClick={() => setReopenConfirm(exam)}
+                      className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-amber-700 bg-amber-50 hover:bg-amber-100 rounded-lg transition disabled:opacity-50"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931z" /></svg>
+                      Re-open for Marks
+                    </button>
+                  )}
+
                   {/* Spacer */}
                   <div className="flex-1" />
 
@@ -628,6 +657,45 @@ function AcademicExams() {
         </div>
       </Modal>
 
+      {/* ─── Re-open for mark entry confirm ─── */}
+      <Modal
+        isOpen={!!reopenConfirm}
+        onClose={reopening ? null : () => setReopenConfirm(null)}
+        title="Re-open Exam for Mark Entry"
+      >
+        {reopening ? (
+          <div className="text-center py-8">
+            <div className="w-10 h-10 border-4 border-gray-200 border-t-amber-500 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm font-medium text-gray-700">Re-opening exam…</p>
+          </div>
+        ) : (
+          <>
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex gap-3">
+              <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+              <div className="text-sm text-amber-800 space-y-1.5">
+                <p className="font-semibold">This will move the exam back to "Entering Marks" status.</p>
+                <ul className="list-disc list-inside space-y-1 text-amber-700">
+                  <li>Teachers will be able to edit and correct marks again.</li>
+                  <li>The previously processed results will remain visible but will be <strong>outdated</strong> until you re-process after corrections.</li>
+                  <li>After fixing the marks, go to <strong>Reprocess</strong> to recalculate grades and rankings.</li>
+                </ul>
+              </div>
+            </div>
+            <div className="bg-gray-50 rounded-xl p-4 space-y-2 mb-5">
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Exam</span><span className="font-semibold text-gray-900">{reopenConfirm?.name}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">Current Status</span><span className="font-semibold text-gray-900 capitalize">{reopenConfirm?.status?.replace(/_/g,' ')}</span></div>
+              <div className="flex justify-between text-sm"><span className="text-gray-500">New Status</span><span className="font-semibold text-amber-700">Entering Marks</span></div>
+            </div>
+            <div className="flex justify-end gap-3">
+              <button onClick={() => setReopenConfirm(null)} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancel</button>
+              <button onClick={() => handleReopen(reopenConfirm)} className="px-5 py-2 text-sm font-semibold text-white bg-amber-600 rounded-lg hover:bg-amber-700 transition">
+                Re-open for Mark Entry
+              </button>
+            </div>
+          </>
+        )}
+      </Modal>
+
       {/* ─── Process confirm ─── */}
       <Modal
         isOpen={!!processConfirm}
@@ -642,14 +710,26 @@ function AcademicExams() {
           </div>
         ) : (
           <>
-            <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-5 flex gap-3">
-              <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
-              <p className="text-sm text-amber-800">
-                {processConfirm?.reprocess
-                  ? 'This will recalculate all grades, divisions and rankings. Exam status will not change.'
-                  : 'This will calculate grades, divisions and rankings for all students and move the exam to Processed.'}
-              </p>
-            </div>
+            {/* Main warning */}
+            {!processConfirm?.reprocess && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4 mb-4 flex gap-3">
+                <svg className="w-5 h-5 text-red-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                <div className="text-sm text-red-800 space-y-1">
+                  <p className="font-semibold">Before you proceed — please read carefully:</p>
+                  <ul className="list-disc list-inside space-y-1 text-red-700">
+                    <li>After processing, <strong>teachers will no longer be able to edit or enter marks</strong> for this exam.</li>
+                    <li>Make sure all marks have been entered and verified before processing.</li>
+                    <li>If a mistake is found after processing, use <strong>"Re-open for Marks"</strong> on the exam card to allow corrections, then re-process.</li>
+                  </ul>
+                </div>
+              </div>
+            )}
+            {processConfirm?.reprocess && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 mb-4 flex gap-3">
+                <svg className="w-5 h-5 text-amber-500 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" /></svg>
+                <p className="text-sm text-amber-800">This will recalculate all grades, divisions and rankings using current marks. Exam status will not change.</p>
+              </div>
+            )}
             <div className="bg-gray-50 rounded-xl p-4 space-y-2 mb-5">
               <div className="flex justify-between text-sm"><span className="text-gray-500">Exam</span><span className="font-semibold text-gray-900">{processConfirm?.exam?.name}</span></div>
               <div className="flex justify-between text-sm"><span className="text-gray-500">Type</span><span className="font-semibold text-gray-900">{processConfirm?.exam?.exam_type?.replace(/_/g,' ')}</span></div>
@@ -658,7 +738,7 @@ function AcademicExams() {
             <div className="flex justify-end gap-3">
               <button onClick={() => setProcessConfirm(null)} className="px-4 py-2 text-sm font-medium text-gray-700 border border-gray-200 rounded-lg hover:bg-gray-50 transition">Cancel</button>
               <button onClick={() => executeProcess(processConfirm.exam, processConfirm.reprocess)} className="px-5 py-2 text-sm font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition">
-                {processConfirm?.reprocess ? 'Reprocess Now' : 'Process Now'}
+                {processConfirm?.reprocess ? 'Reprocess Now' : 'Yes, Process Now'}
               </button>
             </div>
           </>
