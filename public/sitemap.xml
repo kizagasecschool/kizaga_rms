@@ -2,46 +2,46 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"
         xmlns:xhtml="http://www.w3.org/1999/xhtml">
   <url>
-    <loc>https://www.kizaga-school.ac.tz/</loc>
+    <loc>https://kizaga-rms.vercel.app/</loc>
     <lastmod>2026-06-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>1.0</priority>
-    <xhtml:link rel="alternate" hreflang="en" href="https://www.kizaga-school.ac.tz/" />
-    <xhtml:link rel="alternate" hreflang="sw" href="https://www.kizaga-school.ac.tz/" />
-    <xhtml:link rel="alternate" hreflang="x-default" href="https://www.kizaga-school.ac.tz/" />
+    <xhtml:link rel="alternate" hreflang="en" href="https://kizaga-rms.vercel.app/" />
+    <xhtml:link rel="alternate" hreflang="sw" href="https://kizaga-rms.vercel.app/" />
+    <xhtml:link rel="alternate" hreflang="x-default" href="https://kizaga-rms.vercel.app/" />
   </url>
   <url>
-    <loc>https://www.kizaga-school.ac.tz/apply</loc>
+    <loc>https://kizaga-rms.vercel.app/apply</loc>
     <lastmod>2026-06-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://www.kizaga-school.ac.tz/joining-instructions</loc>
+    <loc>https://kizaga-rms.vercel.app/joining-instructions</loc>
     <lastmod>2026-06-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://www.kizaga-school.ac.tz/events-announcements</loc>
+    <loc>https://kizaga-rms.vercel.app/events-announcements</loc>
     <lastmod>2026-06-27</lastmod>
     <changefreq>weekly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.kizaga-school.ac.tz/track-application</loc>
+    <loc>https://kizaga-rms.vercel.app/track-application</loc>
     <lastmod>2026-06-27</lastmod>
     <changefreq>monthly</changefreq>
     <priority>0.8</priority>
   </url>
   <url>
-    <loc>https://www.kizaga-school.ac.tz/school-rules</loc>
+    <loc>https://kizaga-rms.vercel.app/school-rules</loc>
     <lastmod>2026-06-27</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.7</priority>
   </url>
   <url>
-    <loc>https://www.kizaga-school.ac.tz/login</loc>
+    <loc>https://kizaga-rms.vercel.app/login</loc>
     <lastmod>2026-06-27</lastmod>
     <changefreq>yearly</changefreq>
     <priority>0.6</priority>
