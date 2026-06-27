@@ -1,8 +1,6 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { sortSubjectsByNectaCode } from '../../lib/subjectUtils'
-import domtoimage from 'dom-to-image-more'
-import jsPDF from 'jspdf'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
@@ -71,165 +69,6 @@ function computeCombinedMark(mark, hp) {
   return { ...t, max, pct }
 }
 
-function injectHexColors(doc) {
-  const s = doc.createElement('style')
-  s.textContent = `
-    :root {
-      --color-gray-50: #f9fafb; --color-gray-100: #f3f4f6;
-      --color-gray-200: #e5e7eb; --color-gray-300: #d1d5db;
-      --color-gray-400: #9ca3af; --color-gray-500: #6b7280;
-      --color-gray-600: #4b5563; --color-gray-700: #374151;
-      --color-gray-800: #1f2937; --color-gray-900: #111827;
-      --color-green-50: #f0fdf4; --color-green-100: #dcfce7;
-      --color-green-200: #bbf7d0; --color-green-300: #86efac;
-      --color-green-400: #4ade80; --color-green-500: #22c55e;
-      --color-green-600: #16a34a; --color-green-700: #15803d;
-      --color-green-800: #166534; --color-green-900: #14532d;
-      --color-blue-50: #eff6ff; --color-blue-100: #dbeafe;
-      --color-blue-200: #bfdbfe; --color-blue-300: #93c5fd;
-      --color-blue-400: #60a5fa; --color-blue-500: #3b82f6;
-      --color-blue-600: #2563eb; --color-blue-700: #1d4ed8;
-      --color-blue-800: #1e40af; --color-blue-900: #1e3a8a;
-      --color-red-50: #fef2f2; --color-red-100: #fee2e2;
-      --color-red-200: #fecaca; --color-red-300: #fca5a5;
-      --color-red-400: #f87171; --color-red-500: #ef4444;
-      --color-red-600: #dc2626; --color-red-700: #b91c1c;
-      --color-red-800: #991b1b; --color-red-900: #7f1d1d;
-      --color-amber-50: #fffbeb; --color-amber-100: #fef3c7;
-      --color-amber-200: #fde68a; --color-amber-300: #fcd34d;
-      --color-amber-400: #fbbf24; --color-amber-500: #f59e0b;
-      --color-amber-600: #d97706; --color-amber-700: #b45309;
-      --color-amber-800: #92400e; --color-amber-900: #78350f;
-      --color-indigo-50: #eef2ff; --color-indigo-100: #e0e7ff;
-      --color-indigo-200: #c7d2fe; --color-indigo-300: #a5b4fc;
-      --color-indigo-400: #818cf8; --color-indigo-500: #6366f1;
-      --color-indigo-600: #4f46e5; --color-indigo-700: #4338ca;
-      --color-indigo-800: #3730a3; --color-indigo-900: #312e81;
-      --color-purple-50: #faf5ff; --color-purple-100: #f3e8ff;
-      --color-purple-200: #e9d5ff; --color-purple-300: #d8b4fe;
-      --color-purple-400: #c084fc; --color-purple-500: #a855f7;
-      --color-purple-600: #9333ea; --color-purple-700: #7e22ce;
-      --color-purple-800: #6b21a8; --color-purple-900: #581c87;
-      --color-emerald-50: #ecfdf5; --color-emerald-100: #d1fae5;
-      --color-emerald-200: #a7f3d0; --color-emerald-300: #6ee7b7;
-      --color-emerald-400: #34d399; --color-emerald-500: #10b981;
-      --color-emerald-600: #059669; --color-emerald-700: #047857;
-      --color-emerald-800: #065f46; --color-emerald-900: #064e3b;
-      --color-maroon-50: #fdf2f3; --color-maroon-100: #fde8e9;
-      --color-maroon-200: #fbd0d4; --color-maroon-300: #f7a9b0;
-      --color-maroon-400: #f27a86; --color-maroon-500: #e84c5c;
-      --color-maroon-600: #b91c3b; --color-maroon-700: #99152e;
-      --color-maroon-800: #7a1224; --color-maroon-900: #3f0d12;
-    }
-  `
-  doc.head.appendChild(s)
-}
-
-function stripUIElements(doc) {
-  const selectors = [
-    'aside', 'header', 'nav', 'footer',
-    '.no-print', '[class*="sidebar"]', '[class*="topbar"]',
-    '[class*="navbar"]', '[class*="profile-dropdown"]',
-    '[class*="notif"]',
-  ]
-  selectors.forEach(sel => {
-    try {
-      const els = doc.querySelectorAll(sel)
-      els.forEach(el => { if (el) el.style.display = 'none' })
-    } catch {
-      // selector may not match, skip
-    }
-  })
-  const root = doc.documentElement
-  if (root) {
-    root.style.overflow = 'hidden'
-    root.style.height = 'auto'
-  }
-  const body = doc.body
-  if (body) {
-    body.style.overflow = 'hidden'
-    body.style.height = 'auto'
-  }
-  const style = doc.createElement('style')
-  style.textContent = '::-webkit-scrollbar { display: none !important; width: 0 !important; height: 0 !important; }'
-  doc.head.appendChild(style)
-}
-
-async function captureElementWithRetry(element, retries = 2) {
-  for (let attempt = 0; attempt <= retries; attempt++) {
-    try {
-      return await domtoimage.toCanvas(element, {
-        scale: 2,
-        bgcolor: '#ffffff',
-        style: {
-          overflow: 'visible',
-          height: 'auto',
-          width: element.scrollWidth + 'px',
-        },
-        onclone: (node) => {
-          const doc = node.ownerDocument
-          injectHexColors(doc)
-          const imgs = doc.querySelectorAll('img')
-          imgs.forEach(img => { img.crossOrigin = 'anonymous' })
-          stripUIElements(doc)
-        },
-      })
-    } catch (err) {
-      if (attempt < retries) {
-        await new Promise(r => setTimeout(r, 300))
-      } else {
-        throw err
-      }
-    }
-  }
-}
-
-function addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight) {
-  const pdfHeight = pdf.internal.pageSize.getHeight()
-  const usableHeight = pdfHeight - margin * 2
-  let heightLeft = scaledHeight
-  let position = margin
-  pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, scaledHeight)
-  heightLeft -= usableHeight
-  while (heightLeft > 1) {
-    position = margin - (scaledHeight - heightLeft)
-    pdf.addPage()
-    pdf.addImage(imgData, 'JPEG', margin, position, usableWidth, scaledHeight)
-    heightLeft -= usableHeight
-  }
-}
-
-function downloadPDF(pdf, filename) {
-  // Use blob + <a download> so the browser triggers a file download
-  // without opening a new tab or navigating away from the current page.
-  const blob = pdf.output('blob')
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = `${filename}.pdf`
-  a.style.display = 'none'
-  document.body.appendChild(a)
-  a.click()
-  setTimeout(() => {
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }, 150)
-}
-
-async function generatePDF(element, filename, orientation = 'p') {
-  const canvas = await captureElementWithRetry(element)
-  const imgData = canvas.toDataURL('image/jpeg', 0.95)
-  const pdf = new jsPDF(orientation, 'mm', 'a4')
-  const pdfWidth = pdf.internal.pageSize.getWidth()
-  const margin = 8
-  const usableWidth = pdfWidth - margin * 2
-  const canvasWidth = canvas.width
-  const canvasHeight = canvas.height
-  const ratio = usableWidth / canvasWidth
-  const scaledHeight = canvasHeight * ratio
-  addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight)
-  downloadPDF(pdf, filename)
-}
 
 const printStyles = `
   .print-all-students { display: none; }
@@ -310,7 +149,7 @@ function ReportCard({ student, ctx }) {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
           <div style={{ width: '130px', display: 'flex', justifyContent: 'flex-start' }}>
             {schoolInfo?.national_logo_url && (
-              <img src={schoolInfo.national_logo_url} alt="" style={{ width: '110px', height: '110px', objectFit: 'contain' }} crossOrigin="anonymous" />
+              <img src={schoolInfo.national_logo_url} alt="" style={{ width: '85px', height: '85px', objectFit: 'contain' }} crossOrigin="anonymous" />
             )}
           </div>
           <div style={{ flex: 1, textAlign: 'center', fontSize: '15px', fontWeight: 'bold', textTransform: 'uppercase', whiteSpace: 'pre-line', lineHeight: '1.2' }}>
@@ -318,7 +157,7 @@ function ReportCard({ student, ctx }) {
           </div>
           <div style={{ width: '130px', display: 'flex', justifyContent: 'flex-end' }}>
             {schoolInfo?.logo_url && (
-              <img src={schoolInfo.logo_url} alt="" style={{ width: '110px', height: '110px', objectFit: 'contain' }} crossOrigin="anonymous" />
+              <img src={schoolInfo.logo_url} alt="" style={{ width: '85px', height: '85px', objectFit: 'contain' }} crossOrigin="anonymous" />
             )}
           </div>
         </div>
@@ -601,12 +440,6 @@ function ReportCard({ student, ctx }) {
 
 function StudentReports() {
   const reportRef = useRef(null)
-  const bulkContainerRef = useRef(null)
-  const singlePdfRef = useRef(null)
-
-  const [generatingPDF, setGeneratingPDF] = useState(false)
-  const [generatingBulkPDF, setGeneratingBulkPDF] = useState(false)
-  const [singlePdfStudent, setSinglePdfStudent] = useState(null)
 
   const [mode, setMode] = useState('single')
 
@@ -633,7 +466,6 @@ function StudentReports() {
   const [schoolInfo, setSchoolInfo] = useState(null)
 
   const [selectedStudent, setSelectedStudent] = useState(null)
-  const [bulkStudents, setBulkStudents] = useState([])
   const [activeTab, setActiveTab] = useState('list')
 
   const [reportHeading, setReportHeading] = useState('')
@@ -953,114 +785,12 @@ function StudentReports() {
   }, [])
 
   const handleDownloadPDF = useCallback(() => {
-    if (!selectedStudent || generatingPDF) return
-    setGeneratingPDF(true)
-    setSinglePdfStudent(selectedStudent)
-  }, [selectedStudent, generatingPDF])
-
-  // Single PDF: render student in off-screen 794px container then capture — same
-  // approach as bulk so layout matches regardless of screen/sidebar width
-  useEffect(() => {
-    if (!singlePdfStudent) return
-    const timer = setTimeout(async () => {
-      try {
-        const el = singlePdfRef.current
-        if (!el || !el.firstChild) return
-        const name = `${singlePdfStudent.first_name} ${singlePdfStudent.middle_name || ''} ${singlePdfStudent.surname}`.replace(/\s+/g, ' ').trim()
-        const filename = `${name.replace(/[^a-zA-Z0-9]/g, '_')}_report`
-        const canvas = await captureElementWithRetry(el.firstChild)
-        const imgData = canvas.toDataURL('image/jpeg', 0.95)
-        const pdf = new jsPDF('p', 'mm', 'a4')
-        const pdfWidth = pdf.internal.pageSize.getWidth()
-        const margin = 8
-        const usableWidth = pdfWidth - margin * 2
-        const ratio = usableWidth / canvas.width
-        const scaledHeight = canvas.height * ratio
-        addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight)
-        downloadPDF(pdf, filename)
-      } catch (err) {
-        console.error('Single PDF error:', err)
-      } finally {
-        setSinglePdfStudent(null)
-        setGeneratingPDF(false)
-      }
-    }, 400)
-    return () => clearTimeout(timer)
-  }, [singlePdfStudent, reportContext])
+    window.print()
+  }, [])
 
   const handleDownloadClassPDF = useCallback(() => {
-    const studentList = mode === 'single'
-      ? sortedStudents.filter(s => s.result?.position != null)
-      : sortedStudents
-    if (studentList.length === 0) {
-      alert('Hakuna wanafunzi wenye matokeo kwa darasa hili.')
-      return
-    }
-    setGeneratingBulkPDF('Inaandaa...')
-    setBulkStudents(studentList)
-  }, [sortedStudents, mode])
-
-  // Bulk PDF: single multi-page PDF with all students (one per page)
-  useEffect(() => {
-    if (bulkStudents.length === 0 || generatingBulkPDF === false) return
-    const timer = setTimeout(async () => {
-      const errors = []
-      try {
-        const c = classes.find(cl => cl.id === selectedClassId)
-        const className = c?.class_name || 'Darasa'
-        const filename = `${className.replace(/[^a-zA-Z0-9]/g, '_')}_Ripoti_Zote`
-
-        const pdf = new jsPDF('p', 'mm', 'a4')
-        const pdfWidth = pdf.internal.pageSize.getWidth()
-        const margin = 8
-        const usableWidth = pdfWidth - margin * 2
-
-        for (let i = 0; i < bulkStudents.length; i++) {
-          setGeneratingBulkPDF(`Inaandaa ${i + 1} kati ya ${bulkStudents.length}...`)
-          await new Promise(resolve => setTimeout(resolve, 50))
-
-          const studentEl = bulkContainerRef.current?.children[i]
-          if (!studentEl) {
-            console.warn(`Bulk PDF: student element at index ${i} not found, skipping`)
-            continue
-          }
-
-          const s = bulkStudents[i]
-          const studentName = `${s.first_name || ''} ${s.middle_name || ''} ${s.surname || ''}`.trim()
-
-          try {
-            const canvas = await captureElementWithRetry(studentEl)
-            const imgData = canvas.toDataURL('image/jpeg', 0.95)
-            const canvasWidth = canvas.width
-            const canvasHeight = canvas.height
-            const ratio = usableWidth / canvasWidth
-            const scaledHeight = canvasHeight * ratio
-
-            if (i > 0 || pdf.getNumberOfPages() > 0) {
-              if (i > 0) pdf.addPage()
-            }
-            addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight)
-          } catch (studentErr) {
-            console.error(`Bulk PDF: failed to capture report for ${studentName}:`, studentErr)
-            errors.push({ name: studentName, error: studentErr.message })
-          }
-        }
-
-        if (errors.length > 0) {
-          console.warn(`Bulk PDF completed with ${errors.length} error(s):`, errors.map(e => e.name).join(', '))
-        }
-
-        downloadPDF(pdf, filename)
-      } catch (err) {
-        console.error('Bulk PDF generation error:', err)
-        alert('Kuna tatizo wakati wa kuandaa PDF. Tafadhali jaribu tena.')
-      } finally {
-        setGeneratingBulkPDF(false)
-        setBulkStudents([])
-      }
-    }, 800)
-    return () => clearTimeout(timer)
-  }, [bulkStudents, generatingBulkPDF])
+    window.print()
+  }, [])
 
   // Load per-class report settings from DB when class changes or report tab opens
   useEffect(() => {
@@ -1457,20 +1187,13 @@ function StudentReports() {
                 <div className="flex items-center gap-2">
                   <button
                     onClick={handleDownloadClassPDF}
-                    disabled={sortedStudents.length === 0 || generatingBulkPDF !== false}
+                    disabled={sortedStudents.length === 0}
                     className="px-3 py-1.5 text-xs font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition flex items-center gap-1.5 disabled:opacity-50"
                   >
-                    {generatingBulkPDF !== false ? (
-                      <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                      </svg>
-                    ) : (
-                      <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                      </svg>
-                    )}
-                    {generatingBulkPDF !== false ? generatingBulkPDF : `Pakua Zote (${sortedStudents.length})`}
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
+                    </svg>
+                    Chapisha Zote ({sortedStudents.length})
                   </button>
                 </div>
               </div>
@@ -1522,7 +1245,7 @@ function StudentReports() {
                 <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-xs text-blue-700">Chapisha ripoti zote: bonyeza <kbd className="px-1 py-0.5 bg-blue-100 border border-blue-200 rounded text-xs font-mono">Ctrl+P</kbd> ukiwa kwenye mtazamo huu</span>
+                <span className="text-xs text-blue-700">Chapisha ripoti zote: bonyeza <kbd className="px-1 py-0.5 bg-blue-100 border border-blue-200 rounded text-xs font-mono">Ctrl+P</kbd> au kitufe cha <strong>Chapisha Zote</strong> kwenye orodha</span>
               </div>
               <div className="no-print flex items-center justify-between mb-4">
                 <button
@@ -1536,20 +1259,12 @@ function StudentReports() {
                 </button>
                 <button
                   onClick={handleDownloadPDF}
-                  disabled={generatingPDF}
-                  className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition flex items-center gap-2"
                 >
-                  {generatingPDF ? (
-                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3" />
-                    </svg>
-                  )}
-                  {generatingPDF ? 'Inaandaa...' : 'Pakua PDF'}
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
+                  </svg>
+                  Chapisha PDF
                 </button>
               </div>
 
@@ -1639,21 +1354,6 @@ function StudentReports() {
               </div>
             </div>
           )}
-
-          {/* Single PDF off-screen container — fixed 794px (A4 width) so layout
-              is identical to bulk PDF and independent of screen/sidebar width */}
-          <div ref={singlePdfRef} style={{ position: 'absolute', left: '-99999px', top: 0, width: '794px', background: '#fff', zIndex: -1 }}>
-            {singlePdfStudent && (
-              <ReportCard student={singlePdfStudent} ctx={reportContext} />
-            )}
-          </div>
-
-          {/* Bulk container — off-screen for dom-to-image-more capture */}
-          <div ref={bulkContainerRef} style={{ position: 'absolute', left: '-99999px', top: 0, width: '794px', background: '#fff', zIndex: -1 }}>
-            {bulkStudents.map((student) => (
-              <ReportCard key={student.id} student={student} ctx={reportContext} />
-            ))}
-          </div>
 
           {/* Print all students — visible only during Ctrl+P / browser print */}
           <div className="print-all-students">
