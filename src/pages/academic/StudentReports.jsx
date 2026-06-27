@@ -199,6 +199,23 @@ function addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight) {
   }
 }
 
+function downloadPDF(pdf, filename) {
+  // Use blob + <a download> so the browser triggers a file download
+  // without opening a new tab or navigating away from the current page.
+  const blob = pdf.output('blob')
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `${filename}.pdf`
+  a.style.display = 'none'
+  document.body.appendChild(a)
+  a.click()
+  setTimeout(() => {
+    document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+  }, 150)
+}
+
 async function generatePDF(element, filename, orientation = 'p') {
   const canvas = await captureElementWithRetry(element)
   const imgData = canvas.toDataURL('image/jpeg', 0.95)
@@ -211,7 +228,7 @@ async function generatePDF(element, filename, orientation = 'p') {
   const ratio = usableWidth / canvasWidth
   const scaledHeight = canvasHeight * ratio
   addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight)
-  pdf.save(`${filename}.pdf`)
+  downloadPDF(pdf, filename)
 }
 
 const printStyles = `
@@ -960,7 +977,7 @@ function StudentReports() {
         const ratio = usableWidth / canvas.width
         const scaledHeight = canvas.height * ratio
         addImageToPDF(pdf, imgData, margin, usableWidth, scaledHeight)
-        pdf.save(`${filename}.pdf`)
+        downloadPDF(pdf, filename)
       } catch (err) {
         console.error('Single PDF error:', err)
       } finally {
@@ -1033,7 +1050,7 @@ function StudentReports() {
           console.warn(`Bulk PDF completed with ${errors.length} error(s):`, errors.map(e => e.name).join(', '))
         }
 
-        pdf.save(`${filename}.pdf`)
+        downloadPDF(pdf, filename)
       } catch (err) {
         console.error('Bulk PDF generation error:', err)
         alert('Kuna tatizo wakati wa kuandaa PDF. Tafadhali jaribu tena.')
