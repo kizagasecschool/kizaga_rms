@@ -371,7 +371,7 @@ function EnterMarks() {
           .eq('subject_id', selectedSubjectId)
           .limit(500)
 
-        let studsQuery = supabase.from('students').select('*').eq('status', 'active').order('gender').order('surname').order('first_name')
+        let studsQuery = supabase.from('students').select('*').eq('status', 'active')
 
         if (isClassWide && isOLevel) {
           // O-Level: all students in the class take all O-Level subjects — filter by class_id only
@@ -405,7 +405,15 @@ function EnterMarks() {
 
         const { data: studs } = await studsQuery
 
-        setStudents(studs || [])
+        // Sort: girls (Female) first alphabetically, then boys alphabetically
+        const sorted = (studs || []).slice().sort((a, b) => {
+          const gA = a.gender === 'Female' ? 0 : 1
+          const gB = b.gender === 'Female' ? 0 : 1
+          if (gA !== gB) return gA - gB
+          const s = (a.surname || '').localeCompare(b.surname || '')
+          return s !== 0 ? s : (a.first_name || '').localeCompare(b.first_name || '')
+        })
+        setStudents(sorted)
 
         const map = {}
         ;(mRes.data || []).forEach(m => { map[m.student_id] = m })
