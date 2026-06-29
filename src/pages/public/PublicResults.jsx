@@ -402,8 +402,8 @@ export default function PublicResults() {
                           className="accent-maroon-600"
                         />
                         <div className="min-w-0 flex-1">
-                          <p className="text-sm font-medium text-gray-800">{ex.exam_name}</p>
-                          {ex.academic_year && <p className="text-xs text-gray-400 mt-0.5">{ex.academic_year}</p>}
+                          <p className="text-sm font-medium text-gray-800">{ex.name}</p>
+                          {ex.exam_type && <p className="text-xs text-gray-400 mt-0.5">{ex.exam_type.replace('_', ' ')}</p>}
                         </div>
                         {examId === ex.id && (
                           <svg className="w-5 h-5 text-maroon-600 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
@@ -463,7 +463,7 @@ export default function PublicResults() {
                 <div className="flex-1 min-w-0">
                   <p className="font-bold text-xl">{studentName}</p>
                   <p className="text-maroon-200 text-sm">{student.classes?.class_name} &middot; {student.admission_number}</p>
-                  <p className="text-maroon-100 text-sm mt-1 font-medium">{exam?.exam_name}</p>
+                  <p className="text-maroon-100 text-sm mt-1 font-medium">{exam?.name}</p>
                 </div>
                 {division && (
                   <div className="text-center shrink-0">
@@ -510,8 +510,8 @@ export default function PublicResults() {
                 {/* Comparison summary cards */}
                 <div className="grid grid-cols-2 gap-3 mb-5">
                   {[
-                    { label: exam?.exam_name, res: results, div: division },
-                    { label: compareExam?.exam_name, res: compareResults, div: compareDivision },
+                    { label: exam?.name, res: results, div: division },
+                    { label: compareExam?.name, res: compareResults, div: compareDivision },
                   ].map((item, idx) => {
                     const avgA = results.resultRow?.average_marks
                     const avgB = compareResults.resultRow?.average_marks
@@ -565,7 +565,7 @@ export default function PublicResults() {
                             : `${studentName.split(' ')[0]} ameshuka kwa ${Math.abs(diff).toFixed(1)}%`}
                         </p>
                         <p className={`text-xs mt-0.5 ${rose ? 'text-emerald-600' : same ? 'text-gray-500' : 'text-red-600'}`}>
-                          {exam?.exam_name}: {Number(avgA).toFixed(1)}% → {compareExam?.exam_name}: {Number(avgB).toFixed(1)}%
+                          {exam?.name}: {Number(avgA).toFixed(1)}% → {compareExam?.name}: {Number(avgB).toFixed(1)}%
                         </p>
                       </div>
                     </div>
@@ -577,8 +577,8 @@ export default function PublicResults() {
                   <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
                     <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs font-semibold text-gray-500 uppercase">
                       <span>Somo</span>
-                      <span className="text-center w-16 truncate">{exam?.exam_name?.split(' ').slice(0, 2).join(' ')}</span>
-                      <span className="text-center w-16 truncate">{compareExam?.exam_name?.split(' ').slice(0, 2).join(' ')}</span>
+                      <span className="text-center w-16 truncate">{exam?.name?.split(' ').slice(0, 2).join(' ')}</span>
+                      <span className="text-center w-16 truncate">{compareExam?.name?.split(' ').slice(0, 2).join(' ')}</span>
                       <span className="text-center w-10">Mwelekeo</span>
                     </div>
                   </div>
@@ -703,7 +703,7 @@ export default function PublicResults() {
                   >
                     <option value="">Chagua mtihani...</option>
                     {exams.filter(ex => ex.id !== examId).map(ex => (
-                      <option key={ex.id} value={ex.id}>{ex.exam_name}</option>
+                      <option key={ex.id} value={ex.id}>{ex.name}</option>
                     ))}
                   </select>
                   <button
