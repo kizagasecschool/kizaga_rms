@@ -12,6 +12,8 @@ import AdminUsers from './pages/admin/Users'
 import SchoolSettings from './pages/admin/SchoolSettings'
 import ClassUpgrade from './pages/admin/ClassUpgrade'
 import HeadmasterDashboard from './pages/headmaster/Dashboard'
+import HeadmasterReports from './pages/headmaster/Reports'
+import HeadmasterPerformance from './pages/headmaster/Performance'
 import AcademicDashboard from './pages/academic/Dashboard'
 import AcademicClasses from './pages/academic/Classes'
 import AcademicSubjects from './pages/academic/Subjects'
@@ -91,6 +93,8 @@ function App() {
               <RoleBasedRoute allowedRoles={['headmaster']}>
                 <Routes>
                   <Route index element={<HeadmasterDashboard />} />
+                  <Route path="reports" element={<HeadmasterReports />} />
+                  <Route path="performance" element={<HeadmasterPerformance />} />
                   <Route path="admissions" element={<ManageAdmissions />} />
                   <Route path="uniforms" element={<ManageUniforms />} />
                   <Route path="events-announcements" element={<ManageEventsAnnouncements />} />
