@@ -43,7 +43,7 @@ function Login() {
     setIsLoading(true)
 
     try {
-      await signIn(email, password)
+      await signIn(email, password, rememberMe)
     } catch (err) {
       setError(err.message || 'Invalid email or password')
       showToast(err.message || 'Invalid email or password', 'error')

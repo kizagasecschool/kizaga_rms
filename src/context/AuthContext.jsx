@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, SESSION_ONLY_KEY } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
@@ -90,6 +90,7 @@ export function AuthProvider({ children }) {
     const inactivityTime = 30 * 60 * 1000; // 30 minutes
 
     const signOutUser = async () => {
+      sessionStorage.removeItem(SESSION_ONLY_KEY);
       await supabase.auth.signOut();
       setUser(null);
       setProfile(null);
@@ -114,12 +115,21 @@ export function AuthProvider({ children }) {
     };
   }, []);
 
-  const signIn = async (email, password) => {
+  const signIn = async (email, password, rememberMe = true) => {
+    if (rememberMe) {
+      sessionStorage.removeItem(SESSION_ONLY_KEY)
+    } else {
+      sessionStorage.setItem(SESSION_ONLY_KEY, '1')
+    }
     const { error } = await supabase.auth.signInWithPassword({ email, password })
-    if (error) throw error
+    if (error) {
+      sessionStorage.removeItem(SESSION_ONLY_KEY)
+      throw error
+    }
   }
 
   const signOut = useCallback(async () => {
+    sessionStorage.removeItem(SESSION_ONLY_KEY)
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
