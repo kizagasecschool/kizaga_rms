@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase'
 export default function SchoolSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [testingSms, setTestingSms] = useState(false)
   const [message, setMessage] = useState({ type: '', text: '' })
   const timerRef = useRef(null)
 
@@ -141,6 +142,38 @@ export default function SchoolSettings() {
       showMessage({ type: 'success', text: 'Logo removed' })
     } catch (err) {
       showMessage({ type: 'error', text: 'Failed to remove logo: ' + (err.message || err) })
+    }
+  }
+
+  const handleTestSms = async () => {
+    if (!settings.beem_api_key || !settings.beem_secret_key || !settings.beem_sender_id) {
+      showMessage({ type: 'error', text: 'Please fill in all Beem Africa fields first' })
+      return
+    }
+    if (!settings.phone) {
+      showMessage({ type: 'error', text: 'Please add a school phone number to receive the test SMS' })
+      return
+    }
+    setTestingSms(true)
+    try {
+      const res = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          recipients: [{ phone: settings.phone.replace(/[^0-9]/g, '').replace(/^0/, '255') }],
+          message: `Test SMS from ${settings.school_name || 'Kizaga RMS'}. Beem Africa credentials are working correctly.`,
+        }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        showMessage({ type: 'success', text: 'Test SMS sent successfully! Check the school phone.' })
+      } else {
+        showMessage({ type: 'error', text: 'Test failed: ' + (data.error || 'Unknown error') })
+      }
+    } catch (err) {
+      showMessage({ type: 'error', text: 'Test failed: ' + err.message })
+    } finally {
+      setTestingSms(false)
     }
   }
 
@@ -434,6 +467,26 @@ export default function SchoolSettings() {
               maxLength={11}
             />
             <p className="text-xs text-gray-400 mt-1">Max 11 characters. Must be registered with Beem Africa.</p>
+          </div>
+          <div className="pt-1">
+            <button
+              type="button"
+              onClick={handleTestSms}
+              disabled={testingSms || !settings.beem_api_key || !settings.beem_secret_key || !settings.beem_sender_id}
+              className="inline-flex items-center gap-2 px-4 py-2 text-sm font-medium text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-lg hover:bg-emerald-100 disabled:opacity-50 transition"
+            >
+              {testingSms ? (
+                <><span className="w-4 h-4 border-2 border-emerald-400 border-t-transparent rounded-full animate-spin" />Sending test...</>
+              ) : (
+                <>
+                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Send Test SMS
+                </>
+              )}
+            </button>
+            <p className="text-xs text-gray-400 mt-1">Sends a test SMS to the school phone number above to verify credentials.</p>
           </div>
         </div>
 

@@ -8,7 +8,7 @@ import { useNotification } from '../context/NotificationContext'
 function Notifications() {
   const { profile } = useAuth()
   const { showToast } = useNotification()
-  const { notifications, fetchNotifications, markAsRead, markAllAsRead } = useAppNotifications()
+  const { notifications, fetchNotifications, markAsRead, markAllAsRead, deleteNotification } = useAppNotifications()
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -74,11 +74,17 @@ function Notifications() {
     const diffHours = Math.floor(diffMins / 60)
     const diffDays = Math.floor(diffHours / 24)
 
-    if (diffMins < 1) return 'Just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
-    return d.toLocaleDateString('en-TZ', { day: 'numeric', month: 'short' })
+    if (diffMins < 1) return 'Sasa hivi'
+    if (diffMins < 60) return `Dakika ${diffMins} zilizopita`
+    if (diffHours < 24) return `Saa ${diffHours} zilizopita`
+    if (diffDays < 7) return `Siku ${diffDays} zilizopita`
+    return d.toLocaleDateString('sw-TZ', { day: 'numeric', month: 'short' })
+  }
+
+  const handleDelete = async (e, id) => {
+    e.stopPropagation()
+    await deleteNotification(id)
+    showToast('Arifa imefutwa', 'success')
   }
 
   if (loading) {
@@ -145,9 +151,18 @@ function Notifications() {
                 <p className="text-xs text-gray-400 mt-1">From: {n.sender.full_name || n.sender.email}</p>
               )}
             </div>
-            {!n.is_read && (
-              <div className="w-2 h-2 rounded-full bg-maroon-600 shrink-0 mt-2" />
-            )}
+            <div className="flex flex-col items-end gap-2 shrink-0">
+              {!n.is_read && <div className="w-2 h-2 rounded-full bg-maroon-600 mt-1" />}
+              <button
+                onClick={(e) => handleDelete(e, n.id)}
+                className="text-gray-300 hover:text-red-500 transition p-1 rounded"
+                title="Futa arifa"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
         ))}
       </div>

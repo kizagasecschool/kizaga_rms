@@ -17,6 +17,7 @@ export default function TrackApplication() {
   const [submittingReply, setSubmittingReply] = useState(false)
   const [replySuccess, setReplySuccess] = useState('')
   const [previewAttachment, setPreviewAttachment] = useState(null)
+  const [lastRefreshed, setLastRefreshed] = useState(null)
 
   const statusLabels = {
     pending: 'Inasubiri Kukaguliwa',
@@ -43,6 +44,28 @@ export default function TrackApplication() {
   useEffect(() => {
     if (data) loadConversations(data.id)
   }, [data])
+
+  // Auto-refresh status every 30 seconds while viewing an application
+  useEffect(() => {
+    if (!data || !appNo) return
+    const interval = setInterval(async () => {
+      try {
+        const { data: updated } = await supabase
+          .from('admission_applications')
+          .select('*')
+          .eq('application_no', appNo.trim().toUpperCase())
+          .maybeSingle()
+        if (updated) {
+          if (updated.status !== data.status || updated.updated_at !== data.updated_at) {
+            setData(updated)
+            loadConversations(updated.id)
+          }
+          setLastRefreshed(new Date())
+        }
+      } catch { /* silent */ }
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [data, appNo])
 
   const handleSubmitReply = async (e) => {
     e.preventDefault()
@@ -163,11 +186,18 @@ export default function TrackApplication() {
 
         {data && (
           <div className="bg-white rounded-2xl border border-gray-200 p-6 space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between flex-wrap gap-2">
               <h2 className="text-lg font-semibold text-gray-900">Taarifa za Ombi</h2>
-              <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[data.status]}`}>
-                {statusLabels[data.status]}
-              </span>
+              <div className="flex items-center gap-2">
+                {lastRefreshed && (
+                  <span className="text-xs text-gray-400">
+                    Imesasishwa {lastRefreshed.toLocaleTimeString('sw-TZ', { hour: '2-digit', minute: '2-digit' })}
+                  </span>
+                )}
+                <span className={`px-3 py-1 rounded-full text-xs font-medium ${statusColors[data.status]}`}>
+                  {statusLabels[data.status]}
+                </span>
+              </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-sm">

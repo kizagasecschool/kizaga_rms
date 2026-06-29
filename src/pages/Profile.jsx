@@ -1,13 +1,41 @@
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 import { useNotification } from '../context/NotificationContext'
 
 function Profile() {
-  const { profile } = useAuth()
+  const { user, profile } = useAuth()
   const { showToast } = useNotification()
   const [editing, setEditing] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const avatarInputRef = useRef(null)
+
+  const avatarUrl = user?.user_metadata?.avatar_url || null
+
+  const handleAvatarUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return }
+    if (file.size > 2 * 1024 * 1024) { showToast('Image must be less than 2MB', 'error'); return }
+    setUploadingAvatar(true)
+    try {
+      const ext = file.name.split('.').pop().toLowerCase()
+      const filePath = `${profile.id}/avatar.${ext}`
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file, { upsert: true })
+      if (uploadError) throw uploadError
+      const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(filePath)
+      await supabase.auth.updateUser({ data: { avatar_url: publicUrl } })
+      showToast('Profile picture updated', 'success')
+    } catch (err) {
+      showToast('Failed to upload: ' + (err.message || 'Unknown error'), 'error')
+    } finally {
+      setUploadingAvatar(false)
+      e.target.value = ''
+    }
+  }
   const [formData, setFormData] = useState({
     full_name: profile?.full_name || '',
     email: profile?.email || '',
@@ -115,11 +143,30 @@ function Profile() {
       <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
         {/* Header */}
         <div className="bg-gradient-to-r from-maroon-600 to-maroon-700 px-6 py-8 text-center">
-          <div className="w-16 h-16 rounded-full bg-white/20 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-3">
-            {initials}
+          <div
+            className="w-20 h-20 rounded-full bg-white/20 text-white flex items-center justify-center text-2xl font-bold mx-auto mb-3 relative cursor-pointer group overflow-hidden border-2 border-white/30"
+            onClick={() => avatarInputRef.current?.click()}
+            title="Click to change profile picture"
+          >
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-full h-full object-cover" />
+            ) : (
+              <span>{initials}</span>
+            )}
+            <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 group-hover:opacity-100 transition">
+              {uploadingAvatar ? (
+                <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                </svg>
+              )}
+            </div>
+            <input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={handleAvatarUpload} />
           </div>
           <h2 className="text-xl font-bold text-white">{profile?.full_name || 'User'}</h2>
           <p className="text-sm text-white/70 capitalize">{profile?.role}</p>
+          <p className="text-xs text-white/50 mt-1">Bonyeza picha kubadilisha</p>
         </div>
 
         {/* Content */}

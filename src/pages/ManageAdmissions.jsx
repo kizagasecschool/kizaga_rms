@@ -45,6 +45,8 @@ export default function ManageAdmissions() {
   const [convertAdmissionNo, setConvertAdmissionNo] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
+  const [checkedIds, setCheckedIds] = useState(new Set())
+  const [bulkSaving, setBulkSaving] = useState(false)
 
   const canManage = ['admin', 'headmaster', 'academic'].includes(profile?.role)
   const canCreateStudent = ['admin', 'academic'].includes(profile?.role)
@@ -155,8 +157,10 @@ export default function ManageAdmissions() {
   const handleOpenConvertModal = async () => {
     const matchedClass = classes.find(c => c.class_name === selected.class_applying)
     const admNo = await generateAdmissionNumber()
-    setConvertClassId(matchedClass?.id || '')
-    setConvertStreamId('')
+    const classId = matchedClass?.id || ''
+    setConvertClassId(classId)
+    const streamsForClass = classStreams.filter(cs => cs.class_id === classId)
+    setConvertStreamId(streamsForClass.length === 1 ? streamsForClass[0].id : '')
     setConvertAdmissionNo(admNo)
     setShowConvertModal(true)
   }
@@ -181,6 +185,38 @@ export default function ManageAdmissions() {
       showToast('Failed to enrol student', 'error')
     } finally {
       setConverting(false)
+    }
+  }
+
+  const handleBulkStatus = async (newStatus) => {
+    if (checkedIds.size === 0) return
+    setBulkSaving(true)
+    let done = 0
+    for (const id of checkedIds) {
+      try {
+        await supabase.rpc('update_admission_application', { app_id: id, new_status: newStatus, notes: null })
+        done++
+      } catch { /* skip failed */ }
+    }
+    showToast(`${done} maombi ${statusLabels[newStatus].toLowerCase()}`, 'success')
+    setCheckedIds(new Set())
+    loadApplications()
+    setBulkSaving(false)
+  }
+
+  const toggleCheck = (id) => {
+    setCheckedIds(prev => {
+      const next = new Set(prev)
+      next.has(id) ? next.delete(id) : next.add(id)
+      return next
+    })
+  }
+
+  const toggleCheckAll = () => {
+    if (checkedIds.size === filtered.length) {
+      setCheckedIds(new Set())
+    } else {
+      setCheckedIds(new Set(filtered.map(a => a.id)))
     }
   }
 
@@ -247,11 +283,33 @@ export default function ManageAdmissions() {
           <p className="text-xs text-red-500 mt-2">Endesha migration SQL kwenye Supabase Dashboard.</p>
         </div>
       ) : (
-        <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
+        <>
+          {checkedIds.size > 0 && (
+            <div className="flex items-center gap-3 mb-3 bg-maroon-50 border border-maroon-200 rounded-xl px-4 py-2.5">
+              <span className="text-sm font-medium text-maroon-800">{checkedIds.size} yamechaguliwa</span>
+              <button
+                onClick={() => handleBulkStatus('approved')}
+                disabled={bulkSaving}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-green-600 rounded-lg hover:bg-green-700 disabled:opacity-50 transition"
+              >Kubali Wote</button>
+              <button
+                onClick={() => handleBulkStatus('rejected')}
+                disabled={bulkSaving}
+                className="px-3 py-1.5 text-xs font-semibold text-white bg-red-600 rounded-lg hover:bg-red-700 disabled:opacity-50 transition"
+              >Kataa Wote</button>
+              <button onClick={() => setCheckedIds(new Set())} className="ml-auto text-xs text-maroon-600 hover:underline">Ondoa Uchaguzi</button>
+              {bulkSaving && <span className="w-4 h-4 border-2 border-maroon-400 border-t-transparent rounded-full animate-spin" />}
+            </div>
+          )}
+
+          <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="px-4 py-3">
+                    <input type="checkbox" checked={filtered.length > 0 && checkedIds.size === filtered.length} onChange={toggleCheckAll} className="rounded accent-maroon-600" />
+                  </th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">#</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Namba</th>
                   <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Mwanafunzi</th>
@@ -265,7 +323,10 @@ export default function ManageAdmissions() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filtered.map((app, idx) => (
-                  <tr key={app.id} className="hover:bg-gray-50 transition">
+                  <tr key={app.id} className={`hover:bg-gray-50 transition ${checkedIds.has(app.id) ? 'bg-maroon-50' : ''}`}>
+                    <td className="px-4 py-3">
+                      <input type="checkbox" checked={checkedIds.has(app.id)} onChange={() => toggleCheck(app.id)} className="rounded accent-maroon-600" />
+                    </td>
                     <td className="px-4 py-3 text-gray-500">{idx + 1}</td>
                     <td className="px-4 py-3 font-mono text-xs text-gray-700">{app.application_no}</td>
                     <td className="px-4 py-3">
@@ -294,7 +355,7 @@ export default function ManageAdmissions() {
                 ))}
                 {filtered.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-4 py-8 text-center text-sm text-gray-400">Hakuna maombi</td>
+                    <td colSpan={10} className="px-4 py-8 text-center text-sm text-gray-400">Hakuna maombi</td>
                   </tr>
                 )}
               </tbody>
@@ -488,7 +549,8 @@ export default function ManageAdmissions() {
               )}
             </div>
           )}
-        </div>
+          </div>
+        </>
       )}
 
       {/* Delete Confirmation */}

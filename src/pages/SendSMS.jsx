@@ -91,10 +91,15 @@ export default function SendSMS() {
     if (!raw) return null
     const digits = raw.replace(/[^0-9]/g, '')
     if (!digits) return null
-    if (digits.length === 9) return '255' + digits
-    if (digits.length === 10 && digits.startsWith('0')) return '255' + digits.slice(1)
+    // Already correct: 255XXXXXXXXX (12 digits)
     if (digits.startsWith('255') && digits.length === 12) return digits
-    return digits
+    // Country code + leading zero: 2550XXXXXXXXX (13 digits)
+    if (digits.startsWith('2550') && digits.length === 13) return '255' + digits.slice(4)
+    // Local with leading zero: 0XXXXXXXXX (10 digits)
+    if (digits.length === 10 && digits.startsWith('0')) return '255' + digits.slice(1)
+    // Local without leading zero: XXXXXXXXX (9 digits)
+    if (digits.length === 9) return '255' + digits
+    return null
   }
 
   const buildResultsMessage = (student, subjectsWithMarks, resultRow, cls) => {
@@ -362,7 +367,7 @@ export default function SendSMS() {
                 className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 transition"
               >
                 <option value="">Chagua mtihani...</option>
-                {exams.map(e => <option key={e.id} value={e.id}>{e.exam_name}</option>)}
+                {exams.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
           )}

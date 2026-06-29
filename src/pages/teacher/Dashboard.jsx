@@ -39,6 +39,28 @@ function TeacherDashboard() {
       const subjectIds = [...new Set(assignments?.map((a) => a.subject_id) || [])]
       setClassStreamIds(csIds)
 
+      // Get class_ids for the teacher's streams
+      const { data: streamsData } = csIds.length > 0
+        ? await supabase.from('class_streams').select('id, class_id').in('id', csIds)
+        : { data: [] }
+
+      const streamToClassId = Object.fromEntries((streamsData || []).map(s => [s.id, s.class_id]))
+      const classIds = [...new Set(Object.values(streamToClassId))]
+
+      // Get all exam_ids for those classes
+      const { data: examClassRows } = classIds.length > 0
+        ? await supabase.from('exam_classes').select('exam_id, class_id').in('class_id', classIds)
+        : { data: [] }
+
+      const examIds = [...new Set((examClassRows || []).map(ec => ec.exam_id))]
+
+      // Build: classId → examIds[]
+      const classExamMap = {}
+      ;(examClassRows || []).forEach(ec => {
+        if (!classExamMap[ec.class_id]) classExamMap[ec.class_id] = []
+        classExamMap[ec.class_id].push(ec.exam_id)
+      })
+
       const [sRes, subRes, mRes] = await Promise.all([
         csIds.length > 0
           ? supabase.from('students').select('*', { count: 'exact', head: true }).in('class_stream_id', csIds)
@@ -49,11 +71,30 @@ function TeacherDashboard() {
         supabase.from('marks').select('*', { count: 'exact', head: true }).eq('entered_by', profile?.id),
       ])
 
+      // Calculate pending: expected entries - entered
+      let totalExpected = 0
+      for (const { class_stream_id, subject_id } of (assignments || [])) {
+        const classId = streamToClassId[class_stream_id]
+        const applicableExams = classExamMap[classId] || []
+        if (applicableExams.length === 0) continue
+        const { count: streamStudents } = await supabase
+          .from('students').select('*', { count: 'exact', head: true })
+          .eq('class_stream_id', class_stream_id)
+        const { count: entered } = await supabase
+          .from('marks').select('*', { count: 'exact', head: true })
+          .in('exam_id', applicableExams)
+          .eq('subject_id', subject_id)
+          .eq('entered_by', profile?.id)
+        totalExpected += (streamStudents || 0) * applicableExams.length
+        totalExpected -= (entered || 0)
+      }
+      const pending = Math.max(0, totalExpected)
+
       setStats({
         students: sRes.count ?? 0,
         subjects: subRes.count ?? 0,
         marks: mRes.count ?? 0,
-        pending: 0,
+        pending,
       })
       setLoading(false)
     }

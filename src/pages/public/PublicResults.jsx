@@ -2,6 +2,12 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
+const PRINT_STYLE = `@media print {
+  header, .print\\:hidden { display: none !important; }
+  body { background: white !important; }
+  @page { size: A4; margin: 12mm; }
+}`
+
 async function apiPost(action, body) {
   const res = await fetch('/api/public-results', {
     method: 'POST',
@@ -266,6 +272,7 @@ export default function PublicResults() {
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <style>{PRINT_STYLE}</style>
       {/* Header */}
       <header className="sticky top-0 z-40 bg-white border-b border-gray-100 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 h-14 flex items-center justify-between gap-4">
@@ -438,7 +445,7 @@ export default function PublicResults() {
         {(step === 'results' || step === 'compare') && results && (
           <div>
             {/* Nav bar */}
-            <div className="flex items-center gap-3 mb-5 flex-wrap">
+            <div className="flex items-center gap-3 mb-5 flex-wrap print:hidden">
               <button
                 onClick={() => { setStep('select'); setResults(null); setCompareResults(null); setCompareExamId('') }}
                 className="flex items-center gap-1.5 text-sm text-maroon-600 hover:text-maroon-700 font-medium"
@@ -448,7 +455,16 @@ export default function PublicResults() {
                 </svg>
                 Badilisha Mtihani
               </button>
-              <button onClick={resetAll} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 font-medium ml-auto">
+              <button
+                onClick={() => window.print()}
+                className="flex items-center gap-1.5 text-sm font-semibold text-white bg-maroon-600 hover:bg-maroon-700 px-4 py-2 rounded-xl transition ml-auto"
+              >
+                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
+                </svg>
+                Chapisha / Hifadhi PDF
+              </button>
+              <button onClick={resetAll} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 font-medium">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                 </svg>
@@ -469,7 +485,7 @@ export default function PublicResults() {
 
             {/* ── COMPARISON ── */}
             {step === 'compare' && compareResults && (
-              <div className="mt-6">
+              <div className="mt-6 print:hidden">
                 {/* Trend banner */}
                 {(() => {
                   const avgA = results.resultRow?.average_marks
@@ -569,7 +585,7 @@ export default function PublicResults() {
 
             {/* ── COMPARE TRIGGER ── */}
             {step === 'results' && exams.length > 1 && (
-              <div className="mt-5 bg-white rounded-xl border border-gray-200 p-4">
+              <div className="mt-5 bg-white rounded-xl border border-gray-200 p-4 print:hidden">
                 <p className="text-sm font-semibold text-gray-800 mb-1">Linganisha na Mtihani Mwingine</p>
                 <p className="text-xs text-gray-500 mb-3">Ona kama mtoto wako amepanda au ameshuka kati ya mitihani miwili.</p>
                 <div className="flex gap-2">

@@ -98,6 +98,21 @@ export function AppNotificationsProvider({ children }) {
     }
   }, [profile, notifications])
 
+  const deleteNotification = useCallback(async (id) => {
+    const { error } = await supabase
+      .from('notifications')
+      .delete()
+      .eq('id', id)
+      .eq('recipient_id', profile.id)
+    if (!error) {
+      setNotifications((prev) => prev.filter((n) => n.id !== id))
+      setUnreadCount((prev) => {
+        const n = notifications.find(x => x.id === id)
+        return n && !n.is_read ? Math.max(0, prev - 1) : prev
+      })
+    }
+  }, [profile, notifications])
+
   const sendNotification = useCallback(async ({ recipient_id, recipient_role, title, message, type, link }) => {
     const { data, error } = await supabase
       .from('notifications')
@@ -123,6 +138,7 @@ export function AppNotificationsProvider({ children }) {
       fetchUnreadCount,
       markAsRead,
       markAllAsRead,
+      deleteNotification,
       sendNotification,
     }}>
       {children}
