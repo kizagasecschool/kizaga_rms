@@ -289,7 +289,7 @@ function ViewMarks() {
                 {students.map((student) => (
                   <tr key={student.id} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-2.5 text-sm text-gray-900 sticky left-0 bg-white hover:bg-gray-50 z-10">
-                      <span className="font-medium">{student.first_name} {student.surname}</span>
+                      <span className="font-medium">{[student.first_name, student.middle_name, student.surname].filter(Boolean).join(' ')}</span>
                     </td>
                     {subjects.map((subject) => {
                       const mark = markMap[`${student.id}_${subject.id}`]

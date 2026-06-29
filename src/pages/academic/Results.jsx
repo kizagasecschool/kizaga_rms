@@ -1173,7 +1173,7 @@ function Results() {
                             <tr key={student.id} className={`${rowBg} hover:bg-gray-50 transition`}>
                               <td className="px-2 py-2 text-center text-sm text-gray-500 font-medium">{student.result?.position || '-'}</td>
                               <td className={`px-2 py-2 text-sm text-gray-900 sticky left-0 z-10 ${isTop ? 'bg-green-50/60' : isBottom ? 'bg-red-50/60' : 'bg-white/95'}`}>
-                                <span className="font-medium whitespace-nowrap">{student.first_name} {student.middle_name} {student.surname}</span>
+                                <span className="font-medium whitespace-nowrap">{[student.first_name, student.middle_name, student.surname].filter(Boolean).join(' ')}</span>
                               </td>
                               {subjects.map((subject) => {
                                 const mark = markMap[`${student.id}_${subject.id}`]
@@ -1337,7 +1337,7 @@ function Results() {
                           {sortedStudents.filter(s => s.result?.position != null).slice(0, 10).map(s => (
                             <tr key={s.id} className="hover:bg-gray-50 transition">
                               <td className="px-2 py-1.5 text-center text-xs text-gray-500 font-medium">{s.result.position}</td>
-                              <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{s.first_name} {s.middle_name} {s.surname}</td>
+                              <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}</td>
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.result.average_marks}</td>
                               <td className="px-2 py-1.5 text-center text-xs font-semibold text-gray-800">{s.resultGrade || '-'}</td>
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.division || '-'}</td>
@@ -1370,7 +1370,7 @@ function Results() {
                           {sortedStudents.filter(s => s.result?.position != null).slice(-10).reverse().map(s => (
                             <tr key={s.id} className="hover:bg-gray-50 transition">
                               <td className="px-2 py-1.5 text-center text-xs text-gray-500 font-medium">{s.result.position}</td>
-                              <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{s.first_name} {s.middle_name} {s.surname}</td>
+                              <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}</td>
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.result.average_marks}</td>
                               <td className="px-2 py-1.5 text-center text-xs font-semibold text-gray-800">{s.resultGrade || '-'}</td>
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.division || '-'}</td>

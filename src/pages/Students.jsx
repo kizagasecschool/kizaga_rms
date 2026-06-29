@@ -947,7 +947,7 @@ function Students() {
                     </td>
                     <td className="px-5 py-3.5">
                       <p className="text-sm font-medium text-gray-900">
-                        {s.surname}, {s.first_name}{s.middle_name ? ` ${s.middle_name}` : ''}
+                        {[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}
                       </p>
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">{s.gender}</td>
@@ -1311,7 +1311,7 @@ function Students() {
                         <tr key={i}>
                           <td className="px-2 py-2 text-gray-500 sticky left-0 bg-white z-10">{i + 1}</td>
                           <td className="px-2 py-2 font-medium text-gray-700 sticky left-[2rem] bg-white z-10">{row.admission_number}</td>
-                          <td className="px-2 py-2 text-gray-600">{row.surname}, {row.first_name}</td>
+                          <td className="px-2 py-2 text-gray-600">{[row.first_name, row.middle_name, row.surname].filter(Boolean).join(' ')}</td>
                           <td className="px-2 py-2 text-gray-600">{row.gender}</td>
                           <td className="px-2 py-2 text-gray-600">{displayName}</td>
                         </tr>
@@ -1380,7 +1380,7 @@ function Students() {
               const cls = s.class_id ? classes.find((c) => c.id === s.class_id) : null
               const classLabel = cls?.class_name || cs?.class_name || ''
               const streamLabel = cs?.stream_name || ''
-              const label = `${s.surname}, ${s.first_name} (${s.admission_number})${classLabel ? ` - ${classLabel}${streamLabel ? ` Stream ${streamLabel}` : ''}` : ''}`
+              const label = `${[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')} (${s.admission_number})${classLabel ? ` - ${classLabel}${streamLabel ? ` Stream ${streamLabel}` : ''}` : ''}`
               return (
                 <option key={s.id} value={s.id}>{label}</option>
               )
@@ -1393,8 +1393,7 @@ function Students() {
           <div className="mb-4 px-4 py-3 bg-emerald-50 rounded-xl border border-emerald-100 flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-emerald-800">
-                {subjectsStudent.surname}, {subjectsStudent.first_name}
-                {subjectsStudent.middle_name ? ` ${subjectsStudent.middle_name}` : ''}
+                {[subjectsStudent.first_name, subjectsStudent.middle_name, subjectsStudent.surname].filter(Boolean).join(' ')}
               </p>
               <p className="text-xs text-emerald-600">{subjectsStudent.admission_number}</p>
             </div>
@@ -1670,7 +1669,7 @@ function Students() {
                             />
                           </td>
                           <td className="px-3 py-2.5 font-medium text-gray-700">{s.admission_number}</td>
-                          <td className="px-3 py-2.5 text-gray-600">{s.surname}, {s.first_name}</td>
+                          <td className="px-3 py-2.5 text-gray-600">{[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}</td>
                           <td className="px-3 py-2.5 text-gray-600">{s.gender}</td>
                         </tr>
                       ))}
@@ -1730,7 +1729,7 @@ function Students() {
       {/* Delete Confirmation */}
       <Modal isOpen={!!deleteConfirm} onClose={() => setDeleteConfirm(null)} title="Confirm Delete">
         <p className="text-sm text-gray-600 mb-6">
-          Are you sure you want to delete <strong>{deleteConfirm?.surname}, {deleteConfirm?.first_name}</strong>
+          Are you sure you want to delete <strong>{[deleteConfirm?.first_name, deleteConfirm?.middle_name, deleteConfirm?.surname].filter(Boolean).join(' ')}</strong>
           {deleteConfirm?.admission_number && <> (#{deleteConfirm.admission_number})</>}?
           This will also remove all marks, attendance, and results for this student.
         </p>

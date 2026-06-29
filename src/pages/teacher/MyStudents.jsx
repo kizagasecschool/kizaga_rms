@@ -180,7 +180,7 @@ function MyStudents() {
                         <td className="px-4 py-2.5 text-xs text-gray-400 align-middle">{idx + 1}</td>
                         <td className="px-4 py-2.5 align-middle">
                           <p className="text-sm font-medium text-gray-900 whitespace-nowrap">
-                            {[s.surname, s.first_name, s.middle_name].filter(Boolean).join(' ')}
+                            {[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}
                           </p>
                         </td>
                         <td className="px-4 py-2.5 align-middle">

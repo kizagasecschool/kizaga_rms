@@ -607,8 +607,7 @@ function ClassSubjects() {
                             <tr key={student.id} className="hover:bg-gray-50/60 transition">
                               <td className="px-4 py-2.5 text-gray-300">{idx + 1}</td>
                               <td className="px-4 py-2.5 font-medium text-gray-800">
-                                {student.surname}, {student.first_name}
-                                {student.middle_name ? ` ${student.middle_name.charAt(0)}.` : ''}
+                                {[student.first_name, student.middle_name, student.surname].filter(Boolean).join(' ')}
                               </td>
                               <td className="px-4 py-2.5 text-gray-500 font-mono">{student.admission_number}</td>
                               <td className="px-4 py-2.5 text-gray-600">
@@ -889,7 +888,7 @@ function ClassSubjects() {
                   <tr key={student.id} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-2.5 sticky left-0 bg-white z-10 border-r border-gray-100">
                       <p className="text-sm font-medium text-gray-900">
-                        {student.surname}, {student.first_name}
+                        {[student.first_name, student.middle_name, student.surname].filter(Boolean).join(' ')}
                       </p>
                       <p className="text-xs text-gray-400">{student.admission_number}</p>
                     </td>
@@ -1039,7 +1038,7 @@ function ClassSubjects() {
                     }}
                     className="rounded border-gray-300 text-amber-600 focus:ring-amber-500"
                   />
-                  <span className="text-gray-800">{student.surname}, {student.first_name}</span>
+                  <span className="text-gray-800">{[student.first_name, student.middle_name, student.surname].filter(Boolean).join(' ')}</span>
                   <span className="text-xs text-gray-400">({student.admission_number})</span>
                 </label>
               ))}
