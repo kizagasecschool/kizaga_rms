@@ -139,6 +139,14 @@ export default function SendSMS() {
 
       if (!students || students.length === 0) { showToast('Hakuna wanafunzi katika darasa hili', 'error'); return }
 
+      students.sort((a, b) => {
+        const gA = a.gender === 'Female' ? 0 : 1
+        const gB = b.gender === 'Female' ? 0 : 1
+        if (gA !== gB) return gA - gB
+        const s = (a.surname || '').localeCompare(b.surname || '')
+        return s !== 0 ? s : (a.first_name || '').localeCompare(b.first_name || '')
+      })
+
       const cls = clsRes?.data?.class_name || ''
       const selectedExam = exams.find(e => e.id === examId)
       const subjMap = {}
