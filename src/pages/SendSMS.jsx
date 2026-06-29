@@ -143,8 +143,8 @@ export default function SendSMS() {
         const gA = a.gender === 'Female' ? 0 : 1
         const gB = b.gender === 'Female' ? 0 : 1
         if (gA !== gB) return gA - gB
-        const s = (a.surname || '').localeCompare(b.surname || '')
-        return s !== 0 ? s : (a.first_name || '').localeCompare(b.first_name || '')
+        const s = (a.first_name || '').localeCompare(b.first_name || '')
+        return s !== 0 ? s : (a.surname || '').localeCompare(b.surname || '')
       })
 
       const cls = clsRes?.data?.class_name || ''
