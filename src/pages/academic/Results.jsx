@@ -957,7 +957,8 @@ function Results() {
           .print-area .school-header { border-bottom: 2px solid #000 !important; margin-bottom: 3mm !important; }
           .print-area .school-header h1 { font-size: 16pt !important; }
           .print-area .school-header p, .print-area .school-header span { font-size: 14pt !important; }
-          .print-area .school-header img { width: 36pt !important; height: 36pt !important; object-fit: contain !important; }
+          .print-area .school-header img { width: 25mm !important; height: 25mm !important; object-fit: contain !important; }
+          .print-area .school-header .w-28 { width: 30mm !important; }
           .print-area .school-header .flex { display: flex !important; justify-content: center !important; align-items: center !important; gap: 4pt !important; }
           .print-area .school-header > div:last-child { margin-top: 2pt !important; padding-top: 2pt !important; }
           .print-area .div-summary-wrap { display: flex !important; justify-content: center !important; }

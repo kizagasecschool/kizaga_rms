@@ -60,21 +60,14 @@ serve(async (req) => {
       })
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const { data: profile, error: profileErr } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', email.toLowerCase())
+      .maybeSingle()
 
-    const authRes = await fetch(
-      `${supabaseUrl}/auth/v1/admin/users?email=${encodeURIComponent(email)}`,
-      {
-        headers: {
-          apikey: serviceRoleKey,
-          Authorization: `Bearer ${serviceRoleKey}`,
-        },
-      }
-    )
-    const userData = await authRes.json()
-    const user = userData.users?.[0]
-    if (!user) {
+    if (profileErr) throw profileErr
+    if (!profile) {
       return new Response(JSON.stringify({ error: 'User not found' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 404,
@@ -82,7 +75,7 @@ serve(async (req) => {
     }
 
     const { error: pwErr } = await supabase.auth.admin.updateUserById(
-      user.id,
+      profile.id,
       { password: new_password }
     )
 
