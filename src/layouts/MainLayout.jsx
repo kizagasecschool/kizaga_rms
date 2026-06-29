@@ -61,7 +61,8 @@ const navItems = {
   headmaster: [
     { path: '/headmaster', icon: I.dash, label: 'Dashboard' },
     { icon: I.chart, label: 'Reports', children: [
-      { path: '/headmaster/reports', icon: I.reports, label: 'Reports' },
+      { path: '/headmaster/results', icon: I.results, label: 'Results' },
+      { path: '/headmaster/reports', icon: I.reports, label: 'Report Cards' },
       { path: '/headmaster/performance', icon: I.chart, label: 'Performance' },
       { path: '/headmaster/admissions', icon: I.book, label: 'Admissions' },
       { path: '/headmaster/uniforms', icon: I.shirt, label: 'Uniforms' },
