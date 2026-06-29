@@ -292,11 +292,14 @@ function AcademicExams() {
           // Get students in this stream
           const { data: stuData } = await supabase
             .from('students')
-            .select('id, first_name, middle_name, surname')
+            .select('id, first_name, middle_name, surname, gender')
             .eq('class_stream_id', cs.id)
             .eq('status', 'active')
 
           const students = (stuData || []).sort((a, b) => {
+            const gA = a.gender === 'Female' ? 0 : 1
+            const gB = b.gender === 'Female' ? 0 : 1
+            if (gA !== gB) return gA - gB
             const s = (a.surname||'').localeCompare(b.surname||'')
             return s !== 0 ? s : (a.first_name||'').localeCompare(b.first_name||'')
           })
@@ -322,6 +325,9 @@ function AcademicExams() {
         const { data: stuData } = await supabase
           .from('students').select('*').eq('class_id', classId).eq('status', 'active').limit(200)
         const students = (stuData || []).sort((a, b) => {
+          const gA = a.gender === 'Female' ? 0 : 1
+          const gB = b.gender === 'Female' ? 0 : 1
+          if (gA !== gB) return gA - gB
           const s = (a.surname||'').localeCompare(b.surname||'')
           return s !== 0 ? s : (a.first_name||'').localeCompare(b.first_name||'')
         })

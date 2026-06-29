@@ -371,7 +371,7 @@ function EnterMarks() {
           .eq('subject_id', selectedSubjectId)
           .limit(500)
 
-        let studsQuery = supabase.from('students').select('*').eq('status', 'active').order('surname')
+        let studsQuery = supabase.from('students').select('*').eq('status', 'active').order('gender').order('surname').order('first_name')
 
         if (isClassWide && isOLevel) {
           // O-Level: all students in the class take all O-Level subjects — filter by class_id only
