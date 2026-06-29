@@ -772,7 +772,7 @@ async function fetchImageAsBase64(url) {
 
 function buildSheet({ logoBase64, schoolName, addressLine, exam, className, streamLabel, subject, students }) {
   const rows = students.map((s, i) => {
-    const fullName = [s.surname, s.first_name, s.middle_name].filter(Boolean).join(' ')
+    const fullName = [s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')
     return `
       <tr>
         <td style="border:1px solid #555;padding:7px 10px;text-align:center;font-size:11px;">${i + 1}</td>

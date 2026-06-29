@@ -689,7 +689,7 @@ function EnterMarks() {
                       <div className="min-w-0 flex-1">
                         <p className="text-[10px] text-gray-400 mb-0.5 font-medium tracking-wide">#{idx + 1}</p>
                         <p className={`text-sm font-semibold leading-snug ${isAbsent ? 'text-red-600 line-through' : 'text-gray-900'}`}>
-                          {[s.surname, s.first_name, s.middle_name].filter(Boolean).join(' ')}
+                          {[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}
                         </p>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
@@ -787,7 +787,7 @@ function EnterMarks() {
                       <td className="px-3 py-2 text-xs text-gray-400 align-middle">{idx + 1}</td>
                       <td className="px-3 py-2 align-middle">
                         <p className="text-sm font-medium text-gray-900 whitespace-nowrap">
-                          {[s.surname, s.first_name, s.middle_name].filter(Boolean).join(' ')}
+                          {[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}
                         </p>
                       </td>
                       <td className="px-3 py-2 text-center align-middle">
