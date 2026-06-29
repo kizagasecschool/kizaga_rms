@@ -246,8 +246,13 @@ export default function PublicResults() {
     : ''
 
   const examLevel = student?.classes?.level || 'O_LEVEL'
-  const division = results ? calcDivision(results.totalPoints, examLevel) : null
-  const compareDivision = compareResults ? calcDivision(compareResults.totalPoints, examLevel) : null
+  // Prefer pre-computed division/points stored in student_results; fall back to local calc only if missing
+  const division = results
+    ? (results.resultRow?.division?.toString().replace(/Division\s*/i, '') || calcDivision(results.totalPoints, examLevel))
+    : null
+  const compareDivision = compareResults
+    ? (compareResults.resultRow?.division?.toString().replace(/Division\s*/i, '') || calcDivision(compareResults.totalPoints, examLevel))
+    : null
 
   // Diff helper
   const pctDiff = (a, b) => {
@@ -706,7 +711,7 @@ function ResultSlip({ schoolInfo, student, studentName, exam, results, division,
       <div className="border-t-2 border-gray-300 bg-gray-50 px-6 py-4">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
           <SummaryCell label="Wastani wa Alama" value={results.resultRow?.average_marks != null ? `${Number(results.resultRow.average_marks).toFixed(2)}%` : '—'} />
-          <SummaryCell label="Jumla ya Pointi" value={results.totalPoints} />
+          <SummaryCell label="Jumla ya Pointi" value={results.resultRow?.points ?? results.totalPoints} />
           <SummaryCell label="Nafasi Darasani" value={results.resultRow?.position ?? '—'} />
           <div className="text-center">
             <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Daraja (Division)</p>

@@ -23,10 +23,11 @@ export default async function handler(req, res) {
 
       if (!student) return res.json({ student: null })
 
+      const classLevel = student.classes?.level || 'O_LEVEL'
       const [examClassesRes, classSubjRes, gradesRes] = await Promise.all([
         supabase.from('exam_classes').select('exam_id, exams!inner(*)').eq('class_id', student.class_id),
         supabase.from('class_subjects').select('subject_id, subjects(*)').eq('class_id', student.class_id),
-        supabase.from('grades').select('*').order('min_mark', { ascending: false }),
+        supabase.from('grades').select('*').eq('level', classLevel).order('min_mark', { ascending: false }),
       ])
 
       const seen = new Set()
