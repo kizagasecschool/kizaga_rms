@@ -166,19 +166,19 @@ export default function PublicResults() {
   }
 
   const buildResultRows = (marks, selectedExam) => {
-    const examSubjects = subjects.map(s => ({ ...s, hp: hasPractical(s, selectedExam) }))
-    return examSubjects.map(subj => {
-      const mark = (marks || []).find(m => m.subject_id === subj.id)
-      if (!mark) return null
-      const pct = getPct(mark, subj.hp)
+    return (marks || []).map(mark => {
+      const subj = mark.subjects
+      if (!subj) return null
+      const hp = hasPractical(subj, selectedExam)
+      const pct = mark.is_absent ? null : getPct(mark, hp)
       const gradeObj = pct !== null ? getGrade(pct, grades) : null
       return {
-        subjectId: subj.id,
+        subjectId: mark.subject_id,
         subjectName: subj.subject_name,
         subjectCode: subj.subject_code,
         theory: mark.marks_obtained,
         practical: mark.practical_marks,
-        hp: subj.hp,
+        hp,
         pct,
         isAbsent: mark.is_absent,
         grade: gradeObj,
@@ -432,276 +432,148 @@ export default function PublicResults() {
         {/* ===== STEP 3: RESULTS ===== */}
         {(step === 'results' || step === 'compare') && results && (
           <div>
-            {/* Top bar */}
+            {/* Nav bar */}
             <div className="flex items-center gap-3 mb-5 flex-wrap">
               <button
-                onClick={() => { setStep('select'); setResults(null); setCompareResults(null); setCompareExamId(''); }}
+                onClick={() => { setStep('select'); setResults(null); setCompareResults(null); setCompareExamId('') }}
                 className="flex items-center gap-1.5 text-sm text-maroon-600 hover:text-maroon-700 font-medium"
               >
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                 </svg>
-                Rudi Nyuma
+                Badilisha Mtihani
               </button>
-              <button
-                onClick={resetAll}
-                className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 font-medium ml-auto"
-              >
+              <button onClick={resetAll} className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-700 font-medium ml-auto">
                 <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
                 </svg>
-                Tafuta Mwanafunzi Mwingine
+                Tafuta Mwingine
               </button>
             </div>
 
-            {/* Student + Exam header */}
-            <div className="bg-gradient-to-r from-maroon-800 to-maroon-700 text-white rounded-2xl p-5 mb-5">
-              <div className="flex items-start gap-4">
-                <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center shrink-0 text-lg font-bold">
-                  {student.first_name?.[0]}{student.surname?.[0]}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-bold text-xl">{studentName}</p>
-                  <p className="text-maroon-200 text-sm">{student.classes?.class_name} &middot; {student.admission_number}</p>
-                  <p className="text-maroon-100 text-sm mt-1 font-medium">{exam?.name}</p>
-                </div>
-                {division && (
-                  <div className="text-center shrink-0">
-                    <div className="text-xs text-maroon-200 mb-1">Daraja</div>
-                    <div className="text-3xl font-black">{division}</div>
-                  </div>
-                )}
-              </div>
+            {/* ── RESULT SLIP ── */}
+            <ResultSlip
+              schoolInfo={schoolInfo}
+              student={student}
+              studentName={studentName}
+              exam={exam}
+              results={results}
+              division={division}
+              examLevel={examLevel}
+            />
 
-              {/* Summary pills */}
-              <div className="mt-4 flex flex-wrap gap-2">
-                {results.resultRow?.average_marks != null && (
-                  <span className="px-3 py-1 bg-white/15 rounded-full text-xs font-medium">
-                    Wastani: {Number(results.resultRow.average_marks).toFixed(1)}%
-                  </span>
-                )}
-                {results.resultRow?.position && (
-                  <span className="px-3 py-1 bg-white/15 rounded-full text-xs font-medium">
-                    Nafasi: {results.resultRow.position}
-                  </span>
-                )}
-                <span className="px-3 py-1 bg-white/15 rounded-full text-xs font-medium">
-                  Pointi: {results.totalPoints}
-                </span>
-              </div>
-            </div>
-
-            {/* ===== COMPARISON MODE ===== */}
-            {step === 'compare' && compareResults ? (
-              <div>
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-gray-900">Ulinganisho wa Mitihani</h3>
-                  <button
-                    onClick={() => { setStep('results'); setCompareResults(null); setCompareExamId('') }}
-                    className="text-xs text-gray-500 hover:text-gray-700 flex items-center gap-1"
-                  >
-                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                    Funga Ulinganisho
-                  </button>
-                </div>
-
-                {/* Comparison summary cards */}
-                <div className="grid grid-cols-2 gap-3 mb-5">
-                  {[
-                    { label: exam?.name, res: results, div: division },
-                    { label: compareExam?.name, res: compareResults, div: compareDivision },
-                  ].map((item, idx) => {
-                    const avgA = results.resultRow?.average_marks
-                    const avgB = compareResults.resultRow?.average_marks
-                    const diff = idx === 1 && avgA != null && avgB != null ? avgB - avgA : null
-                    return (
-                      <div key={idx} className="bg-white rounded-xl border border-gray-200 p-4">
-                        <p className="text-xs text-gray-500 mb-2 truncate font-medium">{item.label}</p>
-                        <div className="flex items-end justify-between">
-                          <div>
-                            <p className="text-2xl font-black text-gray-900">{item.div}</p>
-                            <p className="text-xs text-gray-400">Daraja</p>
-                          </div>
-                          <div className="text-right">
-                            {item.res.resultRow?.average_marks != null && (
-                              <>
-                                <p className="text-lg font-bold text-gray-700">{Number(item.res.resultRow.average_marks).toFixed(1)}%</p>
-                                {diff !== null && (
-                                  <p className={`text-xs font-semibold flex items-center gap-0.5 justify-end ${diff > 0 ? 'text-emerald-600' : diff < 0 ? 'text-red-500' : 'text-gray-400'}`}>
-                                    {diff > 0 ? '↑' : diff < 0 ? '↓' : '→'}
-                                    {diff !== 0 ? ` ${Math.abs(diff).toFixed(1)}%` : ' Sawa'}
-                                  </p>
-                                )}
-                              </>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-
-                {/* Overall trend */}
+            {/* ── COMPARISON ── */}
+            {step === 'compare' && compareResults && (
+              <div className="mt-6">
+                {/* Trend banner */}
                 {(() => {
                   const avgA = results.resultRow?.average_marks
                   const avgB = compareResults.resultRow?.average_marks
                   if (avgA == null || avgB == null) return null
                   const diff = avgB - avgA
                   const rose = diff > 0
-                  const same = diff === 0
+                  const same = Math.abs(diff) < 0.05
                   return (
-                    <div className={`rounded-xl border p-4 mb-5 flex items-center gap-3 ${rose ? 'bg-emerald-50 border-emerald-200' : same ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-200'}`}>
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center text-xl shrink-0 ${rose ? 'bg-emerald-100' : same ? 'bg-gray-100' : 'bg-red-100'}`}>
-                        {rose ? '📈' : same ? '➡️' : '📉'}
-                      </div>
+                    <div className={`rounded-xl border p-4 mb-4 flex items-center gap-3 ${rose ? 'bg-emerald-50 border-emerald-200' : same ? 'bg-gray-50 border-gray-200' : 'bg-red-50 border-red-200'}`}>
+                      <span className="text-2xl">{rose ? '📈' : same ? '➡️' : '📉'}</span>
                       <div>
                         <p className={`text-sm font-semibold ${rose ? 'text-emerald-800' : same ? 'text-gray-700' : 'text-red-800'}`}>
                           {rose
                             ? `Hongera! ${studentName.split(' ')[0]} amepanda kwa ${Math.abs(diff).toFixed(1)}%`
-                            : same
-                            ? `Matokeo ni sawa na mtihani uliopita`
+                            : same ? 'Matokeo ni sawa na mtihani uliopita'
                             : `${studentName.split(' ')[0]} ameshuka kwa ${Math.abs(diff).toFixed(1)}%`}
                         </p>
                         <p className={`text-xs mt-0.5 ${rose ? 'text-emerald-600' : same ? 'text-gray-500' : 'text-red-600'}`}>
-                          {exam?.name}: {Number(avgA).toFixed(1)}% → {compareExam?.name}: {Number(avgB).toFixed(1)}%
+                          {exam?.name}: {Number(avgA).toFixed(1)}% &rarr; {compareExam?.name}: {Number(avgB).toFixed(1)}%
                         </p>
                       </div>
+                      <button
+                        onClick={() => { setStep('results'); setCompareResults(null); setCompareExamId('') }}
+                        className="ml-auto text-xs text-gray-400 hover:text-gray-600 underline shrink-0"
+                      >Funga</button>
                     </div>
                   )
                 })()}
 
-                {/* Subject-by-subject comparison table */}
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
-                  <div className="px-4 py-3 border-b border-gray-100 bg-gray-50">
-                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 text-xs font-semibold text-gray-500 uppercase">
+                {/* Comparison subject table */}
+                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+                  <div className="bg-gray-800 text-white px-4 py-3">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-center">Ulinganisho wa Masomo</p>
+                    <div className="grid grid-cols-[1fr_auto_auto_auto] gap-2 mt-2 text-xs text-gray-300">
                       <span>Somo</span>
-                      <span className="text-center w-16 truncate">{exam?.name?.split(' ').slice(0, 2).join(' ')}</span>
-                      <span className="text-center w-16 truncate">{compareExam?.name?.split(' ').slice(0, 2).join(' ')}</span>
-                      <span className="text-center w-10">Mwelekeo</span>
+                      <span className="w-20 text-center truncate">{exam?.name?.split(' ').slice(0,3).join(' ')}</span>
+                      <span className="w-20 text-center truncate">{compareExam?.name?.split(' ').slice(0,3).join(' ')}</span>
+                      <span className="w-8 text-center"></span>
                     </div>
                   </div>
-                  <div className="divide-y divide-gray-50">
-                    {allSubjectIds.map(sid => {
+                  <div className="divide-y divide-gray-100">
+                    {allSubjectIds.map((sid, i) => {
                       const rowA = results.rows.find(r => r.subjectId === sid)
                       const rowB = compareResults.rows.find(r => r.subjectId === sid)
-                      const name = rowA?.subjectName || rowB?.subjectName || sid
-                      const diff = pctDiff(rowB?.pct ?? null, rowA?.pct ?? null)
+                      const subjName = rowA?.subjectName || rowB?.subjectName || sid
+                      const diff = (rowB?.pct != null && rowA?.pct != null) ? rowB.pct - rowA.pct : null
                       const trend = diff === null ? null : diff > 1 ? 'up' : diff < -1 ? 'down' : 'same'
                       return (
-                        <div key={sid} className="grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2.5 items-center hover:bg-gray-50 transition">
-                          <span className="text-sm text-gray-700 truncate">{name}</span>
-                          <div className="w-16 text-center">
+                        <div key={sid} className={`grid grid-cols-[1fr_auto_auto_auto] gap-2 px-4 py-2.5 items-center ${i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+                          <span className="text-sm text-gray-800 font-medium">{subjName}</span>
+                          <div className="w-20 text-center">
                             {rowA ? (
-                              rowA.isAbsent ? (
-                                <span className="text-xs text-gray-400">ABS</span>
-                              ) : (
-                                <span className={`text-sm font-medium ${gradeColor(rowA.grade)}`}>{rowA.grade?.grade_letter || '-'}</span>
+                              rowA.isAbsent ? <span className="text-xs text-red-400">ABS</span> : (
+                                <span className="text-sm">
+                                  <span className={`font-bold ${gradeColor(rowA.grade)}`}>{rowA.grade?.grade_letter || '-'}</span>
+                                  <span className="text-gray-400 text-xs ml-1">({rowA.pct?.toFixed(0)}%)</span>
+                                </span>
                               )
-                            ) : <span className="text-gray-300">—</span>}
+                            ) : <span className="text-gray-300 text-xs">—</span>}
                           </div>
-                          <div className="w-16 text-center">
+                          <div className="w-20 text-center">
                             {rowB ? (
-                              rowB.isAbsent ? (
-                                <span className="text-xs text-gray-400">ABS</span>
-                              ) : (
-                                <span className={`text-sm font-medium ${gradeColor(rowB.grade)}`}>{rowB.grade?.grade_letter || '-'}</span>
+                              rowB.isAbsent ? <span className="text-xs text-red-400">ABS</span> : (
+                                <span className="text-sm">
+                                  <span className={`font-bold ${gradeColor(rowB.grade)}`}>{rowB.grade?.grade_letter || '-'}</span>
+                                  <span className="text-gray-400 text-xs ml-1">({rowB.pct?.toFixed(0)}%)</span>
+                                </span>
                               )
-                            ) : <span className="text-gray-300">—</span>}
+                            ) : <span className="text-gray-300 text-xs">—</span>}
                           </div>
-                          <div className="w-10 text-center text-base">
-                            {trend === 'up' ? (
-                              <span className="text-emerald-600" title={`+${diff?.toFixed(1)}%`}>↑</span>
-                            ) : trend === 'down' ? (
-                              <span className="text-red-500" title={`${diff?.toFixed(1)}%`}>↓</span>
-                            ) : trend === 'same' ? (
-                              <span className="text-gray-400">→</span>
-                            ) : <span className="text-gray-200">—</span>}
+                          <div className="w-8 text-center text-base">
+                            {trend === 'up' && <span className="text-emerald-500 font-bold">↑</span>}
+                            {trend === 'down' && <span className="text-red-500 font-bold">↓</span>}
+                            {trend === 'same' && <span className="text-gray-400">→</span>}
                           </div>
                         </div>
                       )
                     })}
                   </div>
-                </div>
-              </div>
-            ) : (
-              /* ===== SINGLE RESULTS TABLE ===== */
-              <div>
-                <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="bg-gray-50 border-b border-gray-200">
-                          <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Somo</th>
-                          <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Alama</th>
-                          <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">%</th>
-                          <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Daraja</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-50">
-                        {results.rows.map(row => (
-                          <tr key={row.subjectId} className="hover:bg-gray-50 transition">
-                            <td className="px-4 py-3 text-gray-800 font-medium">{row.subjectName}</td>
-                            <td className="px-3 py-3 text-center text-gray-600">
-                              {row.isAbsent ? (
-                                <span className="text-xs text-red-500 font-medium">ABS</span>
-                              ) : (
-                                <span>
-                                  {row.theory ?? '-'}
-                                  {row.hp && row.practical != null ? <span className="text-gray-400"> +{row.practical}</span> : ''}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-3 py-3 text-center text-gray-600">
-                              {row.pct !== null ? `${row.pct.toFixed(1)}%` : '—'}
-                            </td>
-                            <td className="px-3 py-3 text-center">
-                              <span className={`font-bold text-base ${gradeColor(row.grade)}`}>
-                                {row.isAbsent ? 'ABS' : (row.grade?.grade_letter || '—')}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Summary */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-                  {[
-                    { label: 'Wastani', value: results.resultRow?.average_marks != null ? `${Number(results.resultRow.average_marks).toFixed(1)}%` : '—' },
-                    { label: 'Nafasi', value: results.resultRow?.position ?? '—' },
-                    { label: 'Pointi', value: results.totalPoints },
-                    { label: 'Daraja', value: division },
-                  ].map(item => (
-                    <div key={item.label} className="bg-white rounded-xl border border-gray-200 p-4 text-center">
-                      <p className="text-xs text-gray-500 mb-1">{item.label}</p>
-                      <p className={`text-2xl font-black ${item.label === 'Daraja' ? divColor(division).split(' ')[0] : 'text-gray-900'}`}>{item.value}</p>
+                  {/* Compare summary footer */}
+                  <div className="bg-gray-50 border-t border-gray-200 px-4 py-3 grid grid-cols-[1fr_auto_auto_auto] gap-2 items-center">
+                    <span className="text-xs font-bold text-gray-600 uppercase">Wastani / Daraja</span>
+                    <div className="w-20 text-center">
+                      <span className="text-sm font-bold text-gray-800">{division}</span>
+                      {results.resultRow?.average_marks != null && <span className="text-gray-400 text-xs ml-1">({Number(results.resultRow.average_marks).toFixed(1)}%)</span>}
                     </div>
-                  ))}
+                    <div className="w-20 text-center">
+                      <span className="text-sm font-bold text-gray-800">{compareDivision}</span>
+                      {compareResults.resultRow?.average_marks != null && <span className="text-gray-400 text-xs ml-1">({Number(compareResults.resultRow.average_marks).toFixed(1)}%)</span>}
+                    </div>
+                    <div className="w-8" />
+                  </div>
                 </div>
               </div>
             )}
 
-            {/* ===== COMPARE PANEL ===== */}
+            {/* ── COMPARE TRIGGER ── */}
             {step === 'results' && exams.length > 1 && (
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <h3 className="text-sm font-semibold text-gray-800 mb-3 flex items-center gap-2">
-                  <svg className="w-4 h-4 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M7.5 21L3 16.5m0 0L7.5 12M3 16.5h13.5m0-13.5L21 7.5m0 0L16.5 12M21 7.5H7.5" />
-                  </svg>
-                  Linganisha na Mtihani Mwingine
-                </h3>
-                <p className="text-xs text-gray-500 mb-3">Chagua mtihani mwingine kulinganisha matokeo na kuona mwelekeo wa mtoto wako.</p>
+              <div className="mt-5 bg-white rounded-xl border border-gray-200 p-4">
+                <p className="text-sm font-semibold text-gray-800 mb-1">Linganisha na Mtihani Mwingine</p>
+                <p className="text-xs text-gray-500 mb-3">Ona kama mtoto wako amepanda au ameshuka kati ya mitihani miwili.</p>
                 <div className="flex gap-2">
                   <select
                     value={compareExamId}
                     onChange={e => setCompareExamId(e.target.value)}
                     className="flex-1 px-3 py-2.5 border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 transition"
                   >
-                    <option value="">Chagua mtihani...</option>
+                    <option value="">Chagua mtihani wa kulinganisha...</option>
                     {exams.filter(ex => ex.id !== examId).map(ex => (
                       <option key={ex.id} value={ex.id}>{ex.name}</option>
                     ))}
@@ -709,32 +581,152 @@ export default function PublicResults() {
                   <button
                     onClick={handleCompare}
                     disabled={!compareExamId || loadingCompare}
-                    className="px-4 py-2.5 bg-maroon-600 hover:bg-maroon-700 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition flex items-center gap-1.5"
+                    className="px-4 py-2.5 bg-maroon-600 hover:bg-maroon-700 disabled:opacity-50 text-white text-sm font-semibold rounded-xl transition flex items-center gap-1.5 shrink-0"
                   >
-                    {loadingCompare ? (
-                      <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    ) : 'Linganisha'}
+                    {loadingCompare
+                      ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      : 'Linganisha'}
                   </button>
                 </div>
-              </div>
-            )}
-
-            {step === 'compare' && (
-              <div className="bg-white rounded-xl border border-gray-200 p-5">
-                <button
-                  onClick={resetAll}
-                  className="w-full py-2.5 border border-maroon-300 text-maroon-600 hover:bg-maroon-50 rounded-xl text-sm font-medium transition flex items-center justify-center gap-2"
-                >
-                  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z" />
-                  </svg>
-                  Tafuta Mwanafunzi Mwingine
-                </button>
               </div>
             )}
           </div>
         )}
       </div>
+    </div>
+  )
+}
+
+/* ══════════════════════════════════════════════════════════
+   FORMAL RESULT SLIP COMPONENT
+══════════════════════════════════════════════════════════ */
+function ResultSlip({ schoolInfo, student, studentName, exam, results, division, examLevel }) {
+  const anyPractical = results.rows.some(r => r.hp)
+
+  const divBadge = {
+    'I':   'bg-emerald-100 text-emerald-800 border-emerald-300',
+    'II':  'bg-blue-100 text-blue-800 border-blue-300',
+    'III': 'bg-amber-100 text-amber-800 border-amber-300',
+    'IV':  'bg-orange-100 text-orange-800 border-orange-300',
+    '0':   'bg-red-100 text-red-800 border-red-300',
+  }[division] || 'bg-gray-100 text-gray-700 border-gray-300'
+
+  const gradeCell = (row) => {
+    if (!row) return <td className="border border-gray-300 px-3 py-2 text-center text-gray-300">—</td>
+    if (row.isAbsent) return <td className="border border-gray-300 px-3 py-2 text-center text-red-500 font-semibold">ABS</td>
+    return (
+      <td className={`border border-gray-300 px-3 py-2 text-center font-bold ${gradeColor(row.grade)}`}>
+        {row.grade?.grade_letter || '—'}
+      </td>
+    )
+  }
+
+  return (
+    <div className="bg-white border-2 border-gray-300 rounded-xl overflow-hidden shadow-sm">
+
+      {/* ── Letterhead ── */}
+      <div className="bg-maroon-800 text-white px-6 py-5 flex items-center gap-4">
+        {schoolInfo?.logo_url ? (
+          <img src={schoolInfo.logo_url} alt="" className="w-14 h-14 object-contain bg-white rounded-lg p-1 shrink-0" crossOrigin="anonymous" />
+        ) : (
+          <div className="w-14 h-14 bg-white/20 rounded-xl flex items-center justify-center text-2xl font-black shrink-0">K</div>
+        )}
+        <div className="flex-1 text-center">
+          <p className="text-lg font-extrabold uppercase tracking-wide">{schoolInfo?.school_name || 'Kizaga Secondary School'}</p>
+          <p className="text-xs text-maroon-200 mt-0.5 uppercase tracking-widest">Academic Result Slip — Matokeo ya Mtihani</p>
+          <p className="text-sm font-semibold text-maroon-100 mt-1">{exam?.name}</p>
+        </div>
+        {/* Division badge */}
+        <div className="text-center shrink-0">
+          <div className={`inline-flex flex-col items-center px-4 py-2 rounded-xl border-2 ${divBadge} bg-opacity-90`}>
+            <span className="text-[10px] font-bold uppercase tracking-widest">Daraja</span>
+            <span className="text-3xl font-black leading-tight">{division}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* ── Student info strip ── */}
+      <div className="border-b-2 border-gray-200 bg-gray-50 px-6 py-3 grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-4 text-sm">
+        <div><span className="text-gray-500 text-xs uppercase font-semibold">Jina la Mwanafunzi</span><p className="font-bold text-gray-900 mt-0.5">{studentName}</p></div>
+        <div><span className="text-gray-500 text-xs uppercase font-semibold">Namba ya Udahili</span><p className="font-bold text-gray-900 font-mono mt-0.5">{student?.admission_number}</p></div>
+        <div><span className="text-gray-500 text-xs uppercase font-semibold">Darasa</span><p className="font-bold text-gray-900 mt-0.5">{student?.classes?.class_name}</p></div>
+      </div>
+
+      {/* ── Marks table ── */}
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm border-collapse">
+          <thead>
+            <tr className="bg-gray-100 text-gray-600 text-xs uppercase">
+              <th className="border border-gray-300 px-3 py-2.5 text-center w-8">#</th>
+              <th className="border border-gray-300 px-3 py-2.5 text-left">Somo (Subject)</th>
+              <th className="border border-gray-300 px-3 py-2.5 text-center">Nadharia<br/><span className="font-normal normal-case text-gray-400">(Theory /100)</span></th>
+              {anyPractical && (
+                <th className="border border-gray-300 px-3 py-2.5 text-center">Vitendo<br/><span className="font-normal normal-case text-gray-400">(Prac. /50)</span></th>
+              )}
+              <th className="border border-gray-300 px-3 py-2.5 text-center">Jumla<br/><span className="font-normal normal-case text-gray-400">({anyPractical ? '150' : '100'})</span></th>
+              <th className="border border-gray-300 px-3 py-2.5 text-center">Asilimia<br/><span className="font-normal normal-case text-gray-400">(%)</span></th>
+              <th className="border border-gray-300 px-3 py-2.5 text-center">Daraja<br/><span className="font-normal normal-case text-gray-400">(Grade)</span></th>
+              <th className="border border-gray-300 px-3 py-2.5 text-center">Pointi<br/><span className="font-normal normal-case text-gray-400">(Pts)</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            {results.rows.map((row, i) => {
+              const total = row.isAbsent ? null
+                : (row.theory ?? 0) + (row.hp ? (row.practical ?? 0) : 0)
+              return (
+                <tr key={row.subjectId} className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                  <td className="border border-gray-300 px-3 py-2.5 text-center text-gray-400 text-xs">{i + 1}</td>
+                  <td className="border border-gray-300 px-3 py-2.5 font-medium text-gray-800">{row.subjectName}</td>
+                  <td className="border border-gray-300 px-3 py-2.5 text-center text-gray-700">
+                    {row.isAbsent ? <span className="text-red-500 font-semibold text-xs">ABS</span> : (row.theory ?? '—')}
+                  </td>
+                  {anyPractical && (
+                    <td className="border border-gray-300 px-3 py-2.5 text-center text-gray-700">
+                      {row.isAbsent ? '—' : row.hp ? (row.practical ?? '—') : <span className="text-gray-300">N/A</span>}
+                    </td>
+                  )}
+                  <td className="border border-gray-300 px-3 py-2.5 text-center font-semibold text-gray-800">
+                    {row.isAbsent ? '—' : total}
+                  </td>
+                  <td className="border border-gray-300 px-3 py-2.5 text-center text-gray-700">
+                    {row.pct !== null ? `${row.pct.toFixed(1)}%` : '—'}
+                  </td>
+                  {gradeCell(row)}
+                  <td className="border border-gray-300 px-3 py-2.5 text-center text-gray-700">
+                    {row.isAbsent ? '—' : (row.grade?.points ?? '—')}
+                  </td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      {/* ── Summary footer ── */}
+      <div className="border-t-2 border-gray-300 bg-gray-50 px-6 py-4">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+          <SummaryCell label="Wastani wa Alama" value={results.resultRow?.average_marks != null ? `${Number(results.resultRow.average_marks).toFixed(2)}%` : '—'} />
+          <SummaryCell label="Jumla ya Pointi" value={results.totalPoints} />
+          <SummaryCell label="Nafasi Darasani" value={results.resultRow?.position ?? '—'} />
+          <div className="text-center">
+            <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Daraja (Division)</p>
+            <span className={`inline-flex items-center px-4 py-1.5 rounded-lg border-2 text-xl font-black ${divBadge}`}>{division}</span>
+          </div>
+        </div>
+      </div>
+
+      <div className="border-t border-gray-200 px-6 py-2 text-center">
+        <p className="text-[10px] text-gray-400">Matokeo haya yanatolewa na mfumo wa kompyuta wa {schoolInfo?.school_name || 'Kizaga Secondary School'}. Kwa uthibitisho rasmi wasiliana na ofisi ya shule.</p>
+      </div>
+    </div>
+  )
+}
+
+function SummaryCell({ label, value }) {
+  return (
+    <div className="text-center">
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">{label}</p>
+      <p className="text-2xl font-black text-gray-900">{value}</p>
     </div>
   )
 }

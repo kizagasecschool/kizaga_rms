@@ -46,7 +46,7 @@ export default async function handler(req, res) {
       if (!studentId || !examId) return res.status(400).json({ error: 'studentId and examId required' })
 
       const [marksRes, resultRes] = await Promise.all([
-        supabase.from('marks').select('*').eq('exam_id', examId).eq('student_id', studentId),
+        supabase.from('marks').select('*, subjects(*)').eq('exam_id', examId).eq('student_id', studentId),
         supabase.from('student_results').select('*').eq('exam_id', examId).eq('student_id', studentId).maybeSingle(),
       ])
 
