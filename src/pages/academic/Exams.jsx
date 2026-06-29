@@ -330,8 +330,10 @@ function AcademicExams() {
           const gA = a.gender === 'Female' ? 0 : 1
           const gB = b.gender === 'Female' ? 0 : 1
           if (gA !== gB) return gA - gB
-          const s = (a.surname||'').localeCompare(b.surname||'')
-          return s !== 0 ? s : (a.first_name||'').localeCompare(b.first_name||'')
+          const s1 = (a.first_name||'').localeCompare(b.first_name||'')
+          if (s1 !== 0) return s1
+          const s2 = (a.middle_name||'').localeCompare(b.middle_name||'')
+          return s2 !== 0 ? s2 : (a.surname||'').localeCompare(b.surname||'')
         })
 
         const [{ data: subjectsData }, { data: excludedData }] = await Promise.all([
