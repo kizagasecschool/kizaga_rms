@@ -24,9 +24,9 @@ export default function SchoolSettings() {
     district: '',
     logo_url: '',
     national_logo_url: '',
-    at_api_key: '',
-    at_username: '',
-    at_sender_id: '',
+    beem_api_key: '',
+    beem_secret_key: '',
+    beem_sender_id: '',
   })
 
   const schoolLogoInput = useRef(null)
@@ -54,9 +54,9 @@ export default function SchoolSettings() {
         district: row.district || '',
         logo_url: row.logo_url || '',
         national_logo_url: row.national_logo_url || '',
-        at_api_key: row.at_api_key || '',
-        at_username: row.at_username || '',
-        at_sender_id: row.at_sender_id || '',
+        beem_api_key: row.beem_api_key || '',
+        beem_secret_key: row.beem_secret_key || '',
+        beem_sender_id: row.beem_sender_id || '',
       })
     }
     setLoading(false)
@@ -165,9 +165,9 @@ export default function SchoolSettings() {
         district: settings.district,
         logo_url: settings.logo_url || null,
         national_logo_url: settings.national_logo_url || null,
-        at_api_key: settings.at_api_key || null,
-        at_username: settings.at_username || null,
-        at_sender_id: settings.at_sender_id || null,
+        beem_api_key: settings.beem_api_key || null,
+        beem_secret_key: settings.beem_secret_key || null,
+        beem_sender_id: settings.beem_sender_id || null,
         updated_at: new Date().toISOString(),
       }, { onConflict: 'id' })
     if (error) {
@@ -392,31 +392,33 @@ export default function SchoolSettings() {
           </div>
         </div>
 
-        {/* Africa's Talking SMS */}
+        {/* Beem Africa SMS */}
         <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
-          <h2 className="text-sm font-semibold text-gray-800 uppercase tracking-wider">SMS Configuration (Africa's Talking)</h2>
-          <p className="text-xs text-gray-400">Configure Africa's Talking SMS gateway to send SMS to parents.</p>
+          <div>
+            <h2 className="text-sm font-semibold text-gray-800 uppercase tracking-wider">SMS Configuration (Beem Africa)</h2>
+            <p className="text-xs text-gray-400 mt-0.5">Configure Beem Africa SMS gateway to send SMS to parents. Get credentials at <span className="font-mono">apisms.beem.africa</span></p>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">API Key</label>
               <input
                 type="text"
-                name="at_api_key"
-                value={settings.at_api_key}
+                name="beem_api_key"
+                value={settings.beem_api_key}
                 onChange={handleChange}
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 outline-none transition"
-                placeholder="Africa's Talking API Key"
+                placeholder="Beem Africa API Key"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Username</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Secret Key</label>
               <input
-                type="text"
-                name="at_username"
-                value={settings.at_username}
+                type="password"
+                name="beem_secret_key"
+                value={settings.beem_secret_key}
                 onChange={handleChange}
                 className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 outline-none transition"
-                placeholder="e.g. sandbox or your AT username"
+                placeholder="Beem Africa Secret Key"
               />
             </div>
           </div>
@@ -424,13 +426,14 @@ export default function SchoolSettings() {
             <label className="block text-sm font-medium text-gray-700 mb-1">Sender ID</label>
             <input
               type="text"
-              name="at_sender_id"
-              value={settings.at_sender_id}
+              name="beem_sender_id"
+              value={settings.beem_sender_id}
               onChange={handleChange}
               className="w-full px-3 py-2.5 text-sm border border-gray-200 rounded-lg focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 outline-none transition"
               placeholder="e.g. KIZAGA"
+              maxLength={11}
             />
-            <p className="text-xs text-gray-400 mt-1">Optional. Leave blank to use Africa's Talking default.</p>
+            <p className="text-xs text-gray-400 mt-1">Max 11 characters. Must be registered with Beem Africa.</p>
           </div>
         </div>
 
