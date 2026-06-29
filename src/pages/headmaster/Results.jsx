@@ -1,3 +1,10 @@
+import ErrorBoundary from '../../components/ErrorBoundary'
 import AcademicResults from '../academic/Results'
 
-export default AcademicResults
+export default function HeadmasterResults() {
+  return (
+    <ErrorBoundary>
+      <AcademicResults />
+    </ErrorBoundary>
+  )
+}
