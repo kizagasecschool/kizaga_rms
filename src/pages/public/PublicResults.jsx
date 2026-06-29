@@ -2,6 +2,15 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { supabase } from '../../lib/supabase'
 
+async function apiPost(action, body) {
+  const res = await fetch('/api/public-results', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ action, ...body }),
+  })
+  return res.json()
+}
+
 const SCIENCE_CODES = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
 function hasPractical(subject, exam) {
@@ -128,9 +137,6 @@ export default function PublicResults() {
     supabase.from('school_settings').select('logo_url, school_name').limit(1).then(({ data }) => {
       if (data?.[0]) setSchoolInfo(data[0])
     })
-    supabase.from('grades').select('*').order('min_mark', { ascending: false }).then(({ data }) => {
-      if (data) setGrades(data)
-    })
   }, [])
 
   const handleLookup = async (e) => {
@@ -139,45 +145,17 @@ export default function PublicResults() {
     setLooking(true)
     setLookupError('')
     try {
-      const { data: studentData, error } = await supabase
-        .from('students')
-        .select('id, first_name, middle_name, surname, gender, class_id, class_stream_id, admission_number, classes(class_name, level)')
-        .ilike('admission_number', admNo.trim())
-        .maybeSingle()
+      const data = await apiPost('lookup', { admissionNo: admNo })
 
-      if (error) throw error
-      if (!studentData) {
+      if (!data.student) {
         setLookupError('Namba ya udahili haikupatikana. Tafadhali angalia namba uliyoingiza.')
         return
       }
 
-      // Fetch exams for this student's class
-      const { data: examClasses } = await supabase
-        .from('exam_classes')
-        .select('exam_id, exams!inner(*)')
-        .eq('class_id', studentData.class_id)
-
-      const seen = new Set()
-      const uniqueExams = []
-      ;(examClasses || []).forEach(ec => {
-        if (!seen.has(ec.exam_id)) {
-          seen.add(ec.exam_id)
-          uniqueExams.push(ec.exams)
-        }
-      })
-      uniqueExams.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-
-      // Fetch subjects for this class
-      const { data: classSubjData } = await supabase
-        .from('class_subjects')
-        .select('subject_id, subjects(*)')
-        .eq('class_id', studentData.class_id)
-
-      const subjList = (classSubjData || []).map(cs => cs.subjects).filter(Boolean)
-
-      setStudent(studentData)
-      setExams(uniqueExams)
-      setSubjects(subjList)
+      setStudent(data.student)
+      setExams(data.exams || [])
+      setSubjects(data.subjects || [])
+      setGrades(data.grades || [])
       setStep('select')
     } catch (err) {
       setLookupError('Hitilafu imetokea. Jaribu tena.')
@@ -185,6 +163,27 @@ export default function PublicResults() {
     } finally {
       setLooking(false)
     }
+  }
+
+  const buildResultRows = (marks, selectedExam) => {
+    const examSubjects = subjects.map(s => ({ ...s, hp: hasPractical(s, selectedExam) }))
+    return examSubjects.map(subj => {
+      const mark = (marks || []).find(m => m.subject_id === subj.id)
+      if (!mark) return null
+      const pct = getPct(mark, subj.hp)
+      const gradeObj = pct !== null ? getGrade(pct, grades) : null
+      return {
+        subjectId: subj.id,
+        subjectName: subj.subject_name,
+        subjectCode: subj.subject_code,
+        theory: mark.marks_obtained,
+        practical: mark.practical_marks,
+        hp: subj.hp,
+        pct,
+        isAbsent: mark.is_absent,
+        grade: gradeObj,
+      }
+    }).filter(Boolean)
   }
 
   const handleViewResults = async (e) => {
@@ -197,48 +196,11 @@ export default function PublicResults() {
     setCompareResults(null)
     setCompareExamId('')
     setCompareExam(null)
-
-    // Re-check practical per exam
-    const examSubjects = subjects.map(s => ({
-      ...s,
-      hp: hasPractical(s, selectedExam),
-    }))
-
     try {
-      const { data: marks } = await supabase
-        .from('marks')
-        .select('*')
-        .eq('exam_id', examId)
-        .eq('student_id', student.id)
-
-      const { data: resultRow } = await supabase
-        .from('student_results')
-        .select('*')
-        .eq('exam_id', examId)
-        .eq('student_id', student.id)
-        .maybeSingle()
-
-      const rows = examSubjects.map(subj => {
-        const mark = (marks || []).find(m => m.subject_id === subj.id)
-        if (!mark) return null
-        const pct = getPct(mark, subj.hp)
-        const gradeObj = pct !== null ? getGrade(pct, grades) : null
-        return {
-          subjectId: subj.id,
-          subjectName: subj.subject_name,
-          subjectCode: subj.subject_code,
-          theory: mark.marks_obtained,
-          practical: mark.practical_marks,
-          hp: subj.hp,
-          pct,
-          isAbsent: mark.is_absent,
-          grade: gradeObj,
-        }
-      }).filter(Boolean)
-
+      const data = await apiPost('results', { studentId: student.id, examId })
+      const rows = buildResultRows(data.marks, selectedExam)
       const totalPoints = rows.reduce((sum, r) => sum + (r.grade?.points ?? 0), 0)
-
-      setResults({ rows, resultRow, totalPoints })
+      setResults({ rows, resultRow: data.resultRow, totalPoints })
       setStep('results')
     } catch (err) {
       console.error(err)
@@ -252,46 +214,11 @@ export default function PublicResults() {
     const selExam = exams.find(ex => ex.id === compareExamId)
     setCompareExam(selExam)
     setLoadingCompare(true)
-
-    const examSubjects = subjects.map(s => ({
-      ...s,
-      hp: hasPractical(s, selExam),
-    }))
-
     try {
-      const { data: marks } = await supabase
-        .from('marks')
-        .select('*')
-        .eq('exam_id', compareExamId)
-        .eq('student_id', student.id)
-
-      const { data: resultRow } = await supabase
-        .from('student_results')
-        .select('*')
-        .eq('exam_id', compareExamId)
-        .eq('student_id', student.id)
-        .maybeSingle()
-
-      const rows = examSubjects.map(subj => {
-        const mark = (marks || []).find(m => m.subject_id === subj.id)
-        if (!mark) return null
-        const pct = getPct(mark, subj.hp)
-        const gradeObj = pct !== null ? getGrade(pct, grades) : null
-        return {
-          subjectId: subj.id,
-          subjectName: subj.subject_name,
-          subjectCode: subj.subject_code,
-          theory: mark.marks_obtained,
-          practical: mark.practical_marks,
-          hp: subj.hp,
-          pct,
-          isAbsent: mark.is_absent,
-          grade: gradeObj,
-        }
-      }).filter(Boolean)
-
+      const data = await apiPost('results', { studentId: student.id, examId: compareExamId })
+      const rows = buildResultRows(data.marks, selExam)
       const totalPoints = rows.reduce((sum, r) => sum + (r.grade?.points ?? 0), 0)
-      setCompareResults({ rows, resultRow, totalPoints })
+      setCompareResults({ rows, resultRow: data.resultRow, totalPoints })
       setStep('compare')
     } catch (err) {
       console.error(err)
