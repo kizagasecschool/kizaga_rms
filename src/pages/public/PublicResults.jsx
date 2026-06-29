@@ -143,7 +143,6 @@ export default function PublicResults() {
         .from('students')
         .select('id, first_name, middle_name, surname, gender, class_id, class_stream_id, admission_number, classes(class_name, level)')
         .ilike('admission_number', admNo.trim())
-        .eq('status', 'active')
         .maybeSingle()
 
       if (error) throw error
