@@ -95,17 +95,24 @@ function Users() {
     setSaving(true)
     try {
       if (editing) {
-        const updates = {
+        // Update email + profile via server-side endpoint so auth.users is also updated
+        const updatePayload = {
+          user_id: editing.id,
           email: formData.email,
           full_name: formData.full_name,
           role: formData.role,
         }
+        if (formData.password) updatePayload.password = formData.password
 
-        const { error: profileErr } = await supabase
-          .from('profiles')
-          .update(updates)
-          .eq('id', editing.id)
-        if (profileErr) throw profileErr
+        const updateRes = await fetch('/api/update-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updatePayload),
+        })
+        const updateText = await updateRes.text()
+        let updateResult
+        try { updateResult = JSON.parse(updateText) } catch { throw new Error(updateText || `Server returned ${updateRes.status}`) }
+        if (!updateRes.ok) throw new Error(updateResult.error || 'Failed to update user')
 
         if (formData.role === 'teacher') {
           const existingTeacher = getTeacherData(editing.id)
