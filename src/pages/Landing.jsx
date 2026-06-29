@@ -17,12 +17,12 @@ const aLevelCombinations = [
 const heroImages = Array.from({ length: 6 }, (_, i) => `/images/${i + 1}.jpg`)
 
 const facilities = [
-  { name: 'Science Laboratories', desc: 'Fully equipped physics, chemistry and biology laboratories for practical learning.', image: 'https://placehold.co/600x400/801818/ffffff?text=Science+Labs', icon: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.113.443-.276.857-.486 1.25M9.75 3.104c.53-.32 1.128-.512 1.759-.58M5 14.5l-.424 2.5A1.5 1.5 0 006.06 19h2.88a1.5 1.5 0 001.485-2l-.423-2.5M18 8.584V4.5a1.5 1.5 0 00-1.5-1.5h-3A1.5 1.5 0 0012 4.5v4.084M18 8.584a3 3 0 01-3 3h-1.5a3 3 0 01-3-3' },
-  { name: 'Boys Dormitory', desc: 'Spacious and secure dormitory accommodating over 200 boarding students.', image: 'https://placehold.co/600x400/801818/ffffff?text=Boys+Dormitory', icon: 'M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z' },
-  { name: 'Girls Dormitory', desc: 'Safe and conducive boarding facility for female students with 24-hour matron support.', image: 'https://placehold.co/600x400/801818/ffffff?text=Girls+Dormitory', icon: 'M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z' },
-  { name: 'Library', desc: 'Well-stocked library with textbooks, reference materials, and a quiet reading zone.', image: 'https://placehold.co/600x400/801818/ffffff?text=Library', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0018 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
-  { name: 'Sports Grounds', desc: 'Football pitch, basketball court, volleyball court and athletics track for sports development.', image: 'https://placehold.co/600x400/801818/ffffff?text=Sports+Grounds', icon: 'M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z' },
-  { name: 'Computer Lab', desc: 'Modern computer laboratory with internet access for IT and research studies.', image: 'https://placehold.co/600x400/801818/ffffff?text=Computer+Lab', icon: 'M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25' },
+  { name: 'Science Laboratories', desc: 'Fully equipped physics, chemistry and biology laboratories for practical learning.', icon: 'M9.75 3.104v5.714a2.25 2.25 0 01-.659 1.591L5 14.5M9.75 3.104c-.113.443-.276.857-.486 1.25M9.75 3.104c.53-.32 1.128-.512 1.759-.58M5 14.5l-.424 2.5A1.5 1.5 0 006.06 19h2.88a1.5 1.5 0 001.485-2l-.423-2.5M18 8.584V4.5a1.5 1.5 0 00-1.5-1.5h-3A1.5 1.5 0 0012 4.5v4.084M18 8.584a3 3 0 01-3 3h-1.5a3 3 0 01-3-3' },
+  { name: 'Boys Dormitory', desc: 'Spacious and secure dormitory accommodating over 200 boarding students.', icon: 'M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z' },
+  { name: 'Girls Dormitory', desc: 'Safe and conducive boarding facility for female students with 24-hour matron support.', icon: 'M2.25 21h19.5m-18-18v18m10.5-18v18m6-13.5V21M6.75 6.75h.75m-.75 3h.75m-.75 3h.75m3-6h.75m-.75 3h.75m-.75 3h.75M6.75 21v-3.375c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125V21M3 3h12m-.75 4.5H21m-3.75 3.75h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008zm0 3h.008v.008h-.008v-.008z' },
+  { name: 'Library', desc: 'Well-stocked library with textbooks, reference materials, and a quiet reading zone.', icon: 'M12 6.042A8.967 8.967 0 006 3.75c-1.052 0-2.062.18-3 .512v14.25A8.987 8.987 0 016 18c2.305 0 4.408.867 6 2.292m0-14.25a8.966 8.966 0 016-2.292c1.052 0 2.062.18 3 .512v14.25A8.987 8.987 0 0118 18a8.967 8.967 0 00-6 2.292m0-14.25v14.25' },
+  { name: 'Sports Grounds', desc: 'Football pitch, basketball court, volleyball court and athletics track for sports development.', icon: 'M15.362 5.214A8.252 8.252 0 0112 21 8.25 8.25 0 016.038 7.048 8.287 8.287 0 009 9.6a8.983 8.983 0 013.361-6.867 8.21 8.21 0 003 2.48z' },
+  { name: 'Computer Lab', desc: 'Modern computer laboratory with internet access for IT and research studies.', icon: 'M9 17.25v1.007a3 3 0 01-.879 2.122L7.5 21h9l-.621-.621A3 3 0 0115 18.257V17.25m6-12V15a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 15V5.25m18 0A2.25 2.25 0 0018.75 3H5.25A2.25 2.25 0 003 5.25m18 0V12a2.25 2.25 0 01-2.25 2.25H5.25A2.25 2.25 0 013 12V5.25' },
 ]
 
 function Landing() {
@@ -32,11 +32,33 @@ function Landing() {
   const [uniforms, setUniforms] = useState([])
   const [joiningInstructions, setJoiningInstructions] = useState([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [stats, setStats] = useState({ students: null, teachers: null })
+  const [headmasterName, setHeadmasterName] = useState('')
 
   useEffect(() => {
-    supabase.from('school_settings').select('logo_url, school_name').limit(1).then(({ data }) => {
-      if (data?.[0]) setSchoolInfo(data[0])
+    supabase
+      .from('school_settings')
+      .select('logo_url, school_name, phone, email, address, region, district')
+      .limit(1)
+      .then(({ data }) => { if (data?.[0]) setSchoolInfo(data[0]) })
+  }, [])
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('students').select('*', { count: 'exact', head: true }),
+      supabase.from('teachers').select('*', { count: 'exact', head: true }),
+    ]).then(([sRes, tRes]) => {
+      setStats({ students: sRes.count ?? null, teachers: tRes.count ?? null })
     })
+  }, [])
+
+  useEffect(() => {
+    supabase
+      .from('profiles')
+      .select('full_name')
+      .eq('role', 'headmaster')
+      .limit(1)
+      .then(({ data }) => { if (data?.[0]?.full_name) setHeadmasterName(data[0].full_name) })
   }, [])
 
   useEffect(() => {
@@ -57,6 +79,8 @@ function Landing() {
     }, 10000)
     return () => clearInterval(timer)
   }, [])
+
+  const formatStat = (n, suffix = '+') => n == null ? '—' : `${n}${suffix}`
 
   return (
     <div className="min-h-screen bg-white">
@@ -85,7 +109,9 @@ function Landing() {
               <a href="#academics" className="text-sm text-gray-600 hover:text-maroon-600 transition">Academics</a>
               <a href="#facilities" className="text-sm text-gray-600 hover:text-maroon-600 transition">Facilities</a>
               <Link to="/joining-instructions" className="text-sm text-gray-600 hover:text-maroon-600 transition">Joining Instructions</Link>
-              <a href="#uniforms" className="text-sm text-gray-600 hover:text-maroon-600 transition">Sare</a>
+              {uniforms.length > 0 && (
+                <a href="#uniforms" className="text-sm text-gray-600 hover:text-maroon-600 transition">Sare</a>
+              )}
               <Link to="/events-announcements" className="text-sm text-gray-600 hover:text-maroon-600 transition">Events</Link>
               <Link to="/results" className="text-sm text-maroon-600 hover:text-maroon-700 font-semibold transition">Angalia Matokeo</Link>
               <Link to="/track-application" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition">Fuatilia Ombi</Link>
@@ -93,7 +119,6 @@ function Landing() {
             </nav>
 
             <div className="flex items-center gap-3">
-              {/* Hamburger — mobile only */}
               <button
                 onClick={() => setMobileMenuOpen(o => !o)}
                 aria-label="Toggle menu"
@@ -157,7 +182,9 @@ function Landing() {
               </a>
             ))}
             <Link to="/joining-instructions" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Joining Instructions</Link>
-            <a href="#uniforms" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Sare za Shule</a>
+            {uniforms.length > 0 && (
+              <a href="#uniforms" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Sare za Shule</a>
+            )}
             <Link to="/events-announcements" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Events &amp; Announcements</Link>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 px-1">
               <Link to="/results" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center py-3.5 text-base font-semibold text-maroon-700 bg-maroon-50 border border-maroon-300 rounded-xl">
@@ -221,7 +248,6 @@ function Landing() {
 
       {/* ========== HERO ========== */}
       <section className="relative bg-black text-white overflow-hidden">
-        {/* Slideshow images */}
         <div className="absolute inset-0">
           {heroImages.map((src, i) => (
             <img
@@ -283,7 +309,6 @@ function Landing() {
             </div>
           </div>
         </div>
-        {/* Dots */}
         <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex items-center gap-2 z-10">
           {heroImages.map((_, i) => (
             <button
@@ -335,11 +360,11 @@ function Landing() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-                <p className="text-3xl font-bold text-maroon-600">500+</p>
+                <p className="text-3xl font-bold text-maroon-600">{formatStat(stats.students)}</p>
                 <p className="text-sm text-gray-500 mt-1">Students</p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-                <p className="text-3xl font-bold text-maroon-600">30+</p>
+                <p className="text-3xl font-bold text-maroon-600">{formatStat(stats.teachers)}</p>
                 <p className="text-sm text-gray-500 mt-1">Teachers</p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
@@ -459,25 +484,14 @@ function Landing() {
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {facilities.map((f) => (
-              <div key={f.name} className="bg-white rounded-xl border border-gray-200 overflow-hidden group">
-                <div className="relative h-48 bg-gray-100 overflow-hidden">
-                  <img
-                    src={f.image}
-                    alt={`${f.name} at Kizaga Secondary School`}
-                    className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                    loading="lazy"
-                  />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent" />
-                  <div className="absolute bottom-3 left-3">
-                    <div className="w-8 h-8 bg-white/90 backdrop-blur rounded-lg flex items-center justify-center">
-                      <svg className="w-4 h-4 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                        <path strokeLinecap="round" strokeLinejoin="round" d={f.icon} />
-                      </svg>
-                    </div>
-                  </div>
+              <div key={f.name} className="bg-white rounded-xl border border-gray-200 p-6 flex gap-4 items-start hover:shadow-md transition">
+                <div className="w-12 h-12 bg-maroon-100 rounded-xl flex items-center justify-center shrink-0">
+                  <svg className="w-6 h-6 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d={f.icon} />
+                  </svg>
                 </div>
-                <div className="p-5">
-                  <h3 className="text-base font-semibold text-gray-900 mb-2">{f.name}</h3>
+                <div>
+                  <h3 className="text-base font-semibold text-gray-900 mb-1">{f.name}</h3>
                   <p className="text-sm text-gray-500 leading-relaxed">{f.desc}</p>
                 </div>
               </div>
@@ -559,17 +573,17 @@ function Landing() {
       </section>
 
       {/* ========== UNIFORMS ========== */}
-      <section id="uniforms" className="py-16 sm:py-20 bg-white">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="text-center mb-12">
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Sare za Shule</h2>
-            <div className="w-16 h-1 bg-maroon-600 mx-auto rounded-full mb-4" />
-            <p className="text-gray-500 max-w-2xl mx-auto">
-              Kizaga Secondary School ina sare maalum kwa wanafunzi. Wanafunzi wanatakiwa kuvaa sare kamili kila siku.
-            </p>
-          </div>
+      {uniforms.length > 0 && (
+        <section id="uniforms" className="py-16 sm:py-20 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 mb-3">Sare za Shule</h2>
+              <div className="w-16 h-1 bg-maroon-600 mx-auto rounded-full mb-4" />
+              <p className="text-gray-500 max-w-2xl mx-auto">
+                Kizaga Secondary School ina sare maalum kwa wanafunzi. Wanafunzi wanatakiwa kuvaa sare kamili kila siku.
+              </p>
+            </div>
 
-          {uniforms.length > 0 && (
             <div className="space-y-10">
               {['SCHOOL','HOSTEL','SHAMBA','SPORTS'].filter(cat => uniforms.some(u => u.category === cat)).map(category => {
                 const items = uniforms.filter(u => u.category === category)
@@ -587,12 +601,10 @@ function Landing() {
                             </div>
                           ) : (
                             <div className="aspect-[4/3] bg-gradient-to-br from-maroon-50 to-maroon-100 flex items-center justify-center p-8">
-                              <div className="text-center">
-                                <div className="w-32 h-48 mx-auto bg-white rounded-xl shadow-lg border border-gray-200 flex items-center justify-center mb-3">
-                                  <svg className="w-16 h-16 text-maroon-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
-                                    <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
-                                  </svg>
-                                </div>
+                              <div className="w-32 h-48 mx-auto bg-white rounded-xl shadow-lg border border-gray-200 flex items-center justify-center">
+                                <svg className="w-16 h-16 text-maroon-300" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
+                                </svg>
                               </div>
                             </div>
                           )}
@@ -617,9 +629,9 @@ function Landing() {
                 )
               })}
             </div>
-          )}
-        </div>
-      </section>
+          </div>
+        </section>
+      )}
 
       {/* ========== HEADMASTER ========== */}
       <section className="py-16 sm:py-20 bg-gray-50">
@@ -638,7 +650,7 @@ function Landing() {
               academic excellence, character development, and personal growth go hand in hand. We
               invite you to join our community and be part of our success story.&rdquo;
             </blockquote>
-            <p className="text-sm font-semibold text-gray-900">Head of School</p>
+            <p className="text-sm font-semibold text-gray-900">{headmasterName || 'Head of School'}</p>
             <p className="text-xs text-gray-500">Kizaga Secondary School</p>
           </div>
         </div>
@@ -668,13 +680,17 @@ function Landing() {
               </div>
               <div>
                 <p className="text-sm font-semibold text-gray-900">Location</p>
-                <p className="text-xs text-gray-500 mt-0.5">Kizaga, Ulemo, Tanzania</p>
+                <p className="text-xs text-gray-500 mt-0.5">
+                  {schoolInfo?.address || 'Kizaga, Ulemo, Tanzania'}
+                  {schoolInfo?.district && `, ${schoolInfo.district}`}
+                  {schoolInfo?.region && `, ${schoolInfo.region}`}
+                </p>
                 <p className="text-xs text-maroon-600 mt-1">View on Maps &rarr;</p>
               </div>
             </a>
 
             {/* Email */}
-            <a href="mailto:kizagasec2024@gmail.com"
+            <a href={`mailto:${schoolInfo?.email || 'kizagasec2024@gmail.com'}`}
                className="bg-gray-50 rounded-xl border border-gray-200 p-5 hover:border-maroon-300 hover:bg-maroon-50/30 transition flex gap-4 items-start">
               <div className="w-10 h-10 bg-maroon-100 rounded-xl flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
@@ -683,7 +699,7 @@ function Landing() {
               </div>
               <div className="min-w-0">
                 <p className="text-sm font-semibold text-gray-900">Email Us</p>
-                <p className="text-xs text-maroon-600 mt-0.5 truncate">kizagasec2024@gmail.com</p>
+                <p className="text-xs text-maroon-600 mt-0.5 truncate">{schoolInfo?.email || 'kizagasec2024@gmail.com'}</p>
               </div>
             </a>
 
@@ -770,7 +786,9 @@ function Landing() {
                 <li><a href="#about" className="text-sm text-gray-400 hover:text-white transition">About Us</a></li>
                 <li><a href="#academics" className="text-sm text-gray-400 hover:text-white transition">Academics</a></li>
                 <li><a href="#facilities" className="text-sm text-gray-400 hover:text-white transition">Facilities</a></li>
-                <li><a href="#uniforms" className="text-sm text-gray-400 hover:text-white transition">Sare za Shule</a></li>
+                {uniforms.length > 0 && (
+                  <li><a href="#uniforms" className="text-sm text-gray-400 hover:text-white transition">Sare za Shule</a></li>
+                )}
                 <li><Link to="/apply" className="text-sm text-gray-400 hover:text-white transition">Tuma Ombi</Link></li>
                 <li><Link to="/joining-instructions" className="text-sm text-gray-400 hover:text-white transition">Maelekezo ya Kujiunga</Link></li>
                 <li><Link to="/events-announcements" className="text-sm text-gray-400 hover:text-white transition">Matukio na Matangazo</Link></li>
@@ -782,20 +800,25 @@ function Landing() {
             <div>
               <h3 className="text-sm font-semibold text-white mb-4">Academics</h3>
               <ul className="space-y-2">
-                <li><a href="#" className="text-sm text-gray-400 hover:text-white transition">O-Level Subjects</a></li>
-                <li><a href="#" className="text-sm text-gray-400 hover:text-white transition">A-Level Combinations</a></li>
-                <li><a href="#" className="text-sm text-gray-400 hover:text-white transition">Examinations</a></li>
-                <li><a href="#" className="text-sm text-gray-400 hover:text-white transition">Academic Calendar</a></li>
+                <li><a href="#academics" className="text-sm text-gray-400 hover:text-white transition">O-Level Subjects</a></li>
+                <li><a href="#academics" className="text-sm text-gray-400 hover:text-white transition">A-Level Combinations</a></li>
+                <li><Link to="/joining-instructions" className="text-sm text-gray-400 hover:text-white transition">Joining Instructions</Link></li>
+                <li><Link to="/results" className="text-sm text-gray-400 hover:text-white transition">Exam Results</Link></li>
               </ul>
             </div>
 
             <div>
               <h3 className="text-sm font-semibold text-white mb-4">Contact</h3>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li>Kizaga, Tanzania</li>
-                <li>+255 712 345 678</li>
-                <li>+255 765 432 100</li>
-                <li>info@kizaga-school.ac.tz</li>
+                {(schoolInfo?.address || schoolInfo?.district || schoolInfo?.region) ? (
+                  <li>
+                    {[schoolInfo.address, schoolInfo.district, schoolInfo.region].filter(Boolean).join(', ')}
+                  </li>
+                ) : (
+                  <li>Kizaga, Ulemo, Tanzania</li>
+                )}
+                {schoolInfo?.phone && <li>{schoolInfo.phone}</li>}
+                {schoolInfo?.email && <li>{schoolInfo.email}</li>}
               </ul>
               <div className="flex items-center gap-3 mt-4">
                 <Link
