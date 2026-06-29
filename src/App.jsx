@@ -33,6 +33,7 @@ import SendNotification from './pages/SendNotification'
 import SendSMS from './pages/SendSMS'
 import AdmissionForm from './pages/public/AdmissionForm'
 import TrackApplication from './pages/public/TrackApplication'
+import PublicResults from './pages/public/PublicResults'
 import SchoolRules from './pages/public/SchoolRules'
 import JoiningInstructions from './pages/public/JoiningInstructions'
 import EventsAnnouncements from './pages/public/EventsAnnouncements'
@@ -49,6 +50,7 @@ function App() {
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/" element={<Landing />} />
         <Route path="/apply" element={<AdmissionForm />} />
+        <Route path="/results" element={<PublicResults />} />
         <Route path="/track-application" element={<TrackApplication />} />
         <Route path="/school-rules" element={<SchoolRules />} />
         <Route path="/events-announcements" element={<EventsAnnouncements />} />

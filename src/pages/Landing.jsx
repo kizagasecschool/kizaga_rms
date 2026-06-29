@@ -87,6 +87,7 @@ function Landing() {
               <Link to="/joining-instructions" className="text-sm text-gray-600 hover:text-maroon-600 transition">Joining Instructions</Link>
               <a href="#uniforms" className="text-sm text-gray-600 hover:text-maroon-600 transition">Sare</a>
               <Link to="/events-announcements" className="text-sm text-gray-600 hover:text-maroon-600 transition">Events</Link>
+              <Link to="/results" className="text-sm text-maroon-600 hover:text-maroon-700 font-semibold transition">Angalia Matokeo</Link>
               <Link to="/track-application" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition">Fuatilia Ombi</Link>
               <a href="#contact" className="text-sm text-gray-600 hover:text-maroon-600 transition">Contact</a>
             </nav>
@@ -159,6 +160,9 @@ function Landing() {
             <a href="#uniforms" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Sare za Shule</a>
             <Link to="/events-announcements" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Events &amp; Announcements</Link>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 px-1">
+              <Link to="/results" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center py-3.5 text-base font-semibold text-maroon-700 bg-maroon-50 border border-maroon-300 rounded-xl">
+                Angalia Matokeo
+              </Link>
               <Link to="/track-application" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center py-3.5 text-base font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-xl">
                 Fuatilia Ombi
               </Link>
@@ -184,6 +188,21 @@ function Landing() {
           </nav>
         </div>
       )}
+
+      {/* ========== RESULTS BANNER ========== */}
+      <div className="bg-maroon-700 text-white">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center justify-between flex-wrap gap-2">
+          <p className="text-xs sm:text-sm text-maroon-100">
+            <span className="font-semibold text-white">Angalia Matokeo ya Mwanafunzi:</span> Ingiza namba ya udahili kuona matokeo ya mtihani na ulinganisho.
+          </p>
+          <Link
+            to="/results"
+            className="shrink-0 px-4 py-1.5 bg-white text-maroon-700 text-xs sm:text-sm font-semibold rounded-lg hover:bg-maroon-50 transition"
+          >
+            Angalia Matokeo &rarr;
+          </Link>
+        </div>
+      </div>
 
       {/* ========== TRACK BANNER ========== */}
       <div className="bg-emerald-50 border-b border-emerald-200">
@@ -802,6 +821,7 @@ function Landing() {
                 <li><Link to="/apply" className="text-sm text-gray-400 hover:text-white transition">Tuma Ombi</Link></li>
                 <li><Link to="/joining-instructions" className="text-sm text-gray-400 hover:text-white transition">Maelekezo ya Kujiunga</Link></li>
                 <li><Link to="/events-announcements" className="text-sm text-gray-400 hover:text-white transition">Matukio na Matangazo</Link></li>
+                <li><Link to="/results" className="text-sm text-gray-400 hover:text-white transition">Angalia Matokeo</Link></li>
                 <li><Link to="/track-application" className="text-sm text-gray-400 hover:text-white transition">Fuatilia Ombi</Link></li>
               </ul>
             </div>
