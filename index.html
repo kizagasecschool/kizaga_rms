@@ -157,9 +157,10 @@
     <script type="module" src="/src/main.jsx"></script>
     <script>
       (function () {
+        var isLocalhost = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        if (isLocalhost) return;
         document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
         document.addEventListener('keydown', function (e) {
-          // Block Ctrl+U (view source), Ctrl+S (save), Ctrl+Shift+I/J/C (devtools), F12
           if (
             (e.ctrlKey && e.key === 'u') ||
             (e.ctrlKey && e.key === 's') ||
