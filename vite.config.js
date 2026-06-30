@@ -19,6 +19,15 @@ export default defineConfig(({ mode }) => {
     ],
     build: {
       target: ['es2015', 'chrome70'],
+      sourcemap: false,
+      minify: 'terser',
+      terserOptions: {
+        compress: {
+          drop_console: true,
+          drop_debugger: true,
+        },
+        mangle: true,
+      },
     },
     server: {
       proxy: {

@@ -155,5 +155,23 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      (function () {
+        document.addEventListener('contextmenu', function (e) { e.preventDefault(); });
+        document.addEventListener('keydown', function (e) {
+          // Block Ctrl+U (view source), Ctrl+S (save), Ctrl+Shift+I/J/C (devtools), F12
+          if (
+            (e.ctrlKey && e.key === 'u') ||
+            (e.ctrlKey && e.key === 's') ||
+            (e.ctrlKey && e.shiftKey && ['i', 'j', 'c'].includes(e.key.toLowerCase())) ||
+            e.key === 'F12'
+          ) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+          }
+        });
+      })();
+    </script>
   </body>
 </html>
