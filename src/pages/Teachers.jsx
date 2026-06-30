@@ -42,8 +42,10 @@ function Teachers() {
     const { data } = await supabase
       .from('teachers')
       .select('*, profiles(*)')
-      .order('created_at', { ascending: false })
-    if (data) setTeachers(data)
+    if (data) {
+      data.sort((a, b) => (a.profiles?.full_name || '').localeCompare(b.profiles?.full_name || ''))
+      setTeachers(data)
+    }
   }, [])
 
   const fetchLookups = useCallback(async () => {
