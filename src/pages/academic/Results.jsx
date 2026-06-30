@@ -422,7 +422,7 @@ function Results() {
         if (yRes.data) setAcademicYears(yRes.data)
       } catch (err) {
         console.error('Init load error:', err)
-        setInitError('Imeshindwa kupakia data. Tafadhali angalia mtandao wako na ujaribu tena.')
+        setInitError('Failed to load data. Please check your connection and try again.')
       } finally {
         setLoading(false)
       }
@@ -807,10 +807,10 @@ function Results() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Kosa la Kupakia Data</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Failed to Load Data</h3>
         <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">{initError}</p>
         <button onClick={() => window.location.reload()} className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition">
-          Jaribu Tena
+          Try Again
         </button>
       </div>
     )

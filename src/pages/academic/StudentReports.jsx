@@ -510,7 +510,7 @@ function StudentReports() {
         if (yRes.data) setAcademicYears(yRes.data)
       } catch (err) {
         console.error('Init load error:', err)
-        setInitError('Imeshindwa kupakia data. Tafadhali angalia mtandao wako na ujaribu tena.')
+        setInitError('Failed to load data. Please check your connection and try again.')
       } finally {
         setLoading(false)
       }
@@ -927,10 +927,10 @@ function StudentReports() {
             <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
           </svg>
         </div>
-        <h3 className="text-lg font-semibold text-gray-800 mb-2">Kosa la Kupakia Data</h3>
+        <h3 className="text-lg font-semibold text-gray-800 mb-2">Failed to Load Data</h3>
         <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">{initError}</p>
         <button onClick={() => window.location.reload()} className="px-4 py-2 text-sm font-medium text-white bg-maroon-600 rounded-lg hover:bg-maroon-700 transition">
-          Jaribu Tena
+          Try Again
         </button>
       </div>
     )
@@ -1329,7 +1329,7 @@ function StudentReports() {
                 <svg className="w-3.5 h-3.5 text-blue-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                   <path strokeLinecap="round" strokeLinejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="text-xs text-blue-700">Chapisha ripoti zote: bonyeza <kbd className="px-1 py-0.5 bg-blue-100 border border-blue-200 rounded text-xs font-mono">Ctrl+P</kbd> au kitufe cha <strong>Chapisha Zote</strong> kwenye orodha</span>
+                <span className="text-xs text-blue-700">To print all reports: press <kbd className="px-1 py-0.5 bg-blue-100 border border-blue-200 rounded text-xs font-mono">Ctrl+P</kbd> or use the <strong>Print All</strong> button in the student list</span>
               </div>
               <div className="no-print flex items-center justify-between mb-4">
                 <button
@@ -1339,7 +1339,7 @@ function StudentReports() {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18" />
                   </svg>
-                  Rudi kwenye Orodha
+                  Back to List
                 </button>
                 <button
                   onClick={handleDownloadPDF}
@@ -1348,14 +1348,14 @@ function StudentReports() {
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                     <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
                   </svg>
-                  Chapisha PDF
+                  Print PDF
                 </button>
               </div>
 
               <div className="no-print bg-white rounded-xl border border-gray-200 p-4 mb-4">
-                <h4 className="text-sm font-semibold text-gray-800 mb-3">Mipangilio ya Ripoti</h4>
+                <h4 className="text-sm font-semibold text-gray-800 mb-3">Report Settings</h4>
                 <div className="mb-3">
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Kichwa cha Ripoti <span className="text-gray-400">(bonyeza Enter kwa mstari mpya, hadi mistari 4)</span></label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Report Heading <span className="text-gray-400">(press Enter for new line, up to 4 lines)</span></label>
                   <textarea
                     value={localHeading}
                     onChange={e => {
@@ -1371,65 +1371,65 @@ function StudentReports() {
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tarehe ya Kufunga</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">School Closing Date</label>
                     <input type="date" value={schoolClosingDate} onChange={e => setSchoolClosingDate(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Tarehe ya Kufungua</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">School Opening Date</label>
                     <input type="date" value={schoolOpeningDate} onChange={e => setSchoolOpeningDate(e.target.value)} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Salamu kwa Mzazi</label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Parent Greeting</label>
                     <input type="text" value={parentGreeting} onChange={e => setParentGreeting(e.target.value)} placeholder="e.g. Wazazi wa [Jina] ..." className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-3">
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Maoni ya Mwalimu wa Darasa <span className="text-gray-400">(moja kwa moja kama tupu)</span></label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Class Teacher Comment <span className="text-gray-400">(overrides auto-comment when filled)</span></label>
                     <input type="text" value={classTeacherComment} onChange={e => setClassTeacherComment(e.target.value)} placeholder="" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-gray-600 mb-1">Maoni ya Mkuu wa Shule <span className="text-gray-400">(moja kwa moja kama tupu)</span></label>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">Head Teacher Comment <span className="text-gray-400">(overrides auto-comment when filled)</span></label>
                     <input type="text" value={headTeacherComment} onChange={e => setHeadTeacherComment(e.target.value)} placeholder="" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Ujumbe wa Kufunga</label>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Closing Message</label>
                   <input type="text" value={closingMessage} onChange={e => setClosingMessage(e.target.value)} placeholder="e.g. Asante kwa ushirikiano wenu. Mungu awabariki." className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                 </div>
                 <div className="border-t border-gray-200 pt-3 mt-3">
-                  <h5 className="text-xs font-semibold text-gray-700 mb-2">Majina ya Safu Wima Kwenye Ripoti</h5>
+                  <h5 className="text-xs font-semibold text-gray-700 mb-2">Column Labels in Report</h5>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {mode === 'combined' ? (
                       <>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Mtihani 1</label>
-                          <input type="text" value={examLabel1} onChange={e => setExamLabel1(e.target.value)} placeholder={selectedExam?.name || 'Mtihani 1'} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Exam 1 Label</label>
+                          <input type="text" value={examLabel1} onChange={e => setExamLabel1(e.target.value)} placeholder={selectedExam?.name || 'Exam 1'} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Mtihani 2</label>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Exam 2 Label</label>
                           <input type="text" value={examLabel2} onChange={e => setExamLabel2(e.target.value)} placeholder={selectedExam2?.name || 'Mtihani 2'} className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                         </div>
                       </>
                     ) : selectedExam?.has_practical ? (
                       <>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Nadharia</label>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Theory Label</label>
                           <input type="text" value={examLabel1} onChange={e => setExamLabel1(e.target.value)} placeholder="Nadharia" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                         </div>
                         <div>
-                          <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Vitendo</label>
+                          <label className="block text-xs font-medium text-gray-600 mb-1">Practical Label</label>
                           <input type="text" value={examLabel2} onChange={e => setExamLabel2(e.target.value)} placeholder="Vitendo" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                         </div>
                       </>
                     ) : (
                       <div>
-                        <label className="block text-xs font-medium text-gray-600 mb-1">Jina la Alama</label>
+                        <label className="block text-xs font-medium text-gray-600 mb-1">Marks Label</label>
                         <input type="text" value={examLabel1} onChange={e => setExamLabel1(e.target.value)} placeholder="Alama" className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                       </div>
                     )}
                   </div>
-                  <p className="text-[10px] text-gray-400 mt-1">Majina haya yataonekana kwenye safu wima za jedwali la matokeo kwa darasa hili tu.</p>
+                  <p className="text-[10px] text-gray-400 mt-1">These labels appear in the results table columns for this class only.</p>
                 </div>
               </div>
 

@@ -158,7 +158,7 @@ function TeacherDashboard() {
       {!loading && classStreamIds.length > 0 && (
         <div className="mt-8">
           <div className="bg-white rounded-xl border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Wanafunzi kwa Darasa</h2>
+            <h2 className="text-lg font-semibold text-gray-900 mb-4">Students by Class</h2>
             <StudentsByClassTable classStreamIds={classStreamIds} />
           </div>
         </div>
