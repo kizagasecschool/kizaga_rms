@@ -84,6 +84,7 @@ function Students() {
   const [search, setSearch] = useState('')
   const [filterClass, setFilterClass] = useState('')
   const [filterStatus, setFilterStatus] = useState('active')
+  const [studentsPage, setStudentsPage] = useState(1)
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(false)
   const [deletingAll, setDeletingAll] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -187,6 +188,11 @@ function Students() {
     if (filterStatus && s.status !== filterStatus) return false
     return true
   })
+
+  const S_PAGE_SIZE = 50
+  const sTotalPages = Math.max(1, Math.ceil(filtered.length / S_PAGE_SIZE))
+  const sPage = Math.min(studentsPage, sTotalPages)
+  const paginated = filtered.slice((sPage - 1) * S_PAGE_SIZE, sPage * S_PAGE_SIZE)
 
   const generateAdmissionNumber = useCallback(async () => {
     const year = new Date().getFullYear().toString()
@@ -846,14 +852,14 @@ function Students() {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setStudentsPage(1) }}
               placeholder="Search by admission number or name..."
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             />
           </div>
           <select
             value={filterClass}
-            onChange={(e) => setFilterClass(e.target.value)}
+            onChange={(e) => { setFilterClass(e.target.value); setStudentsPage(1) }}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
           >
             <option value="">All Classes</option>
@@ -864,7 +870,7 @@ function Students() {
           </select>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => { setFilterStatus(e.target.value); setStudentsPage(1) }}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
           >
             <option value="">All Statuses</option>
@@ -928,7 +934,7 @@ function Students() {
                   </td>
                 </tr>
               )}
-              {filtered.map((s) => {
+              {paginated.map((s) => {
                 const cs = s.class_stream_id ? classStreamMap[s.class_stream_id] : null
                 const cls = s.class_id ? classes.find((c) => c.id === s.class_id) : null
                 const displayClass = cls?.class_name || cs?.class_name || null
@@ -1013,8 +1019,23 @@ function Students() {
           </table>
         </div>
 
-        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-wrap gap-2">
           <span className="text-xs text-gray-500">{filtered.length} student(s)</span>
+          {sTotalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setStudentsPage(p => Math.max(1, p - 1))}
+                disabled={sPage <= 1}
+                className="px-2.5 py-1 text-xs rounded border border-gray-300 bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50"
+              >‹ Prev</button>
+              <span className="text-xs text-gray-500 px-2">Page {sPage} of {sTotalPages}</span>
+              <button
+                onClick={() => setStudentsPage(p => Math.min(sTotalPages, p + 1))}
+                disabled={sPage >= sTotalPages}
+                className="px-2.5 py-1 text-xs rounded border border-gray-300 bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50"
+              >Next ›</button>
+            </div>
+          )}
         </div>
       </div>
 

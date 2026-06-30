@@ -23,6 +23,7 @@ function Teachers() {
 
   const [search, setSearch] = useState('')
   const [filterStatus, setFilterStatus] = useState('')
+  const [teachersPage, setTeachersPage] = useState(1)
 
   const [formOpen, setFormOpen] = useState(false)
   const [editing, setEditing] = useState(null)
@@ -98,6 +99,11 @@ function Teachers() {
     if (filterStatus && t.status !== filterStatus) return false
     return true
   })
+
+  const T_PAGE_SIZE = 50
+  const tTotalPages = Math.max(1, Math.ceil(filtered.length / T_PAGE_SIZE))
+  const tPage = Math.min(teachersPage, tTotalPages)
+  const paginatedTeachers = filtered.slice((tPage - 1) * T_PAGE_SIZE, tPage * T_PAGE_SIZE)
 
   const getAssignmentsForTeacher = (teacherId) => {
     return assignments.filter((a) => a.teacher_id === teacherId)
@@ -399,14 +405,14 @@ function Teachers() {
             <input
               type="text"
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => { setSearch(e.target.value); setTeachersPage(1) }}
               placeholder="Search by name or TSC No..."
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             />
           </div>
           <select
             value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
+            onChange={(e) => { setFilterStatus(e.target.value); setTeachersPage(1) }}
             className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
           >
             <option value="">All Statuses</option>
@@ -437,7 +443,7 @@ function Teachers() {
                   </td>
                 </tr>
               )}
-              {filtered.map((t) => {
+              {paginatedTeachers.map((t) => {
                 return (
                   <tr key={t.id} className="hover:bg-gray-50 transition">
                     <td className="px-4 py-3.5">
@@ -498,8 +504,23 @@ function Teachers() {
           </table>
         </div>
 
-        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
+        <div className="px-5 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between flex-wrap gap-2">
           <span className="text-xs text-gray-500">{filtered.length} teacher(s)</span>
+          {tTotalPages > 1 && (
+            <div className="flex items-center gap-1">
+              <button
+                onClick={() => setTeachersPage(p => Math.max(1, p - 1))}
+                disabled={tPage <= 1}
+                className="px-2.5 py-1 text-xs rounded border border-gray-300 bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50"
+              >‹ Prev</button>
+              <span className="text-xs text-gray-500 px-2">Page {tPage} of {tTotalPages}</span>
+              <button
+                onClick={() => setTeachersPage(p => Math.min(tTotalPages, p + 1))}
+                disabled={tPage >= tTotalPages}
+                className="px-2.5 py-1 text-xs rounded border border-gray-300 bg-white text-gray-600 disabled:opacity-40 hover:bg-gray-50"
+              >Next ›</button>
+            </div>
+          )}
         </div>
       </div>
 

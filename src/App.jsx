@@ -95,6 +95,7 @@ function App() {
                 <Routes>
                   <Route index element={<HeadmasterDashboard />} />
                   <Route path="teachers" element={<Teachers />} />
+                  <Route path="students" element={<Students />} />
                   <Route path="results" element={<HeadmasterResults />} />
                   <Route path="reports" element={<HeadmasterReports />} />
                   <Route path="performance" element={<HeadmasterPerformance />} />
