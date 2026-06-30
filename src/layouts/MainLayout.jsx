@@ -100,6 +100,7 @@ const navItems = {
       { path: '/academic/reports', icon: I.reports, label: 'Report Cards' },
     ]},
     { path: '/academic/attendance', icon: I.cal, label: 'Attendance' },
+    { path: '/academic/timetable', icon: I.group, label: 'Timetable' },
     { icon: I.comms, label: 'Communication', children: [
       { path: '/send-sms', icon: I.notif, label: 'Send SMS' },
       { path: '/send-notification', icon: I.notif, label: 'Send Notification' },

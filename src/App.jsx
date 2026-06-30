@@ -25,6 +25,7 @@ import ViewMarks from './pages/academic/ViewMarks'
 import AcademicYears from './pages/academic/AcademicYears'
 import StudentReports from './pages/academic/StudentReports'
 import Attendance from './pages/academic/Attendance'
+import Timetable from './pages/academic/Timetable'
 import EnterMarks from './pages/teacher/EnterMarks'
 import MyStudents from './pages/teacher/MyStudents'
 import Analysis from './pages/teacher/Analysis'
@@ -130,6 +131,7 @@ function App() {
                   <Route path="class-upgrade" element={<ClassUpgrade />} />
                   <Route path="admissions" element={<ManageAdmissions />} />
                   <Route path="attendance" element={<Attendance />} />
+                  <Route path="timetable" element={<Timetable />} />
                 </Routes>
               </RoleBasedRoute>
             }
