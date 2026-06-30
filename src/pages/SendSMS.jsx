@@ -41,7 +41,7 @@ export default function SendSMS() {
   const [message, setMessage] = useState('')
   const [selectedRecipients, setSelectedRecipients] = useState([])
 
-  const canSend = ['admin', 'headmaster', 'academic'].includes(profile?.role)
+  const canSend = ['admin', 'headmaster', 'academic', 'teacher'].includes(profile?.role)
 
   useEffect(() => {
     Promise.all([
@@ -125,7 +125,7 @@ export default function SendSMS() {
   }
 
   const loadResultsRecipients = async () => {
-    if (!classId || !examId) { showToast('Chagua darasa na mtihani', 'error'); return }
+    if (!classId || !examId) { showToast('Select a class and exam first', 'error'); return }
     setLoadingResults(true)
     try {
       const [{ data: students }, { data: marksData }, { data: subjectData }, { data: gradesData }, { data: resultsData }, clsRes] = await Promise.all([
@@ -137,7 +137,7 @@ export default function SendSMS() {
         supabase.from('classes').select('class_name').eq('id', classId).single(),
       ])
 
-      if (!students || students.length === 0) { showToast('Hakuna wanafunzi katika darasa hili', 'error'); return }
+      if (!students || students.length === 0) { showToast('No students found in this class', 'error'); return }
 
       students.sort((a, b) => {
         const gA = a.gender === 'Female' ? 0 : 1
@@ -185,17 +185,17 @@ export default function SendSMS() {
       setPreviewResults(preview)
       setSelectedResults([])
       const noPhone = (students || []).length - preview.length
-      showToast(`${preview.length} mzazi(w) wamepakiwa${noPhone > 0 ? ` (${noPhone} hawana nambari)` : ''}`, 'success')
+      showToast(`${preview.length} parent(s) loaded${noPhone > 0 ? ` (${noPhone} have no phone number)` : ''}`, 'success')
     } catch (err) {
       console.error(err)
-      showToast('Imeshindwa kupakia data', 'error')
+      showToast('Failed to load data', 'error')
     } finally {
       setLoadingResults(false)
     }
   }
 
   const loadRecipients = async () => {
-    if (!classId) { showToast('Chagua darasa kwanza', 'error'); return }
+    if (!classId) { showToast('Select a class first', 'error'); return }
     setLoadingRecipients(true)
     try {
       const { data, error } = await studentFilter()
@@ -211,10 +211,10 @@ export default function SendSMS() {
       setRecipients(list)
       setSelectedRecipients([])
       const noPhone = (data || []).length - list.length
-      showToast(`${list.length} mzazi(w) wamepakiwa${noPhone > 0 ? ` (${noPhone} hawana nambari)` : ''}`, 'success')
+      showToast(`${list.length} parent(s) loaded${noPhone > 0 ? ` (${noPhone} have no phone number)` : ''}`, 'success')
     } catch (err) {
       console.error(err)
-      showToast('Imeshindwa kupakia wazazi', 'error')
+      showToast('Failed to load parents', 'error')
     } finally {
       setLoadingRecipients(false)
     }
@@ -246,8 +246,8 @@ export default function SendSMS() {
   }
 
   const handleSendMessages = async (recipientList, customMessage) => {
-    if (!recipientList || recipientList.length === 0) { showToast('Hakuna wapokeaji', 'error'); return }
-    if (tab === 'message' && !customMessage?.trim()) { showToast('Andika ujumbe kwanza', 'error'); return }
+    if (!recipientList || recipientList.length === 0) { showToast('No recipients selected', 'error'); return }
+    if (tab === 'message' && !customMessage?.trim()) { showToast('Please type a message first', 'error'); return }
     setSending(true)
     setSendProgress({ done: 0, total: recipientList.length })
     let success = 0
@@ -286,12 +286,12 @@ export default function SendSMS() {
       }
 
       if (fail === 0) {
-        showToast(`SMS ${success} zimetumwa`, 'success')
+        showToast(`${success} SMS sent successfully`, 'success')
       } else {
-        showToast(`Zimetumwa: ${success}, Zimeshindwa: ${fail}${errors[0] ? ' — ' + errors[0] : ''}`, 'warning')
+        showToast(`Sent: ${success}, Failed: ${fail}${errors[0] ? ' — ' + errors[0] : ''}`, 'warning')
       }
     } catch (err) {
-      showToast('Imeshindwa kutuma: ' + (err.message || ''), 'error')
+      showToast('Failed to send: ' + (err.message || ''), 'error')
     } finally {
       setSending(false)
       setSendProgress(null)
@@ -304,8 +304,8 @@ export default function SendSMS() {
     return (
       <div className="max-w-3xl mx-auto">
         <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-center">
-          <h2 className="text-lg font-semibold text-amber-800 mb-1">Hairuhusiwi</h2>
-          <p className="text-sm text-amber-600">Ni Admin, Headmaster, na Academic Officer pekee wanaoruhusiwa kutuma SMS.</p>
+          <h2 className="text-lg font-semibold text-amber-800 mb-1">Access Denied</h2>
+          <p className="text-sm text-amber-600">Only Admin, Headmaster, Academic Officer, and Teachers can send SMS.</p>
         </div>
       </div>
     )
@@ -314,8 +314,8 @@ export default function SendSMS() {
   return (
     <div className="max-w-4xl mx-auto">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-gray-900">Tuma SMS kwa Wazazi</h1>
-        <p className="text-sm text-gray-500 mt-1">Tuma matokeo ya mtihani au ujumbe kwa wazazi wa wanafunzi kupitia Beem Africa</p>
+        <h1 className="text-xl font-bold text-gray-900">Send SMS to Parents</h1>
+        <p className="text-sm text-gray-500 mt-1">Send exam results or a custom message to parents via Beem Africa</p>
       </div>
 
       {/* Tabs */}
@@ -324,13 +324,13 @@ export default function SendSMS() {
           onClick={() => { setTab('results'); setSelectedResults([]); setSelectedRecipients([]) }}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition ${tab === 'results' ? 'bg-white text-maroon-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
         >
-          Tuma Matokeo
+          Send Results
         </button>
         <button
           onClick={() => { setTab('message'); setSelectedResults([]); setSelectedRecipients([]) }}
           className={`px-4 py-2 text-sm font-medium rounded-lg transition ${tab === 'message' ? 'bg-white text-maroon-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'}`}
         >
-          Tunga Ujumbe
+          Compose Message
         </button>
       </div>
 
@@ -339,13 +339,13 @@ export default function SendSMS() {
         <div className="flex flex-wrap items-end gap-3">
           {/* Class */}
           <div className="flex-1 min-w-[140px]">
-            <label className="block text-xs font-medium text-gray-600 mb-1">Darasa</label>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Class</label>
             <select
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
               className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 transition"
             >
-              <option value="">Chagua darasa...</option>
+              <option value="">Select class...</option>
               {classes.map(c => <option key={c.id} value={c.id}>{c.class_name}</option>)}
             </select>
           </div>
@@ -353,13 +353,13 @@ export default function SendSMS() {
           {/* Stream */}
           {streamsForClass.length > 0 && (
             <div className="flex-1 min-w-[120px]">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Mkondo (optional)</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Stream (optional)</label>
               <select
                 value={streamId}
                 onChange={(e) => setStreamId(e.target.value)}
                 className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 transition"
               >
-                <option value="">Wote</option>
+                <option value="">All Streams</option>
                 {streamsForClass.map(cs => (
                   <option key={cs.id} value={cs.id}>{cs.streams?.stream_name}</option>
                 ))}
@@ -370,13 +370,13 @@ export default function SendSMS() {
           {/* Exam (results tab only) */}
           {tab === 'results' && (
             <div className="flex-1 min-w-[160px]">
-              <label className="block text-xs font-medium text-gray-600 mb-1">Mtihani</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Exam</label>
               <select
                 value={examId}
                 onChange={(e) => { setExamId(e.target.value); setPreviewResults([]) }}
                 className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 transition"
               >
-                <option value="">Chagua mtihani...</option>
+                <option value="">Select exam...</option>
                 {exams.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
               </select>
             </div>
@@ -389,8 +389,8 @@ export default function SendSMS() {
             className="px-4 py-2.5 bg-maroon-600 text-white text-sm font-medium rounded-xl disabled:opacity-50 shrink-0 hover:bg-maroon-700 transition"
           >
             {loadingRecipients || loadingResults
-              ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Inapakia...</span>
-              : 'Pakia Wazazi'}
+              ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />Loading...</span>
+              : 'Load Parents'}
           </button>
         </div>
       </div>
@@ -400,11 +400,11 @@ export default function SendSMS() {
         <div className="bg-white rounded-2xl border border-gray-200 p-5 mb-4">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-sm font-semibold text-gray-800">
-              Hakiki ya Ujumbe
-              <span className="ml-2 text-xs font-normal text-gray-400">({previewResults.length} mzazi)</span>
+              Message Preview
+              <span className="ml-2 text-xs font-normal text-gray-400">({previewResults.length} parent(s))</span>
             </h3>
             <button onClick={toggleSelectAll} className="text-xs text-maroon-600 hover:text-maroon-700 font-medium" type="button">
-              {selectedResults.length === previewResults.length ? 'Ondoa Wote' : 'Chagua Wote'}
+              {selectedResults.length === previewResults.length ? 'Deselect All' : 'Select All'}
             </button>
           </div>
           <div className="max-h-72 overflow-y-auto space-y-2 mb-4">
@@ -416,11 +416,11 @@ export default function SendSMS() {
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="font-semibold text-gray-800">{p.name}</span>
-                      <span className="text-gray-400">· mzazi: {p.parent}</span>
+                      <span className="text-gray-400">· parent: {p.parent}</span>
                       <span className="ml-auto text-gray-400 font-mono">{p.phone}</span>
                     </div>
                     <p className="text-gray-500 break-words leading-relaxed">{p.message}</p>
-                    <p className="text-gray-400 mt-1">{seg.chars} herufi · {seg.segments} SMS</p>
+                    <p className="text-gray-400 mt-1">{seg.chars} chars · {seg.segments} SMS</p>
                   </div>
                 </label>
               )
@@ -430,7 +430,7 @@ export default function SendSMS() {
           {sending && sendProgress && (
             <div className="mb-3">
               <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Inatuma...</span>
+                <span>Sending...</span>
                 <span>{sendProgress.done}/{sendProgress.total}</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-1.5">
@@ -448,14 +448,14 @@ export default function SendSMS() {
             className="w-full px-4 py-2.5 bg-maroon-600 hover:bg-maroon-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition flex items-center justify-center gap-2"
           >
             {sending && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-            {sending ? 'Inatuma...' : selectedCount > 0 ? `Tuma kwa Waliochaguliwa (${selectedCount})` : `Tuma kwa Wote (${previewResults.length})`}
+            {sending ? 'Sending...' : selectedCount > 0 ? `Send to Selected (${selectedCount})` : `Send to All (${previewResults.length})`}
           </button>
         </div>
       )}
 
       {tab === 'results' && previewResults.length === 0 && !loadingResults && classId && examId && (
         <div className="bg-white rounded-2xl border border-gray-100 p-8 text-center text-sm text-gray-400">
-          Bonyeza "Pakia Wazazi" kupata orodha ya wapokeaji
+          Click "Load Parents" to get the list of recipients
         </div>
       )}
 
@@ -466,18 +466,18 @@ export default function SendSMS() {
           <div>
             <div className="flex items-center justify-between mb-2">
               <label className="text-sm font-medium text-gray-700">
-                Wapokeaji
-                {recipients.length > 0 && <span className="ml-1.5 text-xs text-gray-400">({recipients.length} wazazi wamepakiwa)</span>}
+                Recipients
+                {recipients.length > 0 && <span className="ml-1.5 text-xs text-gray-400">({recipients.length} parent(s) loaded)</span>}
               </label>
               {recipients.length > 0 && (
                 <button onClick={toggleSelectAll} className="text-xs text-maroon-600 hover:text-maroon-700 font-medium" type="button">
-                  {selectedRecipients.length === recipients.length ? 'Ondoa Wote' : 'Chagua Wote'}
+                  {selectedRecipients.length === recipients.length ? 'Deselect All' : 'Select All'}
                 </button>
               )}
             </div>
 
             {recipients.length === 0 ? (
-              <p className="text-xs text-gray-400 py-3">Pakia wazazi kwanza kwa kuchagua darasa na kubonyeza "Pakia Wazazi"</p>
+              <p className="text-xs text-gray-400 py-3">Select a class and click "Load Parents" to get recipients</p>
             ) : (
               <div className="max-h-52 overflow-y-auto border border-gray-100 rounded-xl divide-y divide-gray-50">
                 {recipients.map((r, i) => (
@@ -499,9 +499,9 @@ export default function SendSMS() {
           {/* Message compose */}
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="text-sm font-medium text-gray-700">Ujumbe</label>
+              <label className="text-sm font-medium text-gray-700">Message</label>
               <span className={`text-xs ${chars > 612 ? 'text-red-500' : 'text-gray-400'}`}>
-                {chars}/612 herufi · {segments} SMS{segments > 1 ? ' (gharama ' + segments + 'x)' : ''}
+                {chars}/612 chars · {segments} SMS{segments > 1 ? ' (cost ' + segments + 'x)' : ''}
               </span>
             </div>
             <textarea
@@ -510,14 +510,14 @@ export default function SendSMS() {
               rows={5}
               maxLength={612}
               className="w-full px-3.5 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition resize-none"
-              placeholder="Andika ujumbe kwa wazazi hapa..."
+              placeholder="Type your message to parents here..."
             />
           </div>
 
           {sending && sendProgress && (
             <div>
               <div className="flex justify-between text-xs text-gray-500 mb-1">
-                <span>Inatuma...</span>
+                <span>Sending...</span>
                 <span>{sendProgress.done}/{sendProgress.total}</span>
               </div>
               <div className="w-full bg-gray-100 rounded-full h-1.5">
@@ -532,7 +532,7 @@ export default function SendSMS() {
             className="w-full px-5 py-2.5 bg-maroon-600 hover:bg-maroon-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition flex items-center justify-center gap-2"
           >
             {sending && <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
-            {sending ? 'Inatuma...' : selectedCount > 0 ? `Tuma kwa Waliochaguliwa (${selectedCount})` : recipients.length > 0 ? `Tuma kwa Wote (${recipients.length})` : 'Tuma'}
+            {sending ? 'Sending...' : selectedCount > 0 ? `Send to Selected (${selectedCount})` : recipients.length > 0 ? `Send to All (${recipients.length})` : 'Send'}
           </button>
         </div>
       )}

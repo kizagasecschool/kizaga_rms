@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import Papa from 'papaparse'
 import { supabase } from '../lib/supabase'
@@ -6,7 +6,34 @@ import Modal from '../components/Modal'
 import { useNotification } from '../context/NotificationContext'
 import { useAuth } from '../context/AuthContext'
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
+const studentPhotoUrl = (id, bust) =>
+  id ? `${SUPABASE_URL}/storage/v1/object/public/avatars/students/${id}${bust ? `?t=${bust}` : ''}` : null
+
 const STATUSES = ['active', 'inactive', 'graduated', 'transferred', 'expelled']
+
+function StudentAvatar({ studentId, name, bust, size = 'sm' }) {
+  const [err, setErr] = useState(false)
+  const url = studentPhotoUrl(studentId, bust)
+  const dim = size === 'lg' ? 'w-12 h-12' : 'w-7 h-7'
+  const text = size === 'lg' ? 'text-base' : 'text-xs'
+  const initial = name?.[0]?.toUpperCase() || '?'
+  if (!studentId || err) {
+    return (
+      <div className={`${dim} rounded-xl bg-maroon-100 text-maroon-700 flex items-center justify-center font-semibold ${text} shrink-0`}>
+        {initial}
+      </div>
+    )
+  }
+  return (
+    <img
+      src={url}
+      alt=""
+      onError={() => setErr(true)}
+      className={`${dim} rounded-xl object-cover shrink-0 border border-gray-200`}
+    />
+  )
+}
 
 const parseDate = (str) => {
   if (!str) return null
@@ -85,6 +112,9 @@ function Students() {
   const [filterClass, setFilterClass] = useState('')
   const [filterStatus, setFilterStatus] = useState('active')
   const [studentsPage, setStudentsPage] = useState(1)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [photoBust, setPhotoBust] = useState({}) // { [studentId]: timestamp }
+  const photoInputRef = useRef(null)
   const [deleteAllConfirm, setDeleteAllConfirm] = useState(false)
   const [deletingAll, setDeletingAll] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
@@ -180,6 +210,27 @@ function Students() {
       classStreamMap[cs.id] = { class_name: cls.class_name, stream_name: str.stream_name }
     }
   })
+
+  const handlePhotoUpload = async (file) => {
+    if (!editing?.id || !file) return
+    if (!file.type.startsWith('image/')) { showToast('Please select an image file', 'error'); return }
+    if (file.size > 3 * 1024 * 1024) { showToast('Image must be under 3 MB', 'error'); return }
+    setPhotoUploading(true)
+    try {
+      const { error } = await supabase.storage.from('avatars').upload(
+        `students/${editing.id}`,
+        file,
+        { upsert: true, contentType: file.type }
+      )
+      if (error) throw error
+      setPhotoBust(prev => ({ ...prev, [editing.id]: Date.now() }))
+      showToast('Photo updated', 'success')
+    } catch (err) {
+      showToast('Failed to upload photo: ' + (err.message || ''), 'error')
+    } finally {
+      setPhotoUploading(false)
+    }
+  }
 
   const filtered = students.filter((s) => {
     const q = search.toLowerCase()
@@ -960,9 +1011,12 @@ function Students() {
                       </span>
                     </td>
                     <td className="px-5 py-3.5">
-                      <p className="text-sm font-medium text-gray-900">
-                        {[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}
-                      </p>
+                      <div className="flex items-center gap-2.5">
+                        <StudentAvatar studentId={s.id} name={s.first_name} bust={photoBust[s.id]} size="sm" />
+                        <p className="text-sm font-medium text-gray-900">
+                          {[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}
+                        </p>
+                      </div>
                     </td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">{s.gender}</td>
                     <td className="px-5 py-3.5 text-sm text-gray-600">
@@ -1043,14 +1097,33 @@ function Students() {
       <Modal isOpen={formOpen} onClose={() => setFormOpen(false)} title="" className="max-w-3xl">
         <div className="border-b border-gray-100 px-6 py-4 -mx-6 -mt-6 mb-6 bg-maroon-50/50 rounded-t-xl">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-maroon-100 rounded-xl flex items-center justify-center">
-              <svg className="w-5 h-5 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
-                <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
-              </svg>
-            </div>
+            {editing?.id ? (
+              <div className="relative group shrink-0">
+                <StudentAvatar studentId={editing.id} name={formData.first_name} bust={photoBust[editing.id]} size="lg" />
+                <button
+                  type="button"
+                  onClick={() => photoInputRef.current?.click()}
+                  disabled={photoUploading}
+                  className="absolute inset-0 flex items-center justify-center bg-black/40 rounded-xl opacity-0 group-hover:opacity-100 transition cursor-pointer"
+                  title="Upload photo"
+                >
+                  {photoUploading
+                    ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    : <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" /></svg>
+                  }
+                </button>
+                <input ref={photoInputRef} type="file" accept="image/*" className="hidden" onChange={e => handlePhotoUpload(e.target.files?.[0])} />
+              </div>
+            ) : (
+              <div className="w-12 h-12 bg-maroon-100 rounded-xl flex items-center justify-center shrink-0">
+                <svg className="w-6 h-6 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z" />
+                </svg>
+              </div>
+            )}
             <div>
               <h2 className="text-lg font-semibold text-gray-900">{editing ? 'Edit Student' : 'Register New Student'}</h2>
-              <p className="text-sm text-gray-500">{editing ? 'Update the student\'s information below' : 'Fill in the student\'s details below'}</p>
+              <p className="text-sm text-gray-500">{editing ? editing.id ? 'Hover the photo to upload a new one' : 'Update the student\'s information below' : 'Fill in the student\'s details below'}</p>
             </div>
           </div>
         </div>
