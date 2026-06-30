@@ -37,7 +37,10 @@ export default async function handler(req, res) {
 
     // Build auth update payload — only include fields that are changing
     const authUpdates = {}
-    if (email) authUpdates.email = email
+    if (email) {
+      authUpdates.email = email
+      authUpdates.email_confirm = true  // apply immediately, skip confirmation email
+    }
     if (password) authUpdates.password = password
     if (full_name || role) {
       authUpdates.user_metadata = {}

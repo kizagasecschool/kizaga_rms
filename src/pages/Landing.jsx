@@ -32,7 +32,7 @@ function Landing() {
   const [uniforms, setUniforms] = useState([])
   const [joiningInstructions, setJoiningInstructions] = useState([])
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
-  const [stats, setStats] = useState({ students: null, teachers: null })
+  const [stats, setStats] = useState({ oLevel: null, aLevel: null, teachers: null })
   const [headmasterName, setHeadmasterName] = useState('')
 
   useEffect(() => {
@@ -44,12 +44,24 @@ function Landing() {
   }, [])
 
   useEffect(() => {
-    Promise.all([
-      supabase.from('students').select('*', { count: 'exact', head: true }),
-      supabase.from('teachers').select('*', { count: 'exact', head: true }),
-    ]).then(([sRes, tRes]) => {
-      setStats({ students: sRes.count ?? null, teachers: tRes.count ?? null })
-    })
+    const fetchStats = async () => {
+      const { data: classes } = await supabase.from('classes').select('id, level')
+      const oLevelIds = classes?.filter(c => c.level === 'O_LEVEL').map(c => c.id) || []
+      const aLevelIds = classes?.filter(c => c.level === 'A_LEVEL').map(c => c.id) || []
+
+      const [oRes, aRes, tRes] = await Promise.all([
+        oLevelIds.length > 0
+          ? supabase.from('students').select('*', { count: 'exact', head: true }).in('class_id', oLevelIds).eq('status', 'active')
+          : Promise.resolve({ count: 0 }),
+        aLevelIds.length > 0
+          ? supabase.from('students').select('*', { count: 'exact', head: true }).in('class_id', aLevelIds).eq('status', 'active')
+          : Promise.resolve({ count: 0 }),
+        supabase.from('teachers').select('*', { count: 'exact', head: true }),
+      ])
+
+      setStats({ oLevel: oRes.count ?? null, aLevel: aRes.count ?? null, teachers: tRes.count ?? null })
+    }
+    fetchStats()
   }, [])
 
   useEffect(() => {
@@ -108,14 +120,14 @@ function Landing() {
               <a href="#about" className="text-sm text-gray-600 hover:text-maroon-600 transition">About</a>
               <a href="#academics" className="text-sm text-gray-600 hover:text-maroon-600 transition">Academics</a>
               <a href="#facilities" className="text-sm text-gray-600 hover:text-maroon-600 transition">Facilities</a>
+              <Link to="/events-announcements" className="text-sm text-gray-600 hover:text-maroon-600 transition">Events</Link>
               <Link to="/joining-instructions" className="text-sm text-gray-600 hover:text-maroon-600 transition">Joining Instructions</Link>
               {uniforms.length > 0 && (
                 <a href="#uniforms" className="text-sm text-gray-600 hover:text-maroon-600 transition">Sare</a>
               )}
-              <Link to="/events-announcements" className="text-sm text-gray-600 hover:text-maroon-600 transition">Events</Link>
+              <a href="#contact" className="text-sm text-gray-600 hover:text-maroon-600 transition">Contact</a>
               <Link to="/results" className="text-sm text-maroon-600 hover:text-maroon-700 font-semibold transition">Angalia Matokeo</Link>
               <Link to="/track-application" className="text-sm text-emerald-600 hover:text-emerald-700 font-medium transition">Fuatilia Ombi</Link>
-              <a href="#contact" className="text-sm text-gray-600 hover:text-maroon-600 transition">Contact</a>
             </nav>
 
             <div className="flex items-center gap-3">
@@ -170,7 +182,6 @@ function Landing() {
               { href: '#about', label: 'About' },
               { href: '#academics', label: 'Academics' },
               { href: '#facilities', label: 'Facilities' },
-              { href: '#contact', label: 'Contact' },
             ].map(item => (
               <a
                 key={item.href}
@@ -181,11 +192,12 @@ function Landing() {
                 {item.label}
               </a>
             ))}
+            <Link to="/events-announcements" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Events &amp; Announcements</Link>
             <Link to="/joining-instructions" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Joining Instructions</Link>
             {uniforms.length > 0 && (
               <a href="#uniforms" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Sare za Shule</a>
             )}
-            <Link to="/events-announcements" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Events &amp; Announcements</Link>
+            <a href="#contact" onClick={() => setMobileMenuOpen(false)} className="flex items-center px-4 py-3.5 text-base font-medium text-gray-700 rounded-xl hover:bg-gray-50 transition">Contact</a>
             <div className="mt-4 pt-4 border-t border-gray-100 space-y-3 px-1">
               <Link to="/results" onClick={() => setMobileMenuOpen(false)} className="flex items-center justify-center py-3.5 text-base font-semibold text-maroon-700 bg-maroon-50 border border-maroon-300 rounded-xl">
                 Angalia Matokeo
@@ -360,16 +372,16 @@ function Landing() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-                <p className="text-3xl font-bold text-maroon-600">{formatStat(stats.students)}</p>
-                <p className="text-sm text-gray-500 mt-1">Students</p>
+                <p className="text-3xl font-bold text-maroon-600">{formatStat(stats.oLevel)}</p>
+                <p className="text-sm text-gray-500 mt-1">O-Level Students</p>
+              </div>
+              <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
+                <p className="text-3xl font-bold text-maroon-600">{formatStat(stats.aLevel)}</p>
+                <p className="text-sm text-gray-500 mt-1">A-Level Students</p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
                 <p className="text-3xl font-bold text-maroon-600">{formatStat(stats.teachers)}</p>
                 <p className="text-sm text-gray-500 mt-1">Teachers</p>
-              </div>
-              <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
-                <p className="text-3xl font-bold text-maroon-600">15+</p>
-                <p className="text-sm text-gray-500 mt-1">Years</p>
               </div>
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center">
                 <p className="text-3xl font-bold text-maroon-600">95%</p>

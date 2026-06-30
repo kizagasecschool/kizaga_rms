@@ -163,11 +163,19 @@ function Teachers() {
     setSaving(true)
     try {
       if (editing) {
-        const { error: profileErr } = await supabase
-          .from('profiles')
-          .update({ full_name: formData.full_name, email: formData.email })
-          .eq('id', editing.profile_id)
-        if (profileErr) throw profileErr
+        const res = await fetch('/api/update-user', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            user_id: editing.profile_id,
+            email: formData.email,
+            full_name: formData.full_name,
+          }),
+        })
+        const text = await res.text()
+        let result
+        try { result = JSON.parse(text) } catch { throw new Error(text || `Server returned ${res.status}`) }
+        if (!res.ok) throw new Error(result.error || 'Failed to update teacher')
 
         const { error: teacherErr } = await supabase
           .from('teachers')
