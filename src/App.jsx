@@ -14,6 +14,7 @@ import ClassUpgrade from './pages/admin/ClassUpgrade'
 import HeadmasterDashboard from './pages/headmaster/Dashboard'
 import HeadmasterReports from './pages/headmaster/Reports'
 import HeadmasterPerformance from './pages/headmaster/Performance'
+import HeadmasterTeacherPerformance from './pages/headmaster/TeacherPerformance'
 import HeadmasterResults from './pages/headmaster/Results'
 import AcademicDashboard from './pages/academic/Dashboard'
 import AcademicClasses from './pages/academic/Classes'
@@ -23,6 +24,7 @@ import AcademicResults from './pages/academic/Results'
 import ViewMarks from './pages/academic/ViewMarks'
 import AcademicYears from './pages/academic/AcademicYears'
 import StudentReports from './pages/academic/StudentReports'
+import Attendance from './pages/academic/Attendance'
 import EnterMarks from './pages/teacher/EnterMarks'
 import MyStudents from './pages/teacher/MyStudents'
 import Analysis from './pages/teacher/Analysis'
@@ -99,6 +101,7 @@ function App() {
                   <Route path="results" element={<HeadmasterResults />} />
                   <Route path="reports" element={<HeadmasterReports />} />
                   <Route path="performance" element={<HeadmasterPerformance />} />
+                  <Route path="teacher-performance" element={<HeadmasterTeacherPerformance />} />
                   <Route path="admissions" element={<ManageAdmissions />} />
                   <Route path="uniforms" element={<ManageUniforms />} />
                   <Route path="events-announcements" element={<ManageEventsAnnouncements />} />
@@ -126,6 +129,7 @@ function App() {
                   <Route path="enter-marks" element={<EnterMarks />} />
                   <Route path="class-upgrade" element={<ClassUpgrade />} />
                   <Route path="admissions" element={<ManageAdmissions />} />
+                  <Route path="attendance" element={<Attendance />} />
                 </Routes>
               </RoleBasedRoute>
             }

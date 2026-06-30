@@ -15,6 +15,7 @@ function AcademicYears() {
   const [yearForm, setYearForm] = useState({ year_name: '', start_date: '', end_date: '', is_active: false })
   const [savingYear, setSavingYear] = useState(false)
   const [deleteYearConfirm, setDeleteYearConfirm] = useState(null)
+  const [lockingYearId, setLockingYearId] = useState(null)
 
   // Terms
   const [terms, setTerms] = useState([])
@@ -86,6 +87,23 @@ function AcademicYears() {
       showToast('Failed to save. ' + (err.message || ''), 'error')
     } finally {
       setSavingYear(false)
+    }
+  }
+
+  const handleToggleLock = async (year) => {
+    setLockingYearId(year.id)
+    try {
+      const { error } = await supabase
+        .from('academic_years')
+        .update({ is_locked: !year.is_locked })
+        .eq('id', year.id)
+      if (error) throw error
+      await fetchYears()
+      showToast(year.is_locked ? 'Academic year unlocked' : 'Academic year locked', 'success')
+    } catch (err) {
+      showToast('Failed to toggle lock. ' + (err.message || ''), 'error')
+    } finally {
+      setLockingYearId(null)
     }
   }
 
@@ -221,13 +239,14 @@ function AcademicYears() {
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Start Date</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">End Date</th>
                   <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Lock</th>
                   <th className="text-right px-5 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {years.length === 0 && (
                   <tr>
-                    <td colSpan={5} className="px-5 py-10 text-center text-sm text-gray-400">
+                    <td colSpan={6} className="px-5 py-10 text-center text-sm text-gray-400">
                       No academic years found. Click "+ Add Year" to create one.
                     </td>
                   </tr>
@@ -247,6 +266,29 @@ function AcademicYears() {
                           Inactive
                         </span>
                       )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <button
+                        onClick={() => handleToggleLock(y)}
+                        disabled={lockingYearId === y.id}
+                        title={y.is_locked ? 'Click to unlock — allows mark entry' : 'Click to lock — prevents mark entry'}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-lg border transition disabled:opacity-50"
+                        style={y.is_locked
+                          ? { borderColor: '#dc2626', color: '#dc2626', background: '#fef2f2' }
+                          : { borderColor: '#d1d5db', color: '#6b7280', background: '#f9fafb' }
+                        }
+                      >
+                        {y.is_locked ? (
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                          </svg>
+                        ) : (
+                          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M13.5 10.5V6.75a4.5 4.5 0 119 0v3.75M3.75 21.75h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H3.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                          </svg>
+                        )}
+                        {y.is_locked ? 'Locked' : 'Open'}
+                      </button>
                     </td>
                     <td className="px-5 py-3.5 text-right">
                       <div className="flex items-center justify-end gap-1">

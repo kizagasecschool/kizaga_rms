@@ -29,6 +29,8 @@ function PassBadge({ rate }) {
 }
 
 export default function HeadmasterPerformance() {
+  const [activeTab, setActiveTab] = useState('exam')
+
   const [academicYears, setAcademicYears] = useState([])
   const [exams, setExams] = useState([])
   const [classes, setClasses] = useState([])
@@ -41,6 +43,11 @@ export default function HeadmasterPerformance() {
   const [loading, setLoading] = useState(true)
   const [loadingResults, setLoadingResults] = useState(false)
   const [selectedExam, setSelectedExam] = useState(null)
+
+  // Trends state
+  const [trendsYearId, setTrendsYearId] = useState('')
+  const [trendData, setTrendData] = useState([])
+  const [loadingTrends, setLoadingTrends] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -88,6 +95,55 @@ export default function HeadmasterPerformance() {
     }
     load()
   }, [selectedExamId])
+
+  useEffect(() => {
+    if (activeTab !== 'trends') return
+    const load = async () => {
+      setLoadingTrends(true)
+      const doneExams = exams.filter(e =>
+        ['processed', 'published', 'locked'].includes(e.status) &&
+        (!trendsYearId || e.academic_year_id === trendsYearId)
+      ).sort((a, b) => new Date(a.start_date || a.created_at) - new Date(b.start_date || b.created_at))
+
+      if (doneExams.length === 0) { setTrendData([]); setLoadingTrends(false); return }
+
+      const examIds = doneExams.map(e => e.id)
+      let from = 0; const allRes = []
+      while (true) {
+        const { data } = await supabase
+          .from('student_results')
+          .select('exam_id, average_marks, division')
+          .in('exam_id', examIds)
+          .range(from, from + 999)
+        if (!data || !data.length) break
+        allRes.push(...data)
+        if (data.length < 1000) break
+        from += 1000
+      }
+
+      const byExam = {}
+      allRes.forEach(r => {
+        if (!byExam[r.exam_id]) byExam[r.exam_id] = []
+        byExam[r.exam_id].push(r)
+      })
+
+      const trend = doneExams.map(exam => {
+        const res = byExam[exam.id] || []
+        return {
+          id: exam.id,
+          name: exam.name,
+          date: exam.start_date || exam.created_at?.slice(0, 10) || '',
+          total: res.length,
+          avg: calcAvg(res),
+          passRate: calcPassRate(res),
+          divs: divCounts(res),
+        }
+      })
+      setTrendData(trend)
+      setLoadingTrends(false)
+    }
+    load()
+  }, [activeTab, trendsYearId, exams])
 
   const filteredExams = useMemo(() => {
     const list = selectedYearId ? exams.filter(e => e.academic_year_id === selectedYearId) : exams
@@ -154,32 +210,142 @@ export default function HeadmasterPerformance() {
   return (
     <div>
       <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900">Utendaji wa Shule</h1>
-        <p className="text-gray-500 mt-1">Muhtasari wa matokeo ya mitihani kwa madarasa yote</p>
+        <h1 className="text-2xl font-bold text-gray-900">School Performance</h1>
+        <p className="text-gray-500 mt-1">Exam results summary across all classes</p>
       </div>
 
+      {/* Tabs */}
+      <div className="flex gap-1 mb-6 bg-gray-100 p-1 rounded-xl w-fit">
+        <button
+          onClick={() => setActiveTab('exam')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition ${activeTab === 'exam' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >Exam Results</button>
+        <button
+          onClick={() => setActiveTab('trends')}
+          className={`px-4 py-2 text-sm font-medium rounded-lg transition ${activeTab === 'trends' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'}`}
+        >Trends</button>
+      </div>
+
+      {/* ── TRENDS TAB ── */}
+      {activeTab === 'trends' && (
+        <div>
+          <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
+            <div className="flex items-center gap-4 flex-wrap">
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">Academic Year</label>
+                <select
+                  value={trendsYearId}
+                  onChange={e => setTrendsYearId(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500"
+                >
+                  <option value="">All Years</option>
+                  {academicYears.map(y => <option key={y.id} value={y.id}>{y.year_name}</option>)}
+                </select>
+              </div>
+            </div>
+          </div>
+
+          {loadingTrends ? (
+            <div className="flex justify-center py-12"><div className="w-6 h-6 border-2 border-gray-200 border-t-maroon-600 rounded-full animate-spin" /></div>
+          ) : trendData.length === 0 ? (
+            <div className="bg-white rounded-xl border border-gray-200 p-10 text-center">
+              <p className="text-sm text-gray-500">No completed exams found for the selected period.</p>
+            </div>
+          ) : (
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-5 py-4 border-b border-gray-100">
+                <h2 className="text-sm font-semibold text-gray-800">Performance Trend — {trendData.length} Exam{trendData.length !== 1 ? 's' : ''}</h2>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="bg-gray-50 border-b border-gray-200">
+                      <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase">Exam</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Date</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Students</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-40">Average</th>
+                      <th className="text-left px-3 py-3 text-xs font-semibold text-gray-500 uppercase w-40">Pass Rate</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Div I</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Div II</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Div III</th>
+                      <th className="text-center px-3 py-3 text-xs font-semibold text-gray-500 uppercase">Div 0</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100">
+                    {trendData.map((t, i) => {
+                      const prevAvg = i > 0 ? trendData[i - 1].avg : null
+                      const trend = t.avg != null && prevAvg != null ? (t.avg > prevAvg ? 'up' : t.avg < prevAvg ? 'down' : 'same') : null
+                      return (
+                        <tr key={t.id} className="hover:bg-gray-50">
+                          <td className="px-4 py-3 font-medium text-gray-900">
+                            <div className="flex items-center gap-2">
+                              {trend === 'up' && <span className="text-green-500 text-xs">▲</span>}
+                              {trend === 'down' && <span className="text-red-500 text-xs">▼</span>}
+                              {t.name}
+                            </div>
+                          </td>
+                          <td className="px-3 py-3 text-center text-gray-500 text-xs">{t.date}</td>
+                          <td className="px-3 py-3 text-center text-gray-700">{t.total || '—'}</td>
+                          <td className="px-3 py-3">
+                            {t.avg != null ? (
+                              <div className="flex items-center gap-2">
+                                <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                  <div className="h-full bg-blue-500 rounded-full" style={{ width: `${Math.min(t.avg, 100)}%` }} />
+                                </div>
+                                <span className="text-xs text-gray-700 w-10 text-right">{t.avg.toFixed(1)}%</span>
+                              </div>
+                            ) : <span className="text-gray-300 text-xs">—</span>}
+                          </td>
+                          <td className="px-3 py-3">
+                            <div className="flex items-center gap-2">
+                              <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                                <div
+                                  className={`h-full rounded-full ${t.passRate >= 80 ? 'bg-green-500' : t.passRate >= 60 ? 'bg-yellow-400' : 'bg-red-400'}`}
+                                  style={{ width: `${t.passRate}%` }}
+                                />
+                              </div>
+                              <span className="text-xs text-gray-700 w-10 text-right">{t.passRate}%</span>
+                            </div>
+                          </td>
+                          {['I', 'II', 'III', '0'].map(d => (
+                            <td key={d} className="px-3 py-3 text-center text-gray-600">{t.divs[d] ?? 0}</td>
+                          ))}
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── EXAM RESULTS TAB ── */}
+      {activeTab === 'exam' && (
+      <div>
       {/* Filters */}
       <div className="bg-white rounded-xl border border-gray-200 p-5 mb-6">
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-xl">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Mwaka wa Masomo</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Academic Year</label>
             <select
               value={selectedYearId}
               onChange={e => { setSelectedYearId(e.target.value); setSelectedExamId('') }}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
-              <option value="">Miaka Yote</option>
+              <option value="">All Years</option>
               {academicYears.map(y => <option key={y.id} value={y.id}>{y.year_name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Chagua Mtihani</label>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Select Exam</label>
             <select
               value={selectedExamId}
               onChange={e => setSelectedExamId(e.target.value)}
               className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             >
-              <option value="">Chagua mtihani...</option>
+              <option value="">Select exam...</option>
               {filteredExams.map(e => (
                 <option key={e.id} value={e.id}>{e.name} — {e.status}</option>
               ))}
@@ -346,6 +512,8 @@ export default function HeadmasterPerformance() {
             </div>
           </div>
         </>
+      )}
+      </div>
       )}
     </div>
   )

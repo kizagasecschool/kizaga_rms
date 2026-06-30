@@ -65,7 +65,8 @@ const navItems = {
     { icon: I.chart, label: 'Reports', children: [
       { path: '/headmaster/results', icon: I.results, label: 'Results' },
       { path: '/headmaster/reports', icon: I.reports, label: 'Report Cards' },
-      { path: '/headmaster/performance', icon: I.chart, label: 'Performance' },
+      { path: '/headmaster/performance', icon: I.chart, label: 'School Performance' },
+      { path: '/headmaster/teacher-performance', icon: I.teachers, label: 'Teacher Performance' },
       { path: '/headmaster/admissions', icon: I.book, label: 'Admissions' },
       { path: '/headmaster/uniforms', icon: I.shirt, label: 'Uniforms' },
       { path: '/headmaster/joining-instructions', icon: I.book, label: 'Joining Instructions' },
@@ -98,6 +99,7 @@ const navItems = {
       { path: '/academic/results', icon: I.results, label: 'Results' },
       { path: '/academic/reports', icon: I.reports, label: 'Report Cards' },
     ]},
+    { path: '/academic/attendance', icon: I.cal, label: 'Attendance' },
     { icon: I.comms, label: 'Communication', children: [
       { path: '/send-sms', icon: I.notif, label: 'Send SMS' },
       { path: '/send-notification', icon: I.notif, label: 'Send Notification' },

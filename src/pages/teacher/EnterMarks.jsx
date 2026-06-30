@@ -165,8 +165,9 @@ function EnterMarks() {
       try {
         let query = supabase
           .from('exams')
-          .select('*, academic_years!inner(year_name), terms!inner(term_name)')
+          .select('*, academic_years!inner(year_name, is_locked), terms!inner(term_name)')
           .eq('status', 'entering_marks')
+          .eq('academic_years.is_locked', false)
 
         if (!isAcademic) {
           const classIds = [...new Set(teacherAssignments.map(a => a.class_streams?.class_id).filter(Boolean))]
@@ -584,7 +585,7 @@ function EnterMarks() {
               className="w-full px-3 py-2.5 bg-white border border-gray-200 rounded-xl text-sm outline-none focus:border-maroon-400 focus:ring-4 focus:ring-maroon-500/10 transition"
             >
               <option value="">-- Select Exam --</option>
-              {exams.length === 0 && <option value="" disabled>No exams in mark entry stage</option>}
+              {exams.length === 0 && <option value="" disabled>No open exams — check that the academic year is not locked</option>}
               {exams.map(exam => (
                 <option key={exam.id} value={exam.id}>{formatExamLabel(exam)}</option>
               ))}
