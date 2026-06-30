@@ -4,17 +4,8 @@ import { sortSubjectsByNectaCode } from '../../lib/subjectUtils'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
-// Deterministic conduct grade A/B/C — same grade every render for same student+category
-function conductGrade(studentId, categoryIdx) {
-  let h = 0x9e3779b9
-  const s = studentId + String(categoryIdx)
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i)
-    h = (Math.imul(h, 0x85ebca6b) ^ (h >>> 13)) >>> 0
-  }
-  // weight: A≈40%, B≈40%, C≈20%
-  return ['A', 'A', 'B', 'B', 'B', 'A', 'C', 'B', 'A', 'C'][h % 10]
-}
+const CONDUCT_CATEGORIES = ['Tabia', 'Uwajibikaji', 'Ubunifu', 'Kujiamini', 'Usafi', 'Ushirikiano', 'Michezo']
+const CONDUCT_GRADES = ['', 'A', 'B', 'C', 'D']
 
 function groupExamsByType(examList) {
   const groups = {}
@@ -112,7 +103,7 @@ function ReportCard({ student, ctx }) {
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
     subjectRanks, teacherSubjects, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
-    students, computeCombinedData
+    students, computeCombinedData, conductData
   } = ctx
 
   const sr = mode === 'single' ? studentResults.find(r => r.student_id === s.id) || null : null
@@ -295,7 +286,7 @@ function ReportCard({ student, ctx }) {
           <tr>
             {[0, 1, 2, 3, 4, 5, 6].map(i => (
               <td key={i} style={{ border: '1px solid #000', padding: '4px', textAlign: 'center', fontWeight: 'bold', fontSize: '12px' }}>
-                {conductGrade(s.id, i)}
+                {conductData?.[s.id]?.[i] || ''}
               </td>
             ))}
           </tr>
@@ -485,6 +476,8 @@ function StudentReports() {
   const [loading, setLoading] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
   const [initError, setInitError] = useState(null)
+  const [conductData, setConductData] = useState({})
+  const [conductShowPanel, setConductShowPanel] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -544,6 +537,25 @@ function StudentReports() {
     setStudentResults([])
     setGrades([])
     setActiveTab('list')
+    setConductData({})
+    setConductShowPanel(false)
+  }, [])
+
+  const setConductGrade = useCallback((studentId, catIdx, grade) => {
+    setConductData(prev => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId] || {}), [catIdx]: grade }
+    }))
+  }, [])
+
+  const setAllConductGrade = useCallback((catIdx, grade, studentList) => {
+    setConductData(prev => {
+      const next = { ...prev }
+      studentList.forEach(s => {
+        next[s.id] = { ...(next[s.id] || {}), [catIdx]: grade }
+      })
+      return next
+    })
   }, [])
 
   const activeExamIds = useMemo(() => {
@@ -890,13 +902,13 @@ function StudentReports() {
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
     subjectRanks, teacherSubjects, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
-    students, computeCombinedData
+    students, computeCombinedData, conductData
   }), [
     mode, studentResults, subjects, markMap, selectedExam, selectedExam2,
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
     subjectRanks, teacherSubjects, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
-    students, computeCombinedData
+    students, computeCombinedData, conductData
   ])
 
   if (loading) {
@@ -1190,9 +1202,18 @@ function StudentReports() {
             <div className="no-print bg-white rounded-xl border border-gray-200 overflow-hidden">
               <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-gray-800">
-                  Students - {students.length} total
+                  Students — {students.length} total
                 </h3>
                 <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => setConductShowPanel(p => !p)}
+                    className="px-3 py-1.5 text-xs font-medium text-indigo-700 bg-indigo-50 border border-indigo-200 rounded-lg hover:bg-indigo-100 transition flex items-center gap-1.5"
+                  >
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z" />
+                    </svg>
+                    {conductShowPanel ? 'Hide Conduct' : 'Enter Conduct Grades'}
+                  </button>
                   <button
                     onClick={handleDownloadClassPDF}
                     disabled={sortedStudents.length === 0}
@@ -1201,10 +1222,65 @@ function StudentReports() {
                     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                       <path strokeLinecap="round" strokeLinejoin="round" d="M6.72 13.829c-.24.03-.48.062-.72.096m.72-.096a42.415 42.415 0 0110.56 0m-10.56 0L6.34 18m10.94-4.171c.24.03.48.062.72.096m-.72-.096L17.66 18m0 0l.229 2.523a1.125 1.125 0 01-1.12 1.227H7.231c-.662 0-1.18-.568-1.12-1.227L6.34 18m11.318 0h1.091A2.25 2.25 0 0021 15.75V9.456c0-1.081-.768-2.015-1.837-2.175a48.055 48.055 0 00-1.913-.247M6.34 18H5.25A2.25 2.25 0 013 15.75V9.456c0-1.081.768-2.015 1.837-2.175a48.041 48.041 0 011.913-.247m10.5 0a48.536 48.536 0 00-10.5 0m10.5 0V3.375c0-.621-.504-1.125-1.125-1.125h-8.25c-.621 0-1.125.504-1.125 1.125v3.659M18 10.5h.008v.008H18V10.5zm-3 0h.008v.008H15V10.5z" />
                     </svg>
-                    Chapisha Zote ({sortedStudents.length})
+                    Print All ({sortedStudents.length})
                   </button>
                 </div>
               </div>
+
+              {/* Conduct Grades Entry Panel */}
+              {conductShowPanel && sortedStudents.length > 0 && (
+                <div className="border-b border-gray-200 bg-indigo-50/40 px-5 py-4">
+                  <p className="text-xs font-semibold text-indigo-800 mb-3">Conduct Grades (Mwenendo) — A, B, C or D per category. Leave blank if not assessed.</p>
+                  <div className="overflow-x-auto">
+                    <table className="text-xs border-collapse min-w-full">
+                      <thead>
+                        <tr>
+                          <th className="text-left pr-3 py-1.5 font-semibold text-gray-600 whitespace-nowrap">Student</th>
+                          {CONDUCT_CATEGORIES.map((cat, ci) => (
+                            <th key={ci} className="px-1 py-1.5 text-center font-semibold text-gray-600 whitespace-nowrap min-w-[80px]">{cat}</th>
+                          ))}
+                        </tr>
+                        {/* Bulk-fill row */}
+                        <tr className="bg-white/70">
+                          <td className="pr-3 py-1 text-[10px] text-gray-500 italic whitespace-nowrap">Set all →</td>
+                          {CONDUCT_CATEGORIES.map((_, ci) => (
+                            <td key={ci} className="px-1 py-1 text-center">
+                              <select
+                                value=""
+                                onChange={e => { if (e.target.value) setAllConductGrade(ci, e.target.value, sortedStudents) }}
+                                className="text-[10px] border border-indigo-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 w-16"
+                              >
+                                <option value="">—</option>
+                                {CONDUCT_GRADES.filter(g => g).map(g => <option key={g} value={g}>{g}</option>)}
+                              </select>
+                            </td>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-indigo-100">
+                        {sortedStudents.map(student => (
+                          <tr key={student.id} className="hover:bg-white/60">
+                            <td className="pr-3 py-1 font-medium text-gray-800 whitespace-nowrap">
+                              {student.first_name} {student.surname}
+                            </td>
+                            {CONDUCT_CATEGORIES.map((_, ci) => (
+                              <td key={ci} className="px-1 py-1 text-center">
+                                <select
+                                  value={conductData?.[student.id]?.[ci] || ''}
+                                  onChange={e => setConductGrade(student.id, ci, e.target.value)}
+                                  className="text-xs border border-gray-200 rounded px-1 py-0.5 bg-white focus:outline-none focus:ring-1 focus:ring-indigo-400 w-16"
+                                >
+                                  {CONDUCT_GRADES.map(g => <option key={g} value={g}>{g || '—'}</option>)}
+                                </select>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
               {students.length === 0 ? (
                 <div className="p-10 text-center">
                   <p className="text-sm text-gray-500">No students found for this class.</p>
