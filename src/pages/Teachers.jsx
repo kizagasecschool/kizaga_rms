@@ -398,7 +398,7 @@ function Teachers() {
               type="text"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or employee number..."
+              placeholder="Search by name or TSC No..."
               className="w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-maroon-500 focus:border-maroon-500"
             />
           </div>
@@ -418,7 +418,7 @@ function Teachers() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-gray-200 bg-gray-50">
-                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Employee #</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">TSC No.</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Full Name</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Email</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Qualification</th>
@@ -566,11 +566,11 @@ function Teachers() {
               <svg className="w-4 h-4 text-maroon-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15m3 0l3-3m0 0l-3-3m3 3H9" />
               </svg>
-              <span className="text-sm font-semibold text-gray-800">Account & Employee Information</span>
+              <span className="text-sm font-semibold text-gray-800">Account & TSC Information</span>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 mb-1.5">Employee Number <span className="text-red-500">*</span></label>
+                <label className="block text-xs font-medium text-gray-600 mb-1.5">TSC No. <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   required

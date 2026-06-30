@@ -60,6 +60,7 @@ const navItems = {
   ],
   headmaster: [
     { path: '/headmaster', icon: I.dash, label: 'Dashboard' },
+    { path: '/headmaster/teachers', icon: I.teachers, label: 'Teachers' },
     { icon: I.chart, label: 'Reports', children: [
       { path: '/headmaster/results', icon: I.results, label: 'Results' },
       { path: '/headmaster/reports', icon: I.reports, label: 'Report Cards' },

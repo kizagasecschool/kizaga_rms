@@ -69,6 +69,8 @@ function Landing() {
       .from('profiles')
       .select('full_name')
       .eq('role', 'headmaster')
+      .not('email', 'ilike', '%@school.com')
+      .order('full_name')
       .limit(1)
       .then(({ data }) => { if (data?.[0]?.full_name) setHeadmasterName(data[0].full_name) })
   }, [])
@@ -645,25 +647,49 @@ function Landing() {
         </section>
       )}
 
-      {/* ========== HEADMASTER ========== */}
-      <section className="py-16 sm:py-20 bg-gray-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="max-w-3xl mx-auto text-center">
-            <div className="w-20 h-20 bg-maroon-100 rounded-full flex items-center justify-center mx-auto mb-6">
-              <svg className="w-10 h-10 text-maroon-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+      {/* ========== HEADMISTRESS ========== */}
+      <section className="relative py-20 sm:py-28 bg-maroon-700 overflow-hidden">
+        {/* Decorative background circles */}
+        <div className="absolute top-0 left-0 w-72 h-72 bg-white/5 rounded-full -translate-x-1/2 -translate-y-1/2 pointer-events-none" />
+        <div className="absolute bottom-0 right-0 w-96 h-96 bg-white/5 rounded-full translate-x-1/3 translate-y-1/3 pointer-events-none" />
+        <div className="absolute top-1/2 right-12 w-32 h-32 bg-white/5 rounded-full -translate-y-1/2 pointer-events-none" />
+
+        <div className="relative max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Section label */}
+          <div className="text-center mb-10">
+            <p className="text-maroon-300 text-xs font-semibold uppercase tracking-[0.2em] mb-3">Message from</p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-white">The Headmistress</h2>
+            <div className="w-12 h-0.5 bg-maroon-400 mx-auto mt-4" />
+          </div>
+
+          {/* Quote card */}
+          <div className="relative bg-white/10 backdrop-blur-sm border border-white/15 rounded-2xl px-8 sm:px-14 py-12">
+            {/* Opening quote badge */}
+            <div className="absolute -top-5 left-10 w-10 h-10 bg-maroon-500 rounded-full flex items-center justify-center shadow-lg border-2 border-maroon-400">
+              <span className="text-white text-2xl font-bold leading-none" style={{ fontFamily: 'Georgia, serif' }}>"</span>
+            </div>
+
+            <blockquote className="text-white/90 text-lg sm:text-xl leading-relaxed italic text-center">
+              At Kizaga Secondary School, we believe every student has the potential to excel.
+              Our dedicated team of educators works tirelessly to create a nurturing environment
+              where academic excellence, character development, and personal growth go hand in hand.
+              We invite you to join our community and be part of our success story.
+            </blockquote>
+
+            {/* Divider with icon */}
+            <div className="flex items-center gap-4 my-8">
+              <div className="flex-1 h-px bg-white/20" />
+              <svg className="w-5 h-5 text-maroon-300 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.147a60.438 60.438 0 0 0-.491 6.347A48.62 48.62 0 0 1 12 20.904a48.62 48.62 0 0 1 8.232-4.41 60.46 60.46 0 0 0-.491-6.347m-15.482 0a50.636 50.636 0 0 0-2.658-.813A59.906 59.906 0 0 1 12 3.493a59.903 59.903 0 0 1 10.399 5.84c-.896.248-1.783.52-2.658.814m-15.482 0A50.717 50.717 0 0 1 12 13.489a50.702 50.702 0 0 1 7.74-3.342" />
               </svg>
+              <div className="flex-1 h-px bg-white/20" />
             </div>
-            <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 mb-2">Message from the Head of School &mdash; Kizaga Secondary School</h2>
-            <div className="w-16 h-1 bg-maroon-600 mx-auto rounded-full mb-6" />
-            <blockquote className="text-gray-600 leading-relaxed italic mb-6">
-              &ldquo;At Kizaga Secondary School, we believe every student has the potential to excel. Our
-              dedicated team of educators works tirelessly to create a nurturing environment where
-              academic excellence, character development, and personal growth go hand in hand. We
-              invite you to join our community and be part of our success story.&rdquo;
-            </blockquote>
-            <p className="text-sm font-semibold text-gray-900">{headmasterName || 'Head of School'}</p>
-            <p className="text-xs text-gray-500">Kizaga Secondary School</p>
+
+            {/* Attribution */}
+            <div className="text-center">
+              <p className="text-white font-bold text-lg tracking-wide">{headmasterName || 'Head of School'}</p>
+              <p className="text-maroon-300 text-sm mt-1">Headmistress &mdash; Kizaga Secondary School</p>
+            </div>
           </div>
         </div>
       </section>

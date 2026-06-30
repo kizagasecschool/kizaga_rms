@@ -94,6 +94,7 @@ function App() {
               <RoleBasedRoute allowedRoles={['headmaster']}>
                 <Routes>
                   <Route index element={<HeadmasterDashboard />} />
+                  <Route path="teachers" element={<Teachers />} />
                   <Route path="results" element={<HeadmasterResults />} />
                   <Route path="reports" element={<HeadmasterReports />} />
                   <Route path="performance" element={<HeadmasterPerformance />} />
