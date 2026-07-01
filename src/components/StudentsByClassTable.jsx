@@ -1,9 +1,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 
-function StudentsByClassTable({ classStreamIds } = {}) {
+function StudentsByClassTable({ oLevelClassIds, aLevelStreamIds } = {}) {
   const [data, setData] = useState([])
   const [loading, setLoading] = useState(true)
+  const isFiltered = oLevelClassIds !== undefined || aLevelStreamIds !== undefined
 
   useEffect(() => {
     const fetchData = async () => {
@@ -25,11 +26,21 @@ function StudentsByClassTable({ classStreamIds } = {}) {
       const streamToClass = {}
       streams?.forEach((cs) => { streamToClass[cs.id] = cs.class_id })
 
-      let query = supabase.from('students').select('class_stream_id, class_id, gender')
-      if (classStreamIds?.length > 0) {
-        query = query.in('class_stream_id', classStreamIds)
+      // O-Level students are tracked by class_id (class_stream_id is NULL for them);
+      // A-Level students are tracked by class_stream_id — must be queried separately.
+      let students
+      if (isFiltered) {
+        const fetchPromises = []
+        if (oLevelClassIds?.length > 0)
+          fetchPromises.push(supabase.from('students').select('class_stream_id, class_id, gender').in('class_id', oLevelClassIds))
+        if (aLevelStreamIds?.length > 0)
+          fetchPromises.push(supabase.from('students').select('class_stream_id, class_id, gender').in('class_stream_id', aLevelStreamIds))
+        const results = await Promise.all(fetchPromises)
+        students = results.flatMap((r) => r.data || [])
+      } else {
+        const { data } = await supabase.from('students').select('class_stream_id, class_id, gender')
+        students = data
       }
-      const { data: students } = await query
 
       students?.forEach((s) => {
         let cid = null
@@ -50,7 +61,7 @@ function StudentsByClassTable({ classStreamIds } = {}) {
       setLoading(false)
     }
     fetchData()
-  }, [classStreamIds])
+  }, [oLevelClassIds, aLevelStreamIds, isFiltered])
 
   if (loading) {
     return (
