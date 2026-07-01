@@ -44,8 +44,11 @@ function Teachers() {
       .from('teachers')
       .select('*, profiles(*)')
     if (data) {
-      data.sort((a, b) => (a.profiles?.full_name || '').localeCompare(b.profiles?.full_name || ''))
-      setTeachers(data)
+      // Headmaster/headmistress may also have a teachers row (they can teach a
+      // subject), but they shouldn't show up in the academic officer's staff list.
+      const teachersOnly = data.filter((t) => t.profiles?.role !== 'headmaster')
+      teachersOnly.sort((a, b) => (a.profiles?.full_name || '').localeCompare(b.profiles?.full_name || ''))
+      setTeachers(teachersOnly)
     }
   }, [])
 

@@ -121,7 +121,6 @@ const navItems = {
     { icon: I.results, label: 'Results', children: [
       { path: '/teacher/results', icon: I.results, label: 'Exam Results' },
     ]},
-    { path: '/send-sms', icon: I.notif, label: 'Send SMS' },
   ],
 }
 

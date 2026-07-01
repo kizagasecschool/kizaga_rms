@@ -153,7 +153,14 @@ function App() {
           <Route path="profile" element={<Profile />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="send-notification" element={<SendNotification />} />
-          <Route path="send-sms" element={<SendSMS />} />
+          <Route
+            path="send-sms"
+            element={
+              <RoleBasedRoute allowedRoles={['admin', 'headmaster', 'academic']}>
+                <SendSMS />
+              </RoleBasedRoute>
+            }
+          />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>
