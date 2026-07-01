@@ -903,22 +903,22 @@ function ClassSubjects() {
                             <button
                               onClick={() => handleToggleSubject(student.id, sub.id, sub.subject_type, isAssigned)}
                               disabled={savingStudentId === student.id}
-                              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-50 text-red-500 hover:bg-red-100 transition disabled:opacity-50"
-                              title="Remove optional subject"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-sky-50 text-sky-500 hover:bg-red-100 hover:text-red-500 transition disabled:opacity-50"
+                              title="Assigned — click to remove"
                             >
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              <svg className="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+                                <path d="M18 7l-1.41-1.41-6.34 6.34 1.41 1.41L18 7zm4.24-1.41L11.66 16.17l-3.88-3.88-1.41 1.41L11.66 19 23.66 7l-1.42-1.41zM.41 13.41L6 19l1.41-1.41L1.82 12 .41 13.41z" />
                               </svg>
                             </button>
                           ) : (
                             <button
                               onClick={() => handleToggleSubject(student.id, sub.id, sub.subject_type, isAssigned)}
                               disabled={savingStudentId === student.id}
-                              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-emerald-50 text-emerald-500 hover:bg-emerald-100 transition disabled:opacity-50"
-                              title="Add optional subject"
+                              className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-red-50 text-red-500 hover:bg-emerald-100 hover:text-emerald-500 transition disabled:opacity-50"
+                              title="Not assigned — click to add"
                             >
                               <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
                               </svg>
                             </button>
                           )}
