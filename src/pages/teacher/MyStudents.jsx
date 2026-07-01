@@ -46,7 +46,7 @@ function MyStudents() {
           fetchPromises.push(supabase.from('students').select('*').in('class_stream_id', aLevelStreamIds).eq('status', 'active').order('surname'))
 
         const [ssRes, subRes, ...studentResults] = await Promise.all([
-          supabase.from('student_subjects').select('student_id, subject_id').in('subject_id', subjectIds).limit(2000),
+          supabase.from('student_subjects').select('student_id, subject_id').in('subject_id', subjectIds),
           supabase.from('subjects').select('*').in('id', subjectIds),
           ...fetchPromises,
         ])
@@ -98,10 +98,6 @@ function MyStudents() {
           const studentList = students
             .filter(s => isOLevel ? s.class_id === cs.class_id : s.class_stream_id === cs.id)
             .map(s => {
-              if (isOLevel) {
-                // O-Level: all students take the same class subjects
-                return { ...s, subjects: subjectNames, subjectCount: groupSubjectIds.length }
-              }
               const ssIds = studentSubMap[s.id] || []
               const matchingSubs = groupSubjectIds.filter(sid => ssIds.includes(sid))
               return {

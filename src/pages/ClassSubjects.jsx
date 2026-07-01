@@ -107,7 +107,6 @@ function ClassSubjects() {
       return s2 !== 0 ? s2 : (a.surname || '').localeCompare(b.surname || '')
     }))
 
-    // Auto-heal only COMPULSORY subjects — optional subjects removed by academic must stay removed
     const cls = classes.find((c) => c.id === classId)
     const oLevelCompulsoryIds = cls?.level === 'O_LEVEL'
       ? (await supabase.from('subjects').select('id').eq('level', 'O_LEVEL').eq('subject_type', 'COMPULSORY')).data?.map((s) => s.id) || []
@@ -117,46 +116,43 @@ function ClassSubjects() {
     if (studData && studData.length > 0) {
       const ids = studData.map((s) => s.id)
 
-      if (oLevelCompulsoryIds.length > 0) {
-        const { data: existingSubs } = await supabase
+      // Build ssMap by batching student IDs (avoids range-based pagination timeout with large classes)
+      const SS_BATCH = 50
+      for (let i = 0; i < ids.length; i += SS_BATCH) {
+        const batchIds = ids.slice(i, i + SS_BATCH)
+        const { data: ssChunk } = await supabase
           .from('student_subjects')
           .select('student_id, subject_id')
-          .in('student_id', ids)
-          .in('subject_id', oLevelCompulsoryIds)
+          .in('student_id', batchIds)
+        if (ssChunk) {
+          ssChunk.forEach((row) => {
+            if (!ssMap[row.student_id]) ssMap[row.student_id] = []
+            ssMap[row.student_id].push(row.subject_id)
+          })
+        }
+      }
 
-        const existingKeys = new Set((existingSubs || []).map((row) => `${row.student_id}:${row.subject_id}`))
-        const missingSubs = []
-        for (const student of studData) {
-          for (const subjectId of oLevelCompulsoryIds) {
-            if (!existingKeys.has(`${student.id}:${subjectId}`)) {
+      // Auto-heal COMPULSORY subjects only for brand-new students (those with zero subjects).
+      // Students who already have any subjects are skipped — deliberate removals must stay removed.
+      if (oLevelCompulsoryIds.length > 0) {
+        const newStudents = studData.filter((s) => !ssMap[s.id] || ssMap[s.id].length === 0)
+        if (newStudents.length > 0) {
+          const missingSubs = []
+          for (const student of newStudents) {
+            for (const subjectId of oLevelCompulsoryIds) {
               missingSubs.push({ student_id: student.id, subject_id: subjectId })
             }
           }
-        }
-
-        if (missingSubs.length > 0) {
           const { error: insertErr } = await supabase
             .from('student_subjects')
             .upsert(missingSubs, { onConflict: 'student_id,subject_id' })
           if (insertErr) console.error('autoAssignCompulsorySubjects error:', insertErr)
+          // Reflect newly healed subjects in ssMap so UI is in sync
+          for (const { student_id, subject_id } of missingSubs) {
+            if (!ssMap[student_id]) ssMap[student_id] = []
+            if (!ssMap[student_id].includes(subject_id)) ssMap[student_id].push(subject_id)
+          }
         }
-      }
-
-      // Fetch student subjects — paginate in 1000-row pages (server-side db-max-rows cap)
-      let ssPage = 0
-      while (true) {
-        const { data: ssChunk } = await supabase
-          .from('student_subjects')
-          .select('student_id, subject_id')
-          .in('student_id', ids)
-          .range(ssPage * 1000, ssPage * 1000 + 999)
-        if (!ssChunk || ssChunk.length === 0) break
-        ssChunk.forEach((row) => {
-          if (!ssMap[row.student_id]) ssMap[row.student_id] = []
-          ssMap[row.student_id].push(row.subject_id)
-        })
-        if (ssChunk.length < 1000) break
-        ssPage++
       }
 
       // Fetch student combinations (A-Level)
@@ -322,7 +318,6 @@ function ClassSubjects() {
   }
 
   const handleToggleSubject = async (studentId, subjectId, subjectType, currentlyAssigned) => {
-    if (subjectType === 'COMPULSORY') return
 
     setSavingStudentId(studentId)
     try {
@@ -902,16 +897,9 @@ function ClassSubjects() {
                     </td>
                     {displaySubjects.map((sub) => {
                       const isAssigned = (studentSubjects[student.id] || []).includes(sub.id)
-                      const isCompulsory = sub.subject_type === 'COMPULSORY'
                       return (
                         <td key={sub.id} className="text-center px-2 py-2.5">
-                          {isCompulsory ? (
-                            <span className="inline-flex items-center justify-center w-7 h-7 rounded-full bg-blue-50 text-blue-500 cursor-not-allowed" title="Compulsory — cannot be removed">
-                              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-                              </svg>
-                            </span>
-                          ) : isAssigned ? (
+                          {isAssigned ? (
                             <button
                               onClick={() => handleToggleSubject(student.id, sub.id, sub.subject_type, isAssigned)}
                               disabled={savingStudentId === student.id}
@@ -945,8 +933,8 @@ function ClassSubjects() {
           <div className="px-4 py-3 border-t border-gray-100 bg-gray-50 flex items-center justify-between">
             <span className="text-xs text-gray-500">
               {students.length} student(s) across {streamIdsForClass.length} stream(s) &middot;
-              <span className="text-blue-600 font-medium ml-1">{compulsorySubjects.length} compulsory</span> (locked) &middot;
-              <span className="text-amber-600 font-medium ml-1">{optionalSubjects.length} optional</span> (add/remove per student)
+              <span className="text-blue-600 font-medium ml-1">{compulsorySubjects.length} compulsory</span> &middot;
+              <span className="text-amber-600 font-medium ml-1">{optionalSubjects.length} optional</span>
               {excludedCount > 0 && <span className="text-red-500 font-medium ml-1">&middot; {excludedCount} excluded</span>}
             </span>
           </div>
