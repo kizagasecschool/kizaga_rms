@@ -37,6 +37,18 @@ function getGrade(pct, grades) {
   return grades[grades.length - 1] || null
 }
 
+// Matches compute_student_result() in the DB: O-Level = best 7 subjects,
+// A-Level = best 3 non-ELECTIVE (principal) subjects. Points must be trimmed
+// to these "best N" sets — summing every subject overstates the total and
+// no longer matches the division computed server-side.
+function computeTotalPoints(rows, level) {
+  const bestN = level === 'A_LEVEL' ? 3 : 7
+  let pool = rows.filter(r => !r.isAbsent && r.grade?.points != null)
+  if (level === 'A_LEVEL') pool = pool.filter(r => r.subjectType !== 'ELECTIVE')
+  const sorted = pool.map(r => r.grade.points).sort((a, b) => a - b)
+  return sorted.slice(0, bestN).reduce((sum, p) => sum + p, 0)
+}
+
 function calcDivision(points, level) {
   if (!points || points <= 0) return '0'
   if (level === 'A_LEVEL') {
@@ -182,6 +194,7 @@ export default function PublicResults() {
         subjectId: mark.subject_id,
         subjectName: subj.subject_name,
         subjectCode: subj.subject_code,
+        subjectType: subj.subject_type,
         theory: mark.marks_obtained,
         practical: mark.practical_marks,
         hp,
@@ -205,7 +218,7 @@ export default function PublicResults() {
     try {
       const data = await apiPost('results', { studentId: student.id, examId })
       const rows = buildResultRows(data.marks, selectedExam)
-      const totalPoints = rows.reduce((sum, r) => sum + (r.grade?.points ?? 0), 0)
+      const totalPoints = computeTotalPoints(rows, examLevel)
       setResults({ rows, resultRow: data.resultRow, totalPoints })
       setStep('results')
     } catch (err) {
@@ -223,7 +236,7 @@ export default function PublicResults() {
     try {
       const data = await apiPost('results', { studentId: student.id, examId: compareExamId })
       const rows = buildResultRows(data.marks, selExam)
-      const totalPoints = rows.reduce((sum, r) => sum + (r.grade?.points ?? 0), 0)
+      const totalPoints = computeTotalPoints(rows, examLevel)
       setCompareResults({ rows, resultRow: data.resultRow, totalPoints })
       setStep('compare')
     } catch (err) {
@@ -541,7 +554,7 @@ export default function PublicResults() {
                             {rowA ? (
                               rowA.isAbsent ? <span className="text-xs text-red-400">ABS</span> : (
                                 <span className="text-sm">
-                                  <span className={`font-bold ${gradeColor(rowA.grade)}`}>{rowA.grade?.grade_letter || '-'}</span>
+                                  <span className={`font-bold ${gradeColor(rowA.grade)}`}>{rowA.grade?.grade || '-'}</span>
                                   <span className="text-gray-400 text-xs ml-1">({rowA.pct?.toFixed(0)}%)</span>
                                 </span>
                               )
@@ -551,7 +564,7 @@ export default function PublicResults() {
                             {rowB ? (
                               rowB.isAbsent ? <span className="text-xs text-red-400">ABS</span> : (
                                 <span className="text-sm">
-                                  <span className={`font-bold ${gradeColor(rowB.grade)}`}>{rowB.grade?.grade_letter || '-'}</span>
+                                  <span className={`font-bold ${gradeColor(rowB.grade)}`}>{rowB.grade?.grade || '-'}</span>
                                   <span className="text-gray-400 text-xs ml-1">({rowB.pct?.toFixed(0)}%)</span>
                                 </span>
                               )
@@ -637,7 +650,7 @@ function ResultSlip({ schoolInfo, student, studentName, exam, results, division,
     if (row.isAbsent) return <td className="border border-gray-300 px-3 py-2 text-center text-red-500 font-semibold">ABS</td>
     return (
       <td className={`border border-gray-300 px-3 py-2 text-center font-bold ${gradeColor(row.grade)}`}>
-        {row.grade?.grade_letter || '—'}
+        {row.grade?.grade || '—'}
       </td>
     )
   }
