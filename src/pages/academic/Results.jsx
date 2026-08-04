@@ -699,10 +699,11 @@ function Results() {
   }, [subjects, studentsWithResults, markMap, grades, selectedExam])
 
   const sortedStudents = useMemo(() => {
-    const withRank = studentsWithResults.filter(s => s.result?.position != null)
-      .sort((a, b) => a.result.position - b.result.position)
-    const withoutRank = studentsWithResults.filter(s => !s.result?.position)
-    return [...withRank, ...withoutRank]
+    return [...studentsWithResults].sort((a, b) => {
+      const admA = a.admission_no || ''
+      const admB = b.admission_no || ''
+      return admA.localeCompare(admB, undefined, { numeric: true, sensitivity: 'base' })
+    })
   }, [studentsWithResults])
 
   const topSet = useMemo(() => {
@@ -757,9 +758,9 @@ function Results() {
     })
     headers.push('Avg', 'Grd', 'Pos', 'Div', 'Pts')
 
-    const rows = sortedStudents.map(student => {
+    const rows = sortedStudents.map((student, idx) => {
       const row = [
-        student.result?.position || '-',
+        idx + 1,
         `${student.first_name} ${student.middle_name || ''} ${student.surname}`.replace(/\s+/g, ' ').trim(),
       ]
       subjects.forEach(subject => {
@@ -1180,13 +1181,13 @@ function Results() {
                             )}
                           </thead>
                       <tbody className="divide-y divide-gray-100">
-                        {sortedStudents.map((student) => {
+                        {sortedStudents.map((student, idx) => {
                           const isTop = topSet.has(student.id)
                           const isBottom = bottomSet.has(student.id)
                           const rowBg = isTop ? 'bg-green-50/40' : isBottom ? 'bg-red-50/40' : ''
                           return (
                             <tr key={student.id} className={`${rowBg} hover:bg-gray-50 transition`}>
-                              <td className="px-2 py-2 text-center text-sm text-gray-500 font-medium">{student.result?.position || '-'}</td>
+                              <td className="px-2 py-2 text-center text-sm text-gray-500 font-medium">{idx + 1}</td>
                               <td className={`px-2 py-2 text-sm text-gray-900 sticky left-0 z-10 ${isTop ? 'bg-green-50/60' : isBottom ? 'bg-red-50/60' : 'bg-white/95'}`}>
                                 <span className="font-medium whitespace-nowrap">{[student.first_name, student.middle_name, student.surname].filter(Boolean).join(' ')}</span>
                               </td>
