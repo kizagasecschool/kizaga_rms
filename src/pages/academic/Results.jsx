@@ -700,9 +700,13 @@ function Results() {
 
   const sortedStudents = useMemo(() => {
     return [...studentsWithResults].sort((a, b) => {
-      const admA = a.admission_no || ''
-      const admB = b.admission_no || ''
-      return admA.localeCompare(admB, undefined, { numeric: true, sensitivity: 'base' })
+      const genderOrder = (g) => (g === 'Female' ? 0 : 1)
+      const gA = genderOrder(a.gender)
+      const gB = genderOrder(b.gender)
+      if (gA !== gB) return gA - gB
+      const nameA = `${a.surname || ''} ${a.first_name || ''}`.trim().toLowerCase()
+      const nameB = `${b.surname || ''} ${b.first_name || ''}`.trim().toLowerCase()
+      return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' })
     })
   }, [studentsWithResults])
 
