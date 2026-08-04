@@ -1,0 +1,29 @@
+
+
+PCM – Physics, Chemistry, Mathematics
+PCB – Physics, Chemistry, Biology
+CBG – Chemistry, Biology, Geography
+PGM – Physics, Geography, Mathematics
+CBA – Chemistry, Biology, Agriculture
+ECA – Economics, Commerce, Accountancy
+HGE – History, Geography, Economics
+EGA – Economics, Geography, Accountancy
+EGM – Economics, Geography, Mathematics
+HKL – History, Kiswahili, Literature
+HGK – History, Geography, Kiswahili
+HGL – History, Geography, Language (English/French)
+KLF – Kiswahili, Literature, French
+HKE – History, Kiswahili, Economics
+
+subsjary subjects za lazima kwa wote
+
+Historia ya Tanzania na Maadili
+Academic communication 
+
+kwa CBG, PCB NA HGE, 
+BAM NI SOMO LA LAZIMA KAMA SUBSJARY
+
+OPTIONAL KWA WOTE
+COMPUTER SCIENCE
+BAM
+ACCOUNTACY

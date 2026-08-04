@@ -1,0 +1,12 @@
+node_modules
+dist
+.env
+*.local
+
+# Screenshots
+*.png
+*.PNG
+.vercel
+.env*
+
+.vercel

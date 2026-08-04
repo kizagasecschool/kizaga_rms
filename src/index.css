@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+@theme {
+  --color-maroon-50: #fdf2f3;
+  --color-maroon-100: #fde8e9;
+  --color-maroon-200: #fbd0d4;
+  --color-maroon-300: #f7a9b0;
+  --color-maroon-400: #f27a86;
+  --color-maroon-500: #e84c5c;
+  --color-maroon-600: #b91c3b;
+  --color-maroon-700: #99152e;
+  --color-maroon-800: #7a1224;
+  --color-maroon-900: #3f0d12;
+}
+
+a, button, [role="button"], select, label[for], summary {
+  cursor: pointer;
+}
+
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(100%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@media print {
+  html, body, #root {
+    overflow: visible !important;
+    height: auto !important;
+    width: 100% !important;
+    min-height: 0 !important;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar,
+  #root::-webkit-scrollbar {
+    display: none !important;
+    width: 0 !important;
+    height: 0 !important;
+  }
+
+  aside,
+  header,
+  footer,
+  .h-screen > .flex-1 > header {
+    display: none !important;
+  }
+
+  .h-screen {
+    overflow: visible !important;
+    height: auto !important;
+    display: block !important;
+  }
+
+  .h-screen > .flex-1 {
+    overflow: visible !important;
+    height: auto !important;
+    margin-left: 0 !important;
+    width: 100% !important;
+  }
+
+  .h-screen > .flex-1 > main {
+    overflow: visible !important;
+    height: auto !important;
+    padding: 0 !important;
+  }
+}

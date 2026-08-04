@@ -1,0 +1,46 @@
+{
+  "name": "kizaga_rms",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "concurrently -n api,web -c blue,green \"npm run dev:api\" \"npm run dev:web\"",
+    "dev:web": "vite",
+    "dev:api": "vercel dev --listen 3000 --yes",
+    "build": "vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "seed": "node scripts/seed.js",
+    "create-admin": "node scripts/createAdmin.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.108.1",
+    "dom-to-image-more": "^3.10.0",
+    "jspdf": "^4.2.1",
+    "nodemailer": "^9.0.0",
+    "papaparse": "^5.5.3",
+    "pg": "^8.21.0",
+    "react": "^19.2.6",
+    "react-dom": "^19.2.6",
+    "react-router-dom": "^7.17.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.1",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-legacy": "^8.1.0",
+    "@vitejs/plugin-react": "^6.0.1",
+    "concurrently": "^10.0.3",
+    "dotenv": "^17.4.2",
+    "eslint": "^10.3.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "eslint-plugin-react-refresh": "^0.5.2",
+    "globals": "^17.6.0",
+    "playwright": "^1.61.1",
+    "tailwindcss": "^4.3.1",
+    "terser": "^5.48.0",
+    "vite": "^8.1.0"
+  }
+}
