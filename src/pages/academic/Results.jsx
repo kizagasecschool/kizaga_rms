@@ -704,8 +704,8 @@ function Results() {
       const gA = genderOrder(a.gender)
       const gB = genderOrder(b.gender)
       if (gA !== gB) return gA - gB
-      const nameA = `${a.surname || ''} ${a.first_name || ''}`.trim().toLowerCase()
-      const nameB = `${b.surname || ''} ${b.first_name || ''}`.trim().toLowerCase()
+      const nameA = `${a.first_name || ''} ${a.middle_name || ''} ${a.surname || ''}`.trim().toLowerCase()
+      const nameB = `${b.first_name || ''} ${b.middle_name || ''} ${b.surname || ''}`.trim().toLowerCase()
       return nameA.localeCompare(nameB, undefined, { sensitivity: 'base' })
     })
   }, [studentsWithResults])
