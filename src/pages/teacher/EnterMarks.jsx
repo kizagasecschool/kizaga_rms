@@ -129,6 +129,7 @@ function EnterMarks() {
   const [saving, setSaving] = useState(false)
   const [hasChanges, setHasChanges] = useState(false)
   const [noAssignMsg, setNoAssignMsg] = useState('')
+  const [confirmSkipped, setConfirmSkipped] = useState(null)
 
   // ------- Warn on refresh/close with unsaved changes -------
   useEffect(() => {
@@ -513,28 +514,7 @@ function EnterMarks() {
 
   const showPractical = selectedExam?.has_practical && selectedSubject?.has_practical
 
-  const handleSave = async () => {
-    const errors = []
-    for (const s of students) {
-      const m = marksData[s.id] || {}
-      if (m.is_absent) continue
-      const raw = parseFloat(m.marks_obtained)
-      if (!isNaN(raw) && (raw < 0 || raw > 100)) {
-        errors.push(`${s.first_name} ${s.surname}: Theory mark ${raw} is invalid (0-100)`)
-      }
-      if (showPractical) {
-        const p = parseFloat(m.practical_marks)
-        if (!isNaN(p) && (p < 0 || p > 50)) {
-          errors.push(`${s.first_name} ${s.surname}: Practical mark ${p} is invalid (0-50)`)
-        }
-      }
-    }
-    if (errors.length > 0) {
-      showToast(errors.join('\n'), 'error')
-      setSaving(false)
-      return
-    }
-
+  const doSave = async (skipped = []) => {
     setSaving(true)
     try {
       const toUpsert = students
@@ -578,13 +558,52 @@ function EnterMarks() {
       ;(freshMarks || []).forEach(m => { map[m.student_id] = m })
       setMarksData(map)
       setHasChanges(false)
-      showToast('Marks saved successfully', 'success')
+      if (skipped.length > 0) {
+        showToast(`Alama zimehifadhiwa. Wanafunzi ${skipped.length} hawakuwa na alama na walirukwa.`, 'info')
+      } else {
+        showToast('Marks saved successfully', 'success')
+      }
     } catch (err) {
       console.error('Save error:', err)
       showToast('Failed to save. ' + (err.message || ''), 'error')
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleSave = async () => {
+    const errors = []
+    for (const s of students) {
+      const m = marksData[s.id] || {}
+      if (m.is_absent) continue
+      const raw = parseFloat(m.marks_obtained)
+      if (!isNaN(raw) && (raw < 0 || raw > 100)) {
+        errors.push(`${s.first_name} ${s.surname}: Theory mark ${raw} is invalid (0-100)`)
+      }
+      if (showPractical) {
+        const p = parseFloat(m.practical_marks)
+        if (!isNaN(p) && (p < 0 || p > 50)) {
+          errors.push(`${s.first_name} ${s.surname}: Practical mark ${p} is invalid (0-50)`)
+        }
+      }
+    }
+    if (errors.length > 0) {
+      showToast(errors.join('\n'), 'error')
+      setSaving(false)
+      return
+    }
+
+    const skipped = students.filter(s => {
+      const m = marksData[s.id] || {}
+      const hasTheory = m.marks_obtained !== '' && m.marks_obtained != null
+      const hasPractical = showPractical && m.practical_marks !== '' && m.practical_marks != null
+      return !m.id && !hasTheory && !hasPractical && !m.is_absent
+    })
+    if (skipped.length > 0) {
+      setConfirmSkipped(skipped)
+      return
+    }
+    await doSave([])
   }
 
   const enteredCount = useMemo(() =>
@@ -937,6 +956,59 @@ function EnterMarks() {
               <><svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5"><path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" /></svg> Save All Marks</>
             )}
           </button>
+        </div>
+      )}
+
+      {/* Confirm skipped students modal */}
+      {confirmSkipped && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40"
+          onClick={() => setConfirmSkipped(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="px-6 py-5 border-b border-gray-100">
+              <div className="flex items-start gap-3">
+                <div className="w-9 h-9 rounded-full bg-amber-100 flex items-center justify-center shrink-0">
+                  <svg className="w-5 h-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2"><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-gray-900">Wanafunzi wasio na alama</h3>
+                  <p className="text-sm text-gray-500 mt-0.5">
+                    Wanafunzi {confirmSkipped.length} wafuatao hawana alama yoyote (wala si absent). Wataachwa kwenye hifadhi hii.
+                  </p>
+                </div>
+              </div>
+            </div>
+            <div className="px-6 py-3 max-h-64 overflow-y-auto border-b border-gray-100">
+              {confirmSkipped.map((s, i) => (
+                <div key={s.id} className="flex items-baseline gap-2 py-1.5 text-sm text-gray-700">
+                  <span className="w-6 text-right text-gray-400 text-xs shrink-0">{i + 1}.</span>
+                  <span>{[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}</span>
+                </div>
+              ))}
+            </div>
+            <div className="px-6 py-4 flex flex-col-reverse sm:flex-row gap-3 sm:justify-end">
+              <button
+                onClick={() => setConfirmSkipped(null)}
+                className="px-5 py-2.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50 transition"
+              >
+                Rudi kuwajaza
+              </button>
+              <button
+                onClick={() => {
+                  const skipped = confirmSkipped
+                  setConfirmSkipped(null)
+                  doSave(skipped)
+                }}
+                className="px-5 py-2.5 bg-maroon-600 text-white text-sm font-medium rounded-lg hover:bg-maroon-700 transition"
+              >
+                Hifadhi bila wao
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
