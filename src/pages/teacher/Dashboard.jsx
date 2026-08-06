@@ -4,9 +4,49 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../context/AuthContext'
 import StudentsByClassTable from '../../components/StudentsByClassTable'
 
+async function fetchAllRows(buildQuery, pageSize = 1000) {
+  let from = 0
+  const all = []
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+  return all
+}
+
+async function fetchAssignedStudentIds(subjectId, studentIds) {
+  if (!subjectId || !studentIds?.length) return []
+  const PAGE = 1000
+  const CHUNK = 50
+  const ids = []
+  for (let i = 0; i < studentIds.length; i += CHUNK) {
+    const chunkIds = studentIds.slice(i, i + CHUNK)
+    let from = 0
+    while (true) {
+      const { data, error } = await supabase
+        .from('student_subjects')
+        .select('student_id')
+        .eq('subject_id', subjectId)
+        .in('student_id', chunkIds)
+        .range(from, from + PAGE - 1)
+      if (error) throw error
+      if (!data || data.length === 0) break
+      ids.push(...data.map(row => row.student_id))
+      if (data.length < PAGE) break
+      from += PAGE
+    }
+  }
+  return [...new Set(ids)]
+}
+
 function TeacherDashboard() {
   const { profile } = useAuth()
   const [stats, setStats] = useState({ students: 0, subjects: 0, marks: 0, pending: 0 })
+  const [entryStatus, setEntryStatus] = useState([])
   const [loading, setLoading] = useState(true)
   const [schoolInfo, setSchoolInfo] = useState(null)
   const [oLevelClassIds, setOLevelClassIds] = useState([])
@@ -33,7 +73,7 @@ function TeacherDashboard() {
 
       const { data: assignments } = await supabase
         .from('teacher_subjects')
-        .select('*, class_streams!inner(class_id, classes!inner(level))')
+        .select('*, class_streams!inner(class_id, stream_id, classes!inner(class_name, level)), subjects!inner(*)')
         .eq('teacher_id', teacher.id)
 
       const subjectIds = [...new Set(assignments?.map((a) => a.subject_id) || [])]
@@ -75,7 +115,9 @@ function TeacherDashboard() {
         classExamMap[ec.class_id].push(ec.exam_id)
       })
 
-      const [sOLevelRes, sALevelRes, subRes, mRes] = await Promise.all([
+      const allExamIds = [...new Set((examClassRows || []).map(ec => ec.exam_id))]
+
+      const [sOLevelRes, sALevelRes, subRes, mRes, strRes, examRes] = await Promise.all([
         oLevelClassIds.length > 0
           ? supabase.from('students').select('*', { count: 'exact', head: true }).in('class_id', oLevelClassIds).eq('status', 'active')
           : { count: 0 },
@@ -86,14 +128,41 @@ function TeacherDashboard() {
           ? supabase.from('subjects').select('*', { count: 'exact', head: true }).in('id', subjectIds)
           : { count: 0 },
         supabase.from('marks').select('*', { count: 'exact', head: true }).eq('entered_by', profile?.id),
+        supabase.from('streams').select('id, stream_name').order('stream_name'),
+        allExamIds.length > 0
+          ? supabase.from('exams').select('id, name, exam_type, status').in('id', allExamIds)
+          : { data: [] },
       ])
 
-      // Calculate pending: expected entries - entered.
+      const streamNameMap = {}
+      ;(strRes?.data || []).forEach(s => { streamNameMap[s.id] = s.stream_name })
+
+      const examMeta = {}
+      ;(examRes?.data || []).forEach(e => { examMeta[e.id] = e })
+
+      // Marks entered by this teacher for the relevant exams/subjects,
+      // counted per (exam, subject) → student_id set.
+      const marksByKey = {}
+      if (profile?.id && allExamIds.length > 0 && subjectIds.length > 0) {
+        const teacherMarks = await fetchAllRows(() => supabase
+          .from('marks')
+          .select('exam_id, subject_id, student_id')
+          .eq('entered_by', profile.id)
+          .in('exam_id', allExamIds)
+          .in('subject_id', subjectIds))
+        teacherMarks.forEach(m => {
+          const k = `${m.exam_id}_${m.subject_id}`
+          if (!marksByKey[k]) marksByKey[k] = new Set()
+          marksByKey[k].add(m.student_id)
+        })
+      }
+
+      // Build per subject+class(+stream) entry status.
       // Dedupe by (class-or-stream, subject) — O-Level classes can have several
-      // teacher_subjects rows (one per stream) that all resolve to the same class_id,
-      // and students there are only counted once by class_id, not per stream.
+      // teacher_subjects rows (one per stream) that all resolve to the same class_id.
       const seenGroups = new Set()
-      let totalExpected = 0
+      const rows = []
+      let pending = 0
       for (const a of (assignments || [])) {
         const isOLevel = a.class_streams?.classes?.level !== 'A_LEVEL'
         const classId = a.class_streams?.class_id
@@ -101,26 +170,53 @@ function TeacherDashboard() {
         if (seenGroups.has(groupKey)) continue
         seenGroups.add(groupKey)
 
+        const subject = a.subjects || {}
         const applicableExams = classExamMap[classId] || []
         if (applicableExams.length === 0) continue
-        const { count: groupStudents } = isOLevel
-          ? await supabase.from('students').select('*', { count: 'exact', head: true }).eq('class_id', classId).eq('status', 'active')
-          : await supabase.from('students').select('*', { count: 'exact', head: true }).eq('class_stream_id', a.class_stream_id).eq('status', 'active')
-        const { count: entered } = await supabase
-          .from('marks').select('*', { count: 'exact', head: true })
-          .in('exam_id', applicableExams)
-          .eq('subject_id', a.subject_id)
-          .eq('entered_by', profile?.id)
-        totalExpected += (groupStudents || 0) * applicableExams.length
-        totalExpected -= (entered || 0)
-      }
-      const pending = Math.max(0, totalExpected)
 
+        // Pool of active students for this class (O-Level) or stream (A-Level)
+        const { data: poolData } = isOLevel
+          ? await supabase.from('students').select('id').eq('class_id', classId).eq('status', 'active')
+          : await supabase.from('students').select('id').eq('class_stream_id', a.class_stream_id).eq('status', 'active')
+        const poolIds = (poolData || []).map(s => s.id)
+
+        // Expected = students who actually take this subject (matches Enter Marks)
+        const isCompulsoryOLevel = isOLevel && (subject.subject_type === 'COMPULSORY' || !subject.subject_type)
+        const expected = isCompulsoryOLevel
+          ? poolIds.length
+          : (await fetchAssignedStudentIds(a.subject_id, poolIds)).length
+
+        const className = a.class_streams?.classes?.class_name
+        const streamName = isOLevel ? '' : (streamNameMap[a.class_stream_id] || '')
+
+        for (const examId of applicableExams) {
+          const entered = (marksByKey[`${examId}_${a.subject_id}`] || new Set()).size
+          rows.push({
+            key: `${groupKey}_${examId}`,
+            subjectName: subject.subject_name,
+            subjectCode: subject.subject_code,
+            className,
+            streamName,
+            students: expected,
+            exam: examMeta[examId],
+            entered,
+            completed: expected > 0 && entered >= expected,
+          })
+          if (expected > entered) pending += (expected - entered)
+        }
+      }
+      rows.sort((x, y) => {
+        const c = (x.className || '').localeCompare(y.className || '')
+        if (c !== 0) return c
+        return (x.subjectName || '').localeCompare(y.subjectName || '')
+      })
+
+      setEntryStatus(rows)
       setStats({
         students: (sOLevelRes.count ?? 0) + (sALevelRes.count ?? 0),
         subjects: subRes.count ?? 0,
         marks: mRes.count ?? 0,
-        pending,
+        pending: Math.max(0, pending),
       })
       setLoading(false)
     }
@@ -161,6 +257,67 @@ function TeacherDashboard() {
           </div>
         ))}
       </div>
+
+      {!loading && entryStatus.length > 0 && (
+        <div className="mt-8">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+            <div className="px-5 py-3 border-b border-gray-100 flex flex-wrap items-center justify-between gap-2">
+              <h2 className="text-lg font-semibold text-gray-900">Marks Entry Status</h2>
+              <span className="text-xs text-gray-500">
+                {entryStatus.filter(r => r.completed).length} of {entryStatus.length} complete
+              </span>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-gray-50 border-b border-gray-200">
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Subject</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Class</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Students</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Exam</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Entered</th>
+                    <th className="text-center px-4 py-2.5 text-xs font-semibold text-gray-500 uppercase">Status</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-100">
+                  {entryStatus.map(r => (
+                    <tr key={r.key} className="hover:bg-gray-50 transition">
+                      <td className="px-4 py-2.5">
+                        <span className="font-medium text-gray-900">{r.subjectName || 'Unknown'}</span>
+                        {r.subjectCode && <span className="text-xs text-gray-400 ml-1.5">{r.subjectCode}</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-gray-700 whitespace-nowrap">
+                        {r.className || '-'}
+                        {r.streamName && <span className="text-xs text-gray-400"> ({r.streamName})</span>}
+                      </td>
+                      <td className="px-4 py-2.5 text-center text-gray-900">{r.students}</td>
+                      <td className="px-4 py-2.5 text-gray-700">{r.exam?.name || 'Unknown exam'}</td>
+                      <td className="px-4 py-2.5 text-center text-gray-700">{r.entered} / {r.students}</td>
+                      <td className="px-4 py-2.5 text-center">
+                        {r.completed ? (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-100 text-green-700 text-xs font-semibold">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+                            </svg>
+                            Completed
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-amber-100 text-amber-700 text-xs font-semibold">
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2">
+                              <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" />
+                            </svg>
+                            Pending
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
 
       {!loading && (
         <div className="mt-8">
