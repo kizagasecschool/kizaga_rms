@@ -710,6 +710,12 @@ function Results() {
     })
   }, [studentsWithResults])
 
+  const rankedStudents = useMemo(() => {
+    return [...studentsWithResults]
+      .filter(s => s.result?.position != null)
+      .sort((a, b) => a.result.position - b.result.position)
+  }, [studentsWithResults])
+
   const topSet = useMemo(() => {
     const ids = sortedStudents.filter(s => s.result?.position != null).slice(0, 3).map(s => s.id)
     return new Set(ids)
@@ -1354,7 +1360,7 @@ function Results() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {sortedStudents.filter(s => s.result?.position != null).slice(0, 10).map(s => (
+                          {rankedStudents.slice(0, 10).map(s => (
                             <tr key={s.id} className="hover:bg-gray-50 transition">
                               <td className="px-2 py-1.5 text-center text-xs text-gray-500 font-medium">{s.result.position}</td>
                               <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}</td>
@@ -1363,7 +1369,7 @@ function Results() {
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.division || '-'}</td>
                             </tr>
                           ))}
-                          {sortedStudents.filter(s => s.result?.position != null).length === 0 && (
+                          {rankedStudents.length === 0 && (
                             <tr><td colSpan={5} className="px-2 py-4 text-center text-xs text-gray-400">No data</td></tr>
                           )}
                         </tbody>
@@ -1387,7 +1393,7 @@ function Results() {
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-100">
-                          {sortedStudents.filter(s => s.result?.position != null).slice(-10).reverse().map(s => (
+                          {rankedStudents.slice(-10).reverse().map(s => (
                             <tr key={s.id} className="hover:bg-gray-50 transition">
                               <td className="px-2 py-1.5 text-center text-xs text-gray-500 font-medium">{s.result.position}</td>
                               <td className="px-2 py-1.5 text-xs text-gray-900 font-medium">{[s.first_name, s.middle_name, s.surname].filter(Boolean).join(' ')}</td>
@@ -1396,7 +1402,7 @@ function Results() {
                               <td className="px-2 py-1.5 text-center text-xs text-gray-800">{s.division || '-'}</td>
                             </tr>
                           ))}
-                          {sortedStudents.filter(s => s.result?.position != null).length === 0 && (
+                          {rankedStudents.length === 0 && (
                             <tr><td colSpan={5} className="px-2 py-4 text-center text-xs text-gray-400">No data</td></tr>
                           )}
                         </tbody>
