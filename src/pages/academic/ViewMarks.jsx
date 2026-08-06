@@ -5,6 +5,23 @@ import { sortSubjectsByNectaCode } from '../../lib/subjectUtils'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
+// Supabase/PostgREST caps unpaginated selects at 1000 rows — classes with
+// enough students x subjects (e.g. 155 students x 9 subjects) exceed that,
+// so marks fetches must page through with .range() to get every row.
+async function fetchAllRows(buildQuery, pageSize = 1000) {
+  let from = 0
+  const all = []
+  while (true) {
+    const { data, error } = await buildQuery().range(from, from + pageSize - 1)
+    if (error) throw error
+    if (!data || data.length === 0) break
+    all.push(...data)
+    if (data.length < pageSize) break
+    from += pageSize
+  }
+  return all
+}
+
 function subjectHasPractical(subject, exam) {
   if (!exam?.has_practical) return false
   return subject?.has_practical || SCIENCE_SUBJECTS.includes(subject?.subject_code)
@@ -96,12 +113,11 @@ function ViewMarks() {
         let loadedMarks = []
 
         if (assignedSubjects.length > 0) {
-          const { data: mData } = await supabase
+          loadedMarks = await fetchAllRows(() => supabase
             .from('marks')
             .select('*')
             .eq('exam_id', selectedExamId)
-            .in('subject_id', assignedSubjects.map(s => s.id))
-          loadedMarks = mData || []
+            .in('subject_id', assignedSubjects.map(s => s.id)))
 
           const studentIdsFromMarks = [...new Set(loadedMarks.map(m => m.student_id))]
 
