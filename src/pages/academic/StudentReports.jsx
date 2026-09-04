@@ -205,7 +205,7 @@ function ReportCard({ student, ctx }) {
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
     subjectRanks, teacherSubjects, teacherSignatures, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
-    students, computeCombinedData, conductData
+    students, computeCombinedData, conductData, sigLayout
   } = ctx
 
   const sr = mode === 'single' ? studentResults.find(r => r.student_id === s.id) || null : null
@@ -483,19 +483,19 @@ function ReportCard({ student, ctx }) {
       {/* SIGNATURES */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px' }}>
         <div style={{ textAlign: 'center', width: '33%' }}>
-          <div style={{ position: 'relative', height: `${Math.max(schoolInfo?.signature_sizes?.headmaster || 28, schoolInfo?.signature_sizes?.mhuri || 40) + 10}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ position: 'relative', height: `${Math.max(sigLayout?.headmaster?.size || 28, sigLayout?.mhuri?.size || 40) + 10 + Math.max(sigLayout?.mhuri?.y || 0, 0)}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.headmaster_signature_url ? (
               <img
                 src={schoolInfo.headmaster_signature_url}
                 alt="Mkuu wa Shule"
-                style={{ height: `${schoolInfo?.signature_sizes?.headmaster || 28}px`, maxWidth: '100%', objectFit: 'contain', position: 'absolute', bottom: 0, left: '8%' }}
+                style={{ height: `${sigLayout?.headmaster?.size || 28}px`, maxWidth: '100%', objectFit: 'contain', position: 'absolute', bottom: `${sigLayout?.headmaster?.y || 0}px`, left: `calc(8% + ${sigLayout?.headmaster?.x || 0}px)` }}
               />
             ) : null}
             {schoolInfo?.mhuri_url ? (
               <img
                 src={schoolInfo.mhuri_url}
                 alt="Mhuri wa Shule"
-                style={{ height: `${schoolInfo?.signature_sizes?.mhuri || 40}px`, maxWidth: '100%', objectFit: 'contain', position: 'absolute', bottom: '10px', right: '8%' }}
+                style={{ height: `${sigLayout?.mhuri?.size || 40}px`, maxWidth: '100%', objectFit: 'contain', position: 'absolute', bottom: `${10 + (sigLayout?.mhuri?.y || 0)}px`, right: `calc(8% + ${sigLayout?.mhuri?.x || 0}px)` }}
               />
             ) : null}
           </div>
@@ -505,12 +505,12 @@ function ReportCard({ student, ctx }) {
           </div>
         </div>
         <div style={{ textAlign: 'center', width: '33%' }}>
-          <div style={{ height: `${schoolInfo?.signature_sizes?.deputy || 28}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ height: `${sigLayout?.deputy?.size || 28}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.deputy_signature_url ? (
               <img
                 src={schoolInfo.deputy_signature_url}
                 alt="Makamu wa Mkuu wa Shule"
-                style={{ height: `${schoolInfo?.signature_sizes?.deputy || 28}px`, maxWidth: '100%', objectFit: 'contain' }}
+                style={{ height: `${sigLayout?.deputy?.size || 28}px`, maxWidth: '100%', objectFit: 'contain', marginRight: `${sigLayout?.deputy?.x || 0}px`, marginBottom: `${sigLayout?.deputy?.y || 0}px` }}
               />
             ) : null}
           </div>
@@ -520,12 +520,12 @@ function ReportCard({ student, ctx }) {
           </div>
         </div>
         <div style={{ textAlign: 'center', width: '33%' }}>
-          <div style={{ height: `${schoolInfo?.signature_sizes?.academic || 40}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+          <div style={{ height: `${sigLayout?.academic?.size || 40}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.academic_signature_url ? (
               <img
                 src={schoolInfo.academic_signature_url}
                 alt="Ofisi ya Taaluma"
-                style={{ height: `${schoolInfo?.signature_sizes?.academic || 40}px`, maxWidth: '100%', objectFit: 'contain' }}
+                style={{ height: `${sigLayout?.academic?.size || 40}px`, maxWidth: '100%', objectFit: 'contain', marginRight: `${sigLayout?.academic?.x || 0}px`, marginBottom: `${sigLayout?.academic?.y || 0}px` }}
               />
             ) : null}
           </div>
@@ -622,6 +622,12 @@ function StudentReports() {
   const [initError, setInitError] = useState(null)
   const [conductData, setConductData] = useState({})
   const [conductShowPanel, setConductShowPanel] = useState(false)
+  const [sigLayout, setSigLayout] = useState(() => ({
+    headmaster: { size: 28, x: 0, y: 0 },
+    mhuri: { size: 40, x: 0, y: 0 },
+    deputy: { size: 28, x: 0, y: 0 },
+    academic: { size: 40, x: 0, y: 0 },
+  }))
 
   useEffect(() => {
     const load = async () => {
@@ -650,7 +656,16 @@ function StudentReports() {
         if (eRes.data) setExams(eRes.data)
         if (cRes.data) setClasses(cRes.data)
         setExamClasses(ecAll)
-        if (schRes.data && schRes.data.length > 0) setSchoolInfo(schRes.data[0])
+        if (schRes.data && schRes.data.length > 0) {
+          setSchoolInfo(schRes.data[0])
+          const ss = schRes.data[0].signature_sizes || {}
+          setSigLayout(prev => ({
+            headmaster: { size: ss.headmaster ?? prev.headmaster.size, x: 0, y: 0 },
+            mhuri: { size: ss.mhuri ?? prev.mhuri.size, x: 0, y: 0 },
+            deputy: { size: ss.deputy ?? prev.deputy.size, x: 0, y: 0 },
+            academic: { size: ss.academic ?? prev.academic.size, x: 0, y: 0 },
+          }))
+        }
         if (yRes.data) setAcademicYears(yRes.data)
       } catch (err) {
         console.error('Init load error:', err)
@@ -1086,13 +1101,13 @@ function StudentReports() {
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
     subjectRanks, teacherSubjects, teacherSignatures, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
-    students, computeCombinedData, conductData
+    students, computeCombinedData, conductData, sigLayout
   }), [
     mode, studentResults, subjects, markMap, selectedExam, selectedExam2,
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
     subjectRanks, teacherSubjects, teacherSignatures, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
-    students, computeCombinedData, conductData
+    students, computeCombinedData, conductData, sigLayout
   ])
 
   if (loading) {
@@ -1580,6 +1595,68 @@ function StudentReports() {
                 <div>
                   <label className="block text-xs font-medium text-gray-600 mb-1">Closing Message</label>
                   <input type="text" value={closingMessage} onChange={e => setClosingMessage(e.target.value)} placeholder="e.g. Asante kwa ushirikiano wenu. Mungu awabariki." className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
+                </div>
+                {/* Signature Layout Controls */}
+                <div className="border-t border-gray-200 pt-3 mt-3">
+                  <h5 className="text-xs font-semibold text-gray-700 mb-2">Signature Size & Position</h5>
+                  <p className="text-[10px] text-gray-400 mb-2">Adjust size and move each signature directly on the report. Changes apply immediately.</p>
+                  {[
+                    { key: 'headmaster', label: 'Mkuu wa Shule' },
+                    { key: 'mhuri', label: 'Mhuri wa Shule' },
+                    { key: 'deputy', label: 'Makamu wa Mkuu wa Shule' },
+                    { key: 'academic', label: 'Ofisi ya Taaluma' },
+                  ].map(({ key, label }) => (
+                    <div key={key} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_2fr] gap-2 items-center mb-2 pb-2 border-b border-gray-100 last:border-0">
+                      <span className="text-xs font-medium text-gray-700">{label}</span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-gray-400">Size</span>
+                        <input
+                          type="range"
+                          min="15"
+                          max="90"
+                          value={sigLayout[key]?.size || 28}
+                          onChange={e => setSigLayout(prev => ({
+                            ...prev,
+                            [key]: { ...prev[key], size: parseInt(e.target.value) }
+                          }))}
+                          className="flex-1"
+                        />
+                        <span className="text-[10px] text-gray-500 w-6 text-right">{sigLayout[key]?.size || 28}</span>
+                      </div>
+                      <div className="flex items-center justify-start gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setSigLayout(prev => ({ ...prev, [key]: { ...prev[key], y: (prev[key]?.y || 0) + 2 } }))}
+                          title="Move up"
+                          className="w-6 h-6 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                        >▲</button>
+                        <button
+                          type="button"
+                          onClick={() => setSigLayout(prev => ({ ...prev, [key]: { ...prev[key], y: (prev[key]?.y || 0) - 2 } }))}
+                          title="Move down"
+                          className="w-6 h-6 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                        >▼</button>
+                        <button
+                          type="button"
+                          onClick={() => setSigLayout(prev => ({ ...prev, [key]: { ...prev[key], x: (prev[key]?.x || 0) - 2 } }))}
+                          title="Move left"
+                          className="w-6 h-6 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                        >◀</button>
+                        <button
+                          type="button"
+                          onClick={() => setSigLayout(prev => ({ ...prev, [key]: { ...prev[key], x: (prev[key]?.x || 0) + 2 } }))}
+                          title="Move right"
+                          className="w-6 h-6 text-xs border border-gray-300 rounded hover:bg-gray-50"
+                        >▶</button>
+                        <button
+                          type="button"
+                          onClick={() => setSigLayout(prev => ({ ...prev, [key]: { size: key === 'deputy' || key === 'headmaster' ? 28 : 40, x: 0, y: 0 } }))}
+                          title="Reset"
+                          className="w-6 h-6 text-xs border border-gray-300 rounded hover:bg-gray-50 text-gray-500"
+                        >↺</button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
                 <div className="border-t border-gray-200 pt-3 mt-3">
                   <h5 className="text-xs font-semibold text-gray-700 mb-2">Column Labels in Report</h5>
