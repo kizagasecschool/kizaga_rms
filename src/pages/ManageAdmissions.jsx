@@ -43,6 +43,7 @@ export default function ManageAdmissions() {
   const [convertClassId, setConvertClassId] = useState('')
   const [convertStreamId, setConvertStreamId] = useState('')
   const [convertAdmissionNo, setConvertAdmissionNo] = useState('')
+  const [autoAdmNo, setAutoAdmNo] = useState('')
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [checkedIds, setCheckedIds] = useState(new Set())
@@ -161,7 +162,8 @@ export default function ManageAdmissions() {
     setConvertClassId(classId)
     const streamsForClass = classStreams.filter(cs => cs.class_id === classId)
     setConvertStreamId(streamsForClass.length === 1 ? streamsForClass[0].id : '')
-    setConvertAdmissionNo(admNo)
+    setAutoAdmNo(admNo)
+    setConvertAdmissionNo('')
     setShowConvertModal(true)
   }
 
@@ -169,11 +171,16 @@ export default function ManageAdmissions() {
     if (!convertStreamId) return
     setConverting(true)
     try {
+      const admNo = (convertAdmissionNo || '').trim() || autoAdmNo
+      if (!admNo) {
+        showToast('Admission number is required', 'error')
+        return
+      }
       const { error } = await supabase
         .rpc('convert_application_to_student', {
           p_application_id: selected.id,
           p_class_stream_id: convertStreamId,
-          p_admission_number: convertAdmissionNo,
+          p_admission_number: admNo,
         })
       if (error) throw error
       showToast('Student enrolled successfully', 'success')
@@ -590,11 +597,26 @@ export default function ManageAdmissions() {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Namba ya Udahili</label>
-                <input
-                  value={convertAdmissionNo}
-                  readOnly
-                  className="w-full px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-700"
-                />
+                <div className="flex gap-2">
+                  <input
+                    value={convertAdmissionNo}
+                    onChange={e => setConvertAdmissionNo(e.target.value)}
+                    placeholder={autoAdmNo || 'e.g. 2026K001'}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-700 focus:outline-none focus:ring-1 focus:ring-maroon-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setConvertAdmissionNo(autoAdmNo)}
+                    className="px-3 py-2 text-xs font-medium text-maroon-700 bg-maroon-50 border border-maroon-200 rounded-lg hover:bg-maroon-100 transition shrink-0"
+                  >
+                    Auto
+                  </button>
+                </div>
+                <p className="text-[10px] text-gray-400 mt-1">
+                  {convertAdmissionNo
+                    ? `Namba utakayotumia: ${convertAdmissionNo}`
+                    : `Acha tupu ili mfumo utengeneze automatically: ${autoAdmNo || '...'}`}
+                </p>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-600 mb-1">Darasa</label>
