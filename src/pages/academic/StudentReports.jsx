@@ -482,7 +482,7 @@ function ReportCard({ student, ctx }) {
 
       {/* SIGNATURES */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px' }}>
-        <div style={{ textAlign: 'center', width: '30%' }}>
+        <div style={{ textAlign: 'center', width: '25%' }}>
           <div style={{ height: '28px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.headmaster_signature_url ? (
               <img
@@ -497,7 +497,22 @@ function ReportCard({ student, ctx }) {
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
           </div>
         </div>
-        <div style={{ textAlign: 'center', width: '30%' }}>
+        <div style={{ textAlign: 'center', width: '25%' }}>
+          <div style={{ height: '28px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            {schoolInfo?.deputy_signature_url ? (
+              <img
+                src={schoolInfo.deputy_signature_url}
+                alt="Makamu wa Mkuu wa Shule"
+                style={{ height: '28px', maxWidth: '100%', objectFit: 'contain' }}
+              />
+            ) : null}
+          </div>
+          <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
+            <div style={{ fontWeight: 'bold' }}>Makamu wa Mkuu wa Shule</div>
+            <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
+          </div>
+        </div>
+        <div style={{ textAlign: 'center', width: '25%' }}>
           <div style={{ height: '40px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.academic_signature_url ? (
               <img
@@ -512,7 +527,7 @@ function ReportCard({ student, ctx }) {
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
           </div>
         </div>
-        <div style={{ textAlign: 'center', width: '30%' }}>
+        <div style={{ textAlign: 'center', width: '25%' }}>
           <div style={{ height: '40px' }}></div>
           <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
             <div style={{ fontWeight: 'bold' }}>Mhuri wa Shule</div>

@@ -1,8 +1,9 @@
 -- Add signature_url to teachers table
 ALTER TABLE teachers ADD COLUMN IF NOT EXISTS signature_url TEXT;
 
--- Add headmaster/academic signature URLs to school_settings
+-- Add signature URLs to school_settings
 ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS headmaster_signature_url TEXT;
+ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS deputy_signature_url TEXT;
 ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS academic_signature_url TEXT;
 
 -- Create signatures storage bucket

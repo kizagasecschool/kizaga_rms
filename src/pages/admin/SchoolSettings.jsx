@@ -26,6 +26,7 @@ export default function SchoolSettings() {
     logo_url: '',
     national_logo_url: '',
     headmaster_signature_url: '',
+    deputy_signature_url: '',
     academic_signature_url: '',
     beem_api_key: '',
     beem_secret_key: '',
@@ -35,6 +36,7 @@ export default function SchoolSettings() {
   const schoolLogoInput = useRef(null)
   const nationalLogoInput = useRef(null)
   const headmasterSigInput = useRef(null)
+  const deputySigInput = useRef(null)
   const academicSigInput = useRef(null)
 
   const loadSettings = async () => {
@@ -60,6 +62,7 @@ export default function SchoolSettings() {
         logo_url: row.logo_url || '',
         national_logo_url: row.national_logo_url || '',
         headmaster_signature_url: row.headmaster_signature_url || '',
+        deputy_signature_url: row.deputy_signature_url || '',
         academic_signature_url: row.academic_signature_url || '',
         beem_api_key: row.beem_api_key || '',
         beem_secret_key: row.beem_secret_key || '',
@@ -210,7 +213,7 @@ export default function SchoolSettings() {
     }
     try {
       setSaving(true)
-      const field = type === 'headmaster' ? 'headmaster_signature_url' : 'academic_signature_url'
+const field = type === 'headmaster' ? 'headmaster_signature_url' : type === 'deputy' ? 'deputy_signature_url' : 'academic_signature_url'
       const url = await uploadSignature(file, type)
       if (settings.id) {
         const { error: saveErr } = await supabase
@@ -229,7 +232,7 @@ export default function SchoolSettings() {
   }
 
   const removeSignature = async (type) => {
-    const field = type === 'headmaster' ? 'headmaster_signature_url' : 'academic_signature_url'
+    const field = type === 'headmaster' ? 'headmaster_signature_url' : type === 'deputy' ? 'deputy_signature_url' : 'academic_signature_url'
     const url = settings[field]
     if (!url) return
     try {
@@ -542,6 +545,47 @@ export default function SchoolSettings() {
                 type="file"
                 accept="image/*"
                 onChange={(e) => handleSignatureChange(e, 'headmaster')}
+                className="hidden"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">PNG, JPG, WEBP. Max 3MB</p>
+            </div>
+
+            {/* Deputy Headmaster Signature */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Makamu wa Mkuu wa Shule (Deputy)</label>
+              {settings.deputy_signature_url ? (
+                <div className="relative inline-block">
+                  <img
+                    src={settings.deputy_signature_url}
+                    alt="Deputy Signature"
+                    className="h-20 object-contain border border-gray-200 rounded-lg bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSignature('deputy')}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => deputySigInput.current?.click()}
+                  className="h-20 w-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-maroon-400 hover:bg-maroon-50/20 transition"
+                >
+                  <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  <span className="text-[10px] text-gray-400 mt-1">Upload</span>
+                </div>
+              )}
+              <input
+                ref={deputySigInput}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleSignatureChange(e, 'deputy')}
                 className="hidden"
               />
               <p className="text-[10px] text-gray-400 mt-1">PNG, JPG, WEBP. Max 3MB</p>
