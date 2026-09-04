@@ -25,6 +25,8 @@ export default function SchoolSettings() {
     district: '',
     logo_url: '',
     national_logo_url: '',
+    headmaster_signature_url: '',
+    academic_signature_url: '',
     beem_api_key: '',
     beem_secret_key: '',
     beem_sender_id: '',
@@ -32,6 +34,8 @@ export default function SchoolSettings() {
 
   const schoolLogoInput = useRef(null)
   const nationalLogoInput = useRef(null)
+  const headmasterSigInput = useRef(null)
+  const academicSigInput = useRef(null)
 
   const loadSettings = async () => {
     setLoading(true)
@@ -55,6 +59,8 @@ export default function SchoolSettings() {
         district: row.district || '',
         logo_url: row.logo_url || '',
         national_logo_url: row.national_logo_url || '',
+        headmaster_signature_url: row.headmaster_signature_url || '',
+        academic_signature_url: row.academic_signature_url || '',
         beem_api_key: row.beem_api_key || '',
         beem_secret_key: row.beem_secret_key || '',
         beem_sender_id: row.beem_sender_id || '',
@@ -177,6 +183,74 @@ export default function SchoolSettings() {
     }
   }
 
+  const uploadSignature = async (file, type) => {
+    const ext = file.name.split('.').pop().toLowerCase()
+    const fileName = `${type}-signature-${Date.now()}.${ext}`
+    const filePath = `signatures/${fileName}`
+    const { error } = await supabase.storage
+      .from('signatures')
+      .upload(filePath, file, { cacheControl: '3600', upsert: true })
+    if (error) throw error
+    const { data: { publicUrl } } = supabase.storage
+      .from('signatures')
+      .getPublicUrl(filePath)
+    return publicUrl
+  }
+
+  const handleSignatureChange = async (e, type) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      showMessage({ type: 'error', text: 'Please select an image file' })
+      return
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      showMessage({ type: 'error', text: 'Image must be less than 3MB' })
+      return
+    }
+    try {
+      setSaving(true)
+      const field = type === 'headmaster' ? 'headmaster_signature_url' : 'academic_signature_url'
+      const url = await uploadSignature(file, type)
+      if (settings.id) {
+        const { error: saveErr } = await supabase
+          .from('school_settings')
+          .update({ [field]: url, updated_at: new Date().toISOString() })
+          .eq('id', settings.id)
+        if (saveErr) throw saveErr
+      }
+      setSettings(prev => ({ ...prev, [field]: url }))
+      showMessage({ type: 'success', text: 'Signature uploaded and saved' })
+    } catch (err) {
+      showMessage({ type: 'error', text: 'Failed to upload signature: ' + (err.message || err) })
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const removeSignature = async (type) => {
+    const field = type === 'headmaster' ? 'headmaster_signature_url' : 'academic_signature_url'
+    const url = settings[field]
+    if (!url) return
+    try {
+      const path = url.split('/signatures/')[1]
+      if (path) {
+        await supabase.storage.from('signatures').remove([path])
+      }
+      if (settings.id) {
+        const { error: err } = await supabase
+          .from('school_settings')
+          .update({ [field]: null, updated_at: new Date().toISOString() })
+          .eq('id', settings.id)
+        if (err) throw err
+      }
+      setSettings(prev => ({ ...prev, [field]: '' }))
+      showMessage({ type: 'success', text: 'Signature removed' })
+    } catch (err) {
+      showMessage({ type: 'error', text: 'Failed to remove signature: ' + (err.message || err) })
+    }
+  }
+
   const handleSave = async (e) => {
     e.preventDefault()
     if (!settings.school_name || !settings.school_code) {
@@ -198,6 +272,8 @@ export default function SchoolSettings() {
         district: settings.district,
         logo_url: settings.logo_url || null,
         national_logo_url: settings.national_logo_url || null,
+        headmaster_signature_url: settings.headmaster_signature_url || null,
+        academic_signature_url: settings.academic_signature_url || null,
         beem_api_key: settings.beem_api_key || null,
         beem_secret_key: settings.beem_secret_key || null,
         beem_sender_id: settings.beem_sender_id || null,
@@ -421,6 +497,95 @@ export default function SchoolSettings() {
                 className="hidden"
               />
               <p className="text-[10px] text-gray-400 mt-1">Tanzania Coat of Arms. PNG, JPG. Max 5MB</p>
+            </div>
+          </div>
+        </div>
+
+        {/* Signatures */}
+        <div className="bg-white rounded-xl border border-gray-200 p-5 space-y-4">
+          <h2 className="text-sm font-semibold text-gray-800 uppercase tracking-wider">Signatures</h2>
+          <p className="text-xs text-gray-400 -mt-2">Upload signatures that appear on student reports. Teacher signatures are managed on the Teachers page.</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Headmaster Signature */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Mkuu wa Shule (Head of School)</label>
+              {settings.headmaster_signature_url ? (
+                <div className="relative inline-block">
+                  <img
+                    src={settings.headmaster_signature_url}
+                    alt="Headmaster Signature"
+                    className="h-20 object-contain border border-gray-200 rounded-lg bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSignature('headmaster')}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => headmasterSigInput.current?.click()}
+                  className="h-20 w-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-maroon-400 hover:bg-maroon-50/20 transition"
+                >
+                  <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  <span className="text-[10px] text-gray-400 mt-1">Upload</span>
+                </div>
+              )}
+              <input
+                ref={headmasterSigInput}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleSignatureChange(e, 'headmaster')}
+                className="hidden"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">PNG, JPG, WEBP. Max 3MB</p>
+            </div>
+
+            {/* Academic Signature */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">Ofisi ya Taaluma (Academic)</label>
+              {settings.academic_signature_url ? (
+                <div className="relative inline-block">
+                  <img
+                    src={settings.academic_signature_url}
+                    alt="Academic Signature"
+                    className="h-20 object-contain border border-gray-200 rounded-lg bg-white"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSignature('academic')}
+                    className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              ) : (
+                <div
+                  onClick={() => academicSigInput.current?.click()}
+                  className="h-20 w-40 border-2 border-dashed border-gray-300 rounded-lg flex flex-col items-center justify-center cursor-pointer hover:border-maroon-400 hover:bg-maroon-50/20 transition"
+                >
+                  <svg className="w-8 h-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                  </svg>
+                  <span className="text-[10px] text-gray-400 mt-1">Upload</span>
+                </div>
+              )}
+              <input
+                ref={academicSigInput}
+                type="file"
+                accept="image/*"
+                onChange={(e) => handleSignatureChange(e, 'academic')}
+                className="hidden"
+              />
+              <p className="text-[10px] text-gray-400 mt-1">PNG, JPG, WEBP. Max 3MB</p>
             </div>
           </div>
         </div>

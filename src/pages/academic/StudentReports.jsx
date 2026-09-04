@@ -60,6 +60,108 @@ function computeCombinedMark(mark, hp) {
   return { ...t, max, pct }
 }
 
+// Deterministic per-student variation index so remarks/conduct vary between students
+function studentVariation(seed, salt = 0) {
+  if (seed == null) seed = Math.floor(Math.random() * 100000)
+  const str = String(seed) + ':' + String(salt)
+  let h = 0
+  for (let i = 0; i < str.length; i++) {
+    h = (h * 31 + str.charCodeAt(i)) >>> 0
+  }
+  return h
+}
+
+function pickFrom(arr, seed, salt = 0) {
+  return arr[studentVariation(seed, salt) % arr.length]
+}
+
+const AUTO_CLASS_COMMENTS = {
+  A: [
+    'Hongera kwa ufaulu huu wa hali ya juu ulioonyesha bidii ya kweli. Umeandika kwa umakini wa kipekee na kudumisha nidhamu ya hali ya juu. Endelea kudumisha kiwango hiki cha ubora na uwe mfano kwa wenzako.',
+    'Umeonyesha ujuzi wa ajabu na kufikia daraja la juu zaidi. Bidii yako imejilipa na inastahili sifa kubwa. Endelea kufanya hivyo na uwapongeze wenzako pia wajitahidi.',
+    'Umefanya kwa ubora wa hali ya juu na kuthibitisha kuwa wewe ni mwanafunzi wa kipekee. Uwezo na mwelekeo wako wa kimasomo ni wa kupigiwa mfano. Endelea kusoma kwa bidii na usipunguze kasi.',
+    'Ufaulu wako ni bora na umeonyesha jinsi unavyotambua mwelekeo wa masomo. Hongera sana, endelea kudumisha ubora huu na uwe pia msaada kwa wanafunzi wenzako.',
+    'Umeonyesha juhudi na uelewa wa hali ya juu katika masomo yako. Hii ni ishara ya mwanafunzi anayependa kujifunza. Endelea kusoma kwa bidii na kuwa waangalifu ili uendelee kupiga hatua kubwa.'
+  ],
+  B: [
+    'Umefanya vizuri sana na unaonyesha maendeleo ya kuridhisha. Ukizidi kuongeza bidii kidogo na kujishughulisha zaidi, unaweza kuboresha zaidi. Endelea kuwa makini na usipumzike.',
+    'Hizi ni matokeo mazuri na yanaonyesha juhudi yako thabiti. Kuna nafasi ndogo ya kufanya vyema zaidi ukisoma kwa makini zaidi. Endelea kujitahidi bila kukata tamaa.',
+    'Umefanya mazuri na kuonyesha uwezo wako kwa uwazi. Ikiwa utapanua mazoezi na usimamizi wa muda, unaweza kuinua kiwango chako zaidi. Hongera na endelea bidii.',
+    'Urafiki wako na masomo unalipa, kwa kuwa umepata daraja nzuri. Endelea kusoma kwa bidii na kusaidia wenzako ili uendelee kuimarika.',
+    'Umethibitisha kuwa unaweza kufanya vizuri unapojitahidi. Tofauti kati yako na daraja la juu ni ndogo, hivyo endelea kujitahidi kufikia upeo wako.',
+    'Maendeleo yako ni ya kuridhisha na yanaonyesha kuwa unafuata mwelekeo sahihi. Usisite kuboresha mbinu zako za kusoma ili kuongeza kasi ya ufaulu wako.'
+  ],
+  C: [
+    'Umefanya wastani na kuna nafasi kubwa yakuboresha. Zingatia zaidi masomo yako, fanya mazoezi ya kutosha na usisite kuuliza maswali unapokosa kuelewa. Uwezo wako ni mkubwa zaidi ya hili.',
+    'Matokeo yako ni ya wastani lakini yanaweza kukuboreshwa kwa juhudi zaidi. Panga muda wako vizuri na usikose madarasa. Usikate tamaa, mazoezi ya mara kwa mara yatakusaidia kupiga hatua.',
+    'Umefanya kadiri ya wastani. Ninakuhimiza kutazama mada zilizokuchanganya na kufanya mazoezi ya ziada. Ushirikiano wa karibu na walimu wako utakusaidia kuelewa vyema.',
+    'Wastani wako unaonyesha kwamba unaweza kufanya vyema zaidi ukiweka bidii. Tumia muda wako wa kusoma vizuri na usiache kujifunza. Bado una fursa nzuri ya kukwea daraja.',
+    'Umejiimarisha kwa wastani lakini bado kuna nafasi ya maendeleo makubwa. Ukitilia maanani maelekezo ya walimu na kufanya mazoezi ya nyumbani, matokeo yako yataboreka.'
+  ],
+  D: [
+    'Matokeo yako yanahitaji juhudi kubwa zaidi. Zingatia mada zilizokuwa na ugumu, hudhuria masomo yote na ushirikiane na walimu wako kupata msaada. Bado una nafasi nzuri ya kuboresha.',
+    'Unahitaji kurekebisha mbinu zako za kusoma na kuongeza juhudi. Tambua mada zako za changamoto na ufanye kazi nazo kwa makini. Jitahidi kusoma kwa uhakika.',
+    'Huu ni hitaji la kuchukua hatua za haraka ili kuboresha ufaulu wako. Tumia muda mwingi kujisomea, elewa mada vizuri na usitegemee kukariri pekee.',
+    'Unahitaji msaada wa ziada katika masomo yako. Wasiliana na walimu wako, omba mazoezi ya ziada na uhakikishe unahudhuria masomo yote kwa wakati.',
+    'Kiwango chako kinahitaji kuimarishwa. Panga ratiba thabiti ya masomo na uzingatie sana maelekezo ya walimu. Mabadiliko yanaweza kutokea kwa bidii na usimamizi wa muda.'
+  ],
+  E: [
+    'Umepita lakini kwa kiwango cha chini. Unahitaji kuongeza juhudi za ziada, kufanya mapitio ya kina na kutumia vizuri muda wako wa kujisomea. Ninakuamini unaweza kufanya vizuri zaidi — jitahidi kupiga hatua.',
+    'Matokeo yako yako chini ya wastani. Jitahidi kusoma kwa bidii zaidi, elewa mada vizuri na saidia kupata msaada wa ziada. Nafasi ya kuboresha bado ipo.',
+    'Unaweza kufanya vizuri zaidi kuliko hii. Huu ni wito wa kuongeza bidii kuu, mapitio ya mara kwa mara na kujitolea zaidi kwa masomo yako.',
+    'Kiwango chako kimepungua na kinahitaji kuzingatiwa. Chukua mbinu mpya ya kusoma, tumia muda mwingi kwa mazoezi na usisite kuomba msaada pale unapohitaji.'
+  ],
+  S: [
+    'Unahitaji kurekebisha mkakati wako wa masomo kwa haraka. Tumia kila fursa ya kufanya mazoezi, elewa mada vizuri na usiache muda kupita pasi kufanya kitu. Ninatarajia mabadiliko ya dhahiri kipindi kijacho.',
+    'Matokeo yako yanahitaji uangalizi wa haraka. Shirikiana na walimu wako, panga ratiba bora ya kusoma na usikate tamaa. Uwezo unapo, unahitaji tu kufunguliwa kwa bidii.',
+    'Huu ni wakati wa kujipanga upya kimasomo. Jitolee zaidi, hudhuria masomo yote na ushirikiane na wazazi wako ili kupata msaada unaohitajika.'
+  ],
+  F: [
+    'Hujafaulu katika mtihani huu, hii ni ishara ya dharura inayohitaji hatua za haraka. Ongea na walimu wako, panga ratiba nzuri ya masomo na mwambie wazazi wako ili wakusaidie. Usikate tamaa — mabadiliko yanaweza kutokea ukijitahidi kwa dhati.',
+    'Ufaulu wako umekuwa chini ya kiwango kinachotakiwa. Hii inahitaji ushirikiano wa karibu kati yako, wazazi na walimu. Anza sasa kuweka mazoezi na uhudhirie masomo yote bila kosa.',
+    'Hili linaonyesha kuwa msingi wako unahitaji uimarishaji. Tafuta msaada mapema, usijifunze peke yako na ushirikiane na walimu kuelewa vizuri mada za msingi.'
+  ]
+}
+
+const AUTO_HEAD_COMMENTS = {
+  A: [
+    'Napenda kumshukuru na kumpongeza mtoto wenu kwa ufaulu wake wa hali ya juu na nidhamu ya kipekee. Msaidieni kuendelea kudumisha kiwango hiki cha ubora.',
+    'Mtoto wenu ameonyesha uwezo wa kipekee wa kimasomo na anastahili pongezi za dhati. Endelea kumhimiza na kumuwekea mazingira mazuri ya kusoma nyumbani.',
+    'Nawapongeza sana kwa juhudi zenu za kulea na kumsaidia mtoto wenu kufikia ufaulu huu wa hali ya juu. Tunaendelea kushirikiana kwa furaha kwa maendeleo yake.',
+    'Mtoto wenu ni kielelezo cha wanafunzi wengine kwa bidii na nidhamu yake. Nafurahi kuwashauri kuendelea kuwekeza katika elimu yake kwa kila njia inayowezekana.'
+  ],
+  B: [
+    'Matokeo ya mtoto wenu yanaonyesha juhudi na uwezo wa kustahili pongezi. Nawahimiza kuendelea kushirikiana nasi na kumhimiza kusoma kwa bidii zaidi ili apige hatua kubwa.',
+    'Mtoto wenu amefanya vizuri na tuna matumaini makubwa kwake. Ushirikiano wenu wa nyumbani na walimu ni muhimu kuendelea kumwelekeza kufikia upeo wake.',
+    'Nawapongeza mtoto wenu kwa maendeleo yake ya kuridhisha. Tunaendelea kufanya kazi pamoja ili kuboresha zaidi ufaulu wake wa kimasomo.',
+    'Mtoto wenu ameonyesha uwezo mzuri wa kusoma. Tunawahimiza kuendelea kumtia moyo na kuhakikisha anafanya mazoezi ya kutosha nyumbani.'
+  ],
+  C: [
+    'Matokeo ya mtoto wenu yanaweza kuboreshwa zaidi kwa juhudi na ushirikiano wa karibu. Nashauri muhakikishe anafanya mazoezi ya kutosha nyumbani na kuhudhuria masomo yote kwa makini.',
+    'Mtoto wenu anafanya wastani na bado ana nafasi ya kuboresha. Tuweke mazingira mazuri ya usomaji nyumbani na tushirikiane kwa karibu kumsaidia kupiga hatua.',
+    'Nawashukuru kwa ushirikiano wenu. Tunaendelea kumhimiza mtoto wenu kusoma kwa bidii zaidi; msaada wenu wa nyumbani ni muhimu sana kwa maendeleo yake.',
+    'Kwa kushirikiana kwa karibu, tunaweza kumsaidia mtoto wenu kuboresha ufaulu wake. Tafadhali muendelee kumtia moyo na kushirikiana nasi kwa kila hatua.'
+  ],
+  D: [
+    'Matokeo ya mtoto wenu yanahitaji kuzingatiwa kwa makini zaidi. Nashauri mkutane na walimu wake ili kupanga mkakati wa pamoja wa kumsaidia kuboresha utendaji wake. Msaada wenu wa nyumbani ni muhimu sana.',
+    'Tunaona haja ya kuimarisha ushirikiano wetu ili kumsaidia mtoto wenu. Tafadhali msaidia kuhakikisha anahudhuria masomo yote na anafanya mazoezi ya nyumbani.',
+    'Mtoto wenu anahitaji msaada wa ziada wa kitaaluma. Tushirikiane kwa karibu, tukutane na waboreshe njia za kumsaidia kuelewa masomo yake vyema.'
+  ],
+  E: [
+    'Mtoto wenu amepita lakini kwa kiwango cha chini cha ufaulu. Ninawahimiza sana kushirikiana nasi kwa karibu zaidi ili kumwezesha kuboresha ufaulu wake. Ushirikiano wenu ni nguzo muhimu sana.',
+    'Tunaona haja ya kuchukua hatua pamoja ili kuboresha matokeo ya mtoto wenu. Tafadhali muwekaribiana na walimu na kumsaidia kupanga mazingira bora ya kusoma nyumbani.',
+    'Matokeo ya mtoto wenu yako chini ya wastani. Tunakuhimiza kuwasiliana nasi ili tuweze kutengeneza mpango wa kumsaidia kwa pamoja.'
+  ],
+  S: [
+    'Matokeo ya mtoto wenu yanalazimu uangalizi wa karibu na wa haraka. Nashauri mzazi/mlezi azungumze na walimu wa shule mara moja ili tupange njia za kumsaidia kimasomo.',
+    'Mtoto wenu anahitaji msaada wa pekee wa kitaaluma. Tushirikiane kwa karibu, tukutane na tupange mpango bora wa kumsaidia kurekebisha mwenendo wa masomo.'
+  ],
+  F: [
+    'Matokeo ya mtoto wenu yanahitaji umakini wa haraka kutoka pande zote. Ninawahimiza kuwasiliana nasi mara moja ili tuelewe changamoto anazopitia na kumwandalia mpango maalum wa msaada. Ushirikiano wenu ni muhimu kuliko wakati wowote.',
+    'Hili ni tatizo linalohitaji ushirikiano wa dharura baina ya shule na nyumbani. Tafadhali mwasiliane nasi kwa haraka ili tumsaidie mtoto wenu kushinda changamoto za kimasomo.'
+  ]
+}
+
 
 const printStyles = `
   .print-all-students { display: none; }
@@ -101,7 +203,7 @@ function ReportCard({ student, ctx }) {
   const {
     mode, studentResults, subjects, markMap, selectedExam, selectedExam2,
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
-    subjectRanks, teacherSubjects, parentGreeting, closingMessage,
+    subjectRanks, teacherSubjects, teacherSignatures, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
     students, computeCombinedData, conductData
   } = ctx
@@ -113,22 +215,36 @@ function ReportCard({ student, ctx }) {
   if (mode === 'single') {
     const pts = []
     const classLevel = classes.find(c => c.id === selectedClassId)?.level || 'O_LEVEL'
+    let subjectsDone = 0
     subjects.forEach(subject => {
       if (classLevel === 'A_LEVEL' && subject.subject_type === 'ELECTIVE') return
       const mark = markMap[`${s.id}_${subject.id}`]
       const hp = subjectHasPractical(subject, selectedExam)
-      const total = ((mark?.marks_obtained ?? 0) + (hp ? (mark?.practical_marks ?? 0) : 0))
+      if (!mark || mark.is_absent) return
+      const total = ((mark.marks_obtained ?? 0) + (hp ? (mark.practical_marks ?? 0) : 0))
       const max = hp ? 150 : 100
-      const pct = mark && !mark.is_absent ? (total / max) * 100 : null
+      const pct = (total / max) * 100
       const g = getGradeForPercentage(pct, grades)
+      subjectsDone++
       if (g && g.points > 0) pts.push(g.points)
     })
     pts.sort((a, b) => a - b)
     const bestN = classLevel === 'A_LEVEL' ? 3 : 7
     const bestPoints = pts.slice(0, bestN)
     totalPtsSingle = bestPoints.reduce((s, p) => s + p, 0)
-    // Prefer division stored in DB after exam processing; fall back to frontend calc
-    divisionSingle = (sr?.division || calcDivision(totalPtsSingle, classLevel)).replace('Division ', '')
+    if (classLevel !== 'A_LEVEL') {
+      if (subjectsDone >= 7) {
+        // Prefer division stored in DB after exam processing; fall back to frontend calc
+        divisionSingle = (sr?.division || calcDivision(totalPtsSingle, classLevel)).replace('Division ', '')
+      } else if (subjectsDone >= 1) {
+        divisionSingle = 'INC'
+      } else {
+        divisionSingle = 'ABS'
+      }
+    } else {
+      // Prefer division stored in DB after exam processing; fall back to frontend calc
+      divisionSingle = (sr?.division || calcDivision(totalPtsSingle, classLevel)).replace('Division ', '')
+    }
   }
 
   const cData = mode === 'combined' ? computeCombinedData(s) : null
@@ -230,7 +346,14 @@ function ReportCard({ student, ctx }) {
                   {isAbsent ? '-' : subjectRanks[`${s.id}_${subject.id}`] || '-'}
                 </td>
                 <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                  {teacherSubjects[subject.id] || ''}
+                  {teacherSignatures[subject.id] ? (
+                    <img
+                      src={teacherSignatures[subject.id]}
+                      alt="Sig"
+                      style={{ height: '18px', maxWidth: '70px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+                    />
+                  ) : null}
+                  <div>{teacherSubjects[subject.id] || ''}</div>
                 </td>
               </tr>
             )
@@ -264,7 +387,14 @@ function ReportCard({ student, ctx }) {
                   {entry.isAbsent1 && entry.isAbsent2 ? '-' : subjectRanks[`${s.id}_${entry.subject.id}`] || '-'}
                 </td>
                 <td style={{ border: '1px solid #000', padding: '1px 3px', textAlign: 'center', whiteSpace: 'nowrap' }}>
-                  {teacherSubjects[entry.subject.id] || ''}
+                  {teacherSignatures[entry.subject.id] ? (
+                    <img
+                      src={teacherSignatures[entry.subject.id]}
+                      alt="Sig"
+                      style={{ height: '18px', maxWidth: '70px', objectFit: 'contain', display: 'block', margin: '0 auto' }}
+                    />
+                  ) : null}
+                  <div>{teacherSubjects[entry.subject.id] || ''}</div>
                 </td>
               </tr>
             )
@@ -321,30 +451,12 @@ function ReportCard({ student, ctx }) {
         const avg = mode === 'single' ? (sr?.average_marks ?? null) : (cData?.avgPct ?? null)
         const g = mode === 'single' ? (sr?.grade || getGradeForPercentage(sr?.average_marks, grades)?.grade || '') : (cData?.gradeObj?.grade || '')
 
+        const band = g === 'A' ? 'A' : g === 'B' ? 'B' : g === 'C' ? 'C' : g === 'D' ? 'D' : g === 'E' ? 'E' : g === 'S' ? 'S' : g === 'F' ? 'F' : null
         let autoClass = 'Endelea kujitahidi katika masomo yako.'
         let autoHead = 'Nawahimiza wazazi kuendelea kushirikiana na shule kwa ajili ya maendeleo ya mtoto wenu.'
-
-        if (g === 'A') {
-          autoClass = 'Hongera kwa ufaulu huu wa hali ya juu. Umeonyesha nidhamu ya kipekee na bidii ya kweli katika masomo yako. Endelea kudumisha kiwango hiki cha ubora na uwe mfano wa kuigwa kwa wenzako.'
-          autoHead = 'Napenda kuwapongeza sana kwa juhudi mlizozifanya kumfunza mtoto wenu. Mwanafunzi huyu ameonyesha uwezo wa kipekee na anastahili pongezi za dhati. Msaidieni kuendelea na kiwango hiki cha juu cha ufaulu.'
-        } else if (g === 'B') {
-          autoClass = 'Umefanya vizuri sana na unaonyesha maendeleo ya kuridhisha. Ukizidi kuongeza bidii na kujishughulisha zaidi na masomo yako, unaweza kufikia daraja la A. Endelea kuwa makini na kujitahidi bila kupumzika.'
-          autoHead = 'Matokeo ya mtoto wenu yanaonyesha juhudi na uwezo wa kustahili pongezi. Nawahimiza mzidishe ushirikiano na walimu wa shule na kumhimiza mtoto wenu kusoma kwa bidii zaidi ili apige hatua kubwa zaidi katika ufaulu wake.'
-        } else if (g === 'C') {
-          autoClass = 'Umefanya wastani katika mtihani huu na kuna nafasi kubwa ya kuboresha matokeo yako. Tafadhali zingatia zaidi masomo yako, fanya mazoezi ya kutosha na usisite kuuliza maswali pale unapokosa kuelewa. Uwezo wako ni mkubwa zaidi ya hili.'
-          autoHead = 'Matokeo ya mtoto wenu yanaweza kuboreshwa zaidi kwa juhudi na ushirikiano. Nashauri mzazi au mlezi kushirikiana nasi kwa karibu, kuhakikisha mtoto wenu anafanya mazoezi ya kutosha nyumbani na kuhudhuria masomo yote kwa wakati na makini.'
-        } else if (g === 'D') {
-          autoClass = 'Unahitaji juhudi kubwa zaidi katika masomo yako. Tafadhali zingatia mada ambazo una ugumu nazo, hudhuria masomo yote bila kukosa na ushirikiane na walimu wako ili kupata msaada unaohitajika. Bado una nafasi nzuri ya kuboresha ufaulu wako.'
-          autoHead = 'Matokeo ya mtoto wenu yanahitaji kuzingatiwa kwa makini zaidi na pande zote mbili. Nashauri mkutane na walimu wake hivi karibuni ili kupanga mkakati wa pamoja wa kumsaidia kuboresha utendaji wake wa kitaaluma. Msaada wenu wa nyumbani ni nguzo muhimu sana.'
-        } else if (g === 'E') {
-          autoClass = 'Umepita lakini kwa kiwango cha chini. Unahitaji kuongeza juhudi za ziada, kufanya mapitio ya kina ya masomo na kutumia vizuri muda wako wa kujisomea. Ninakuamini una uwezo wa kufanya vizuri zaidi — jitahidi kupiga hatua kubwa zaidi.'
-          autoHead = 'Mtoto wenu amepita lakini kwa kiwango cha chini cha ufaulu. Ninawahimiza sana kushirikiana nasi kwa karibu zaidi ili kumwezesha kuboresha ufaulu wake. Ushirikiano wenu na mwelekeo mzuri wa nyumbani ni nguzo muhimu sana wakati huu.'
-        } else if (g === 'S') {
-          autoClass = 'Unahitaji kurekebisha mkakati wako wa masomo kwa haraka na kwa makini. Tumia kila fursa unayopata kufanya mazoezi, elewa mada vizuri zaidi na usiache muda kupita bila kufanya kitu. Ninatarajia uonyeshe mabadiliko ya dhahiri katika kipindi kinachokuja.'
-          autoHead = 'Matokeo ya mtoto wenu yanalazimu uangalizi wa karibu na wa haraka. Nashauri mzazi au mlezi azungumze na walimu wa shule mara moja ili tuweze pamoja kupanga njia bora za kumsaidia mtoto wenu kupiga hatua muhimu za kimasomo.'
-        } else if (g === 'F') {
-          autoClass = 'Haujafaulu katika mtihani huu na hii ni ishara ya dharura inayohitaji hatua za haraka. Tafadhali ongea na mwalimu wako ili kupata msaada maalum, panga ratiba nzuri ya masomo na uambie wazazi wako ili wakusaidie. Usikate tamaa — mabadiliko ya kweli yanaweza kutokea ukijitahidi kwa dhati.'
-          autoHead = 'Matokeo ya mtoto wenu yanahitaji umakini wa haraka kutoka kwa pande zote. Ninawahimiza sana kuwasiliana nasi mara moja ili tuweze pamoja kuelewa changamoto anazopitia na kumwandalia mpango maalum wa msaada. Ushirikiano wenu ni muhimu zaidi kuliko wakati wowote sasa hivi.'
+        if (band) {
+          autoClass = pickFrom(AUTO_CLASS_COMMENTS[band], s.id, 1)
+          autoHead = pickFrom(AUTO_HEAD_COMMENTS[band], s.id, 2)
         }
 
         return (
@@ -371,14 +483,30 @@ function ReportCard({ student, ctx }) {
       {/* SIGNATURES */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px' }}>
         <div style={{ textAlign: 'center', width: '30%' }}>
-          <div style={{ height: '28px' }}></div>
+          <div style={{ height: '28px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            {schoolInfo?.headmaster_signature_url ? (
+              <img
+                src={schoolInfo.headmaster_signature_url}
+                alt="Mkuu wa Shule"
+                style={{ height: '28px', maxWidth: '100%', objectFit: 'contain' }}
+              />
+            ) : null}
+          </div>
           <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
             <div style={{ fontWeight: 'bold' }}>Mkuu wa Shule</div>
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
           </div>
         </div>
         <div style={{ textAlign: 'center', width: '30%' }}>
-          <div style={{ height: '40px' }}></div>
+          <div style={{ height: '40px', display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+            {schoolInfo?.academic_signature_url ? (
+              <img
+                src={schoolInfo.academic_signature_url}
+                alt="Ofisi ya Taaluma"
+                style={{ height: '40px', maxWidth: '100%', objectFit: 'contain' }}
+              />
+            ) : null}
+          </div>
           <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
             <div style={{ fontWeight: 'bold' }}>Ofisi ya Taaluma</div>
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
@@ -472,6 +600,7 @@ function StudentReports() {
   const [examLabel1, setExamLabel1] = useState('')
   const [examLabel2, setExamLabel2] = useState('')
   const [teacherSubjects, setTeacherSubjects] = useState([])
+  const [teacherSignatures, setTeacherSignatures] = useState({})
   const [subjectRanks, setSubjectRanks] = useState({})
   const [loading, setLoading] = useState(true)
   const [loadingData, setLoadingData] = useState(false)
@@ -611,6 +740,7 @@ function StudentReports() {
         )
         setSubjects(assignedSubjects)
         const tsMap = {}
+        const sigMap = {}
         ;(tsRes.data || []).forEach(ts => {
           const fullName = ts.teachers?.profiles?.full_name || ''
           if (fullName && !tsMap[ts.subject_id]) {
@@ -621,8 +751,12 @@ function StudentReports() {
           } else if (!tsMap[ts.subject_id]) {
             tsMap[ts.subject_id] = ''
           }
+          if (ts.teachers?.signature_url && !sigMap[ts.subject_id]) {
+            sigMap[ts.subject_id] = ts.teachers.signature_url
+          }
         })
         setTeacherSubjects(tsMap)
+        setTeacherSignatures(sigMap)
 
         let loadedStudents = []
         let loadedMarks = []
@@ -788,6 +922,29 @@ function StudentReports() {
     return [...withRank, ...withoutRank]
   }, [students, studentResults])
 
+  const autoConductKey = sortedStudents.map(st => st.id).join(',')
+  // Auto-fill behaviour/conduct grades with varied B/C values when not manually set
+  useEffect(() => {
+    if (!sortedStudents.length) return
+    setConductData(prev => {
+      let changed = false
+      const next = { ...prev }
+      sortedStudents.forEach(st => {
+        const cur = { ...(next[st.id] || {}) }
+        for (let ci = 0; ci < CONDUCT_CATEGORIES.length; ci++) {
+          if (cur[ci]) continue
+          const v = studentVariation(st.id, 100 + ci)
+          const r = v % 100
+          cur[ci] = r < 5 ? 'A' : r < 50 ? 'B' : r < 90 ? 'C' : 'D'
+          changed = true
+        }
+        next[st.id] = cur
+      })
+      return changed ? next : prev
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [autoConductKey])
+
   const isProcessed = mode === 'single'
     ? selectedExam && ['processed', 'published', 'locked'].includes(selectedExam.status)
     : selectedExam && selectedExam2
@@ -892,7 +1049,19 @@ function StudentReports() {
     const bestPoints = allPoints.slice(0, bestN)
     const totalPoints = bestPoints.reduce((s, p) => s + p, 0)
 
-    const division = calcDivision(totalPoints, classLevel)
+    let division
+    if (classLevel !== 'A_LEVEL') {
+      const subjectsDone = entries.filter(e => !e.isAbsent1 && !e.isAbsent2).length
+      if (subjectsDone >= 7) {
+        division = calcDivision(totalPoints, classLevel)
+      } else if (subjectsDone >= 1) {
+        division = 'INC'
+      } else {
+        division = 'ABS'
+      }
+    } else {
+      division = calcDivision(totalPoints, classLevel)
+    }
 
     return { entries, avgPct, gradeObj: overallGrade, pts: totalPoints, totalMarks, division, validCount: principalValid.length }
   }, [mode, subjects, markMap, markMap2, selectedExam, selectedExam2, grades, classes, selectedClassId])
@@ -900,13 +1069,13 @@ function StudentReports() {
   const reportContext = useMemo(() => ({
     mode, studentResults, subjects, markMap, selectedExam, selectedExam2,
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
-    subjectRanks, teacherSubjects, parentGreeting, closingMessage,
+    subjectRanks, teacherSubjects, teacherSignatures, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
     students, computeCombinedData, conductData
   }), [
     mode, studentResults, subjects, markMap, selectedExam, selectedExam2,
     grades, classes, selectedClassId, schoolInfo, reportHeading, examLabel1, examLabel2,
-    subjectRanks, teacherSubjects, parentGreeting, closingMessage,
+    subjectRanks, teacherSubjects, teacherSignatures, parentGreeting, closingMessage,
     schoolClosingDate, schoolOpeningDate, classTeacherComment, headTeacherComment,
     students, computeCombinedData, conductData
   ])

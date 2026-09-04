@@ -617,12 +617,14 @@ function Results() {
       const result = resultsMap[student.id] || null
       const resultGrade = result?.grade || getGradeForPercentage(result?.average_marks, grades)?.grade || null
       const allPoints = []
+      let subjectsDone = 0
       subjects.forEach(subject => {
         if (classLevel === 'A_LEVEL' && subject.subject_type === 'ELECTIVE') return
         const mark = markMap[`${student.id}_${subject.id}`]
         const hasPrac = subjectHasPractical(subject, selectedExam)
         const pct = getMarkPercentage(mark, hasPrac)
         if (pct !== null) {
+          subjectsDone++
           const gradeObj = getGradeForPercentage(pct, grades)
           if (gradeObj?.points != null) {
             allPoints.push(gradeObj.points)
@@ -633,7 +635,18 @@ function Results() {
       const bestPoints = allPoints.slice(0, BEST_N)
       const totalPoints = bestPoints.reduce((s, p) => s + p, 0)
       const points = bestPoints.length > 0 ? totalPoints : null
-      const division = (result?.division || (points ? calcDivision(points, classLevel) : '0')).replace('Division ', '')
+      let division
+      if (classLevel !== 'A_LEVEL') {
+        if (subjectsDone >= 7) {
+          division = (result?.division || (points ? calcDivision(points, classLevel) : '0')).replace('Division ', '')
+        } else if (subjectsDone >= 1) {
+          division = 'INC'
+        } else {
+          division = 'ABS'
+        }
+      } else {
+        division = (result?.division || (points ? calcDivision(points, classLevel) : '0')).replace('Division ', '')
+      }
       return { ...student, result, resultGrade, points, division }
     })
   }, [students, resultsMap, grades, subjects, markMap, selectedExam, classLevel])

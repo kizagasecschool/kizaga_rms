@@ -141,6 +141,68 @@ function Teachers() {
     return subjects.filter((s) => subjectIds.includes(s.id))
   }
 
+  const [sigUploading, setSigUploading] = useState(null)
+
+  const handleSignatureUpload = async (e, teacher) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      showToast({ type: 'error', text: 'Please select an image file' })
+      return
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      showToast({ type: 'error', text: 'Image must be less than 3MB' })
+      return
+    }
+    try {
+      setSigUploading(teacher.id)
+      const ext = file.name.split('.').pop().toLowerCase()
+      const filePath = `signatures/teacher-${teacher.id}-${Date.now()}.${ext}`
+      const { error: uploadErr } = await supabase.storage
+        .from('signatures')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true })
+      if (uploadErr) throw uploadErr
+      const { data: { publicUrl } } = supabase.storage
+        .from('signatures')
+        .getPublicUrl(filePath)
+      const { error: dbErr } = await supabase
+        .from('teachers')
+        .update({ signature_url: publicUrl, updated_at: new Date().toISOString() })
+        .eq('id', teacher.id)
+      if (dbErr) throw dbErr
+      showToast({ type: 'success', text: 'Signature uploaded' })
+      await fetchTeachers()
+    } catch (err) {
+      showToast({ type: 'error', text: 'Failed: ' + (err.message || err) })
+    } finally {
+      setSigUploading(null)
+      if (e.target) e.target.value = ''
+    }
+  }
+
+  const handleSignatureRemove = async (teacher) => {
+    const url = teacher.signature_url
+    if (!url) return
+    try {
+      setSigUploading(teacher.id)
+      const path = url.split('/signatures/')[1]
+      if (path) {
+        await supabase.storage.from('signatures').remove([path])
+      }
+      const { error: dbErr } = await supabase
+        .from('teachers')
+        .update({ signature_url: null, updated_at: new Date().toISOString() })
+        .eq('id', teacher.id)
+      if (dbErr) throw dbErr
+      showToast({ type: 'success', text: 'Signature removed' })
+      await fetchTeachers()
+    } catch (err) {
+      showToast({ type: 'error', text: 'Failed: ' + (err.message || err) })
+    } finally {
+      setSigUploading(null)
+    }
+  }
+
   const openCreate = () => {
     setEditing(null)
     setFormData({
@@ -435,13 +497,14 @@ function Teachers() {
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider hidden lg:table-cell">Qualification</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider">Phone</th>
                 <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-24">Status</th>
+                <th className="text-left px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Signature</th>
                 <th className="text-right px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wider w-28">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-100">
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-5 py-10 text-center text-sm text-gray-400">
+                  <td colSpan={8} className="px-5 py-10 text-center text-sm text-gray-400">
                     {search || filterStatus ? 'No matching teachers found.' : 'No teachers registered yet. Click "+ Add Teacher" to begin.'}
                   </td>
                 </tr>
@@ -468,6 +531,41 @@ function Teachers() {
                       }`}>
                         {t.status === 'on_leave' ? 'On Leave' : t.status.charAt(0).toUpperCase() + t.status.slice(1)}
                       </span>
+                    </td>
+                    <td className="px-4 py-3.5">
+                      <div className="flex items-center gap-2">
+                        {t.signature_url ? (
+                          <img
+                            src={t.signature_url}
+                            alt="Signature"
+                            className="h-8 max-w-[80px] object-contain border border-gray-200 rounded bg-white"
+                          />
+                        ) : (
+                          <span className="text-xs text-gray-400">No sig</span>
+                        )}
+                        <label className="relative cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            disabled={sigUploading === t.id}
+                            onChange={(e) => handleSignatureUpload(e, t)}
+                          />
+                          <span className="inline-flex items-center px-2 py-1 text-xs rounded bg-indigo-50 text-indigo-600 hover:bg-indigo-100 transition whitespace-nowrap">
+                            {sigUploading === t.id ? '...' : t.signature_url ? 'Change' : 'Upload'}
+                          </span>
+                        </label>
+                        {t.signature_url && (
+                          <button
+                            onClick={() => handleSignatureRemove(t)}
+                            disabled={sigUploading === t.id}
+                            className="text-xs text-red-400 hover:text-red-600 transition"
+                            title="Remove signature"
+                          >
+                            ✕
+                          </button>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-3.5">
                       <div className="flex items-center justify-end gap-1">
