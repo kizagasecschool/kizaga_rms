@@ -107,6 +107,7 @@ function App() {
                   <Route path="uniforms" element={<ManageUniforms />} />
                   <Route path="events-announcements" element={<ManageEventsAnnouncements />} />
                   <Route path="joining-instructions" element={<ManageJoiningInstructions />} />
+                  <Route path="school-settings" element={<SchoolSettings />} />
                 </Routes>
               </RoleBasedRoute>
             }
@@ -132,6 +133,7 @@ function App() {
                   <Route path="admissions" element={<ManageAdmissions />} />
                   <Route path="attendance" element={<Attendance />} />
                   <Route path="timetable" element={<Timetable />} />
+                  <Route path="school-settings" element={<SchoolSettings />} />
                 </Routes>
               </RoleBasedRoute>
             }

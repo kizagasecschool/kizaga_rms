@@ -71,6 +71,7 @@ const navItems = {
       { path: '/headmaster/uniforms', icon: I.shirt, label: 'Uniforms' },
       { path: '/headmaster/joining-instructions', icon: I.book, label: 'Joining Instructions' },
       { path: '/headmaster/events-announcements', icon: I.book, label: 'Events & Announcements' },
+      { path: '/headmaster/school-settings', icon: I.settings, label: 'School Settings' },
     ]},
     { icon: I.comms, label: 'Communication', children: [
       { path: '/send-sms', icon: I.notif, label: 'Send SMS' },
@@ -106,6 +107,7 @@ const navItems = {
       { path: '/send-notification', icon: I.notif, label: 'Send Notification' },
       { path: '/academic/admissions', icon: I.book, label: 'Admissions' },
     ]},
+    { path: '/academic/school-settings', icon: I.settings, label: 'School Settings' },
   ],
   teacher: [
     { path: '/teacher', icon: I.dash, label: 'Dashboard' },
