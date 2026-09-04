@@ -5,6 +5,8 @@ ALTER TABLE teachers ADD COLUMN IF NOT EXISTS signature_url TEXT;
 ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS headmaster_signature_url TEXT;
 ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS deputy_signature_url TEXT;
 ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS academic_signature_url TEXT;
+ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS mhuri_url TEXT;
+ALTER TABLE school_settings ADD COLUMN IF NOT EXISTS signature_sizes JSONB DEFAULT '{}';
 
 -- Create signatures storage bucket
 INSERT INTO storage.buckets (id, name, public) VALUES ('signatures', 'signatures', true)
