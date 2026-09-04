@@ -482,22 +482,29 @@ function ReportCard({ student, ctx }) {
 
       {/* SIGNATURES */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px' }}>
-        <div style={{ textAlign: 'center', width: '25%' }}>
-          <div style={{ height: `${schoolInfo?.signature_sizes?.headmaster || 28}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        <div style={{ textAlign: 'center', width: '33%' }}>
+          <div style={{ position: 'relative', height: `${Math.max(schoolInfo?.signature_sizes?.headmaster || 28, schoolInfo?.signature_sizes?.mhuri || 40) + 10}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.headmaster_signature_url ? (
               <img
                 src={schoolInfo.headmaster_signature_url}
                 alt="Mkuu wa Shule"
-                style={{ height: `${schoolInfo?.signature_sizes?.headmaster || 28}px`, maxWidth: '100%', objectFit: 'contain' }}
+                style={{ height: `${schoolInfo?.signature_sizes?.headmaster || 28}px`, maxWidth: '100%', objectFit: 'contain', position: 'absolute', bottom: 0, left: '8%' }}
+              />
+            ) : null}
+            {schoolInfo?.mhuri_url ? (
+              <img
+                src={schoolInfo.mhuri_url}
+                alt="Mhuri wa Shule"
+                style={{ height: `${schoolInfo?.signature_sizes?.mhuri || 40}px`, maxWidth: '100%', objectFit: 'contain', position: 'absolute', bottom: '10px', right: '8%' }}
               />
             ) : null}
           </div>
           <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
-            <div style={{ fontWeight: 'bold' }}>Mkuu wa Shule</div>
+            <div style={{ fontWeight: 'bold' }}>Mkuu wa Shule & Mhuri wa Shule</div>
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
           </div>
         </div>
-        <div style={{ textAlign: 'center', width: '25%' }}>
+        <div style={{ textAlign: 'center', width: '33%' }}>
           <div style={{ height: `${schoolInfo?.signature_sizes?.deputy || 28}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.deputy_signature_url ? (
               <img
@@ -512,7 +519,7 @@ function ReportCard({ student, ctx }) {
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
           </div>
         </div>
-        <div style={{ textAlign: 'center', width: '25%' }}>
+        <div style={{ textAlign: 'center', width: '33%' }}>
           <div style={{ height: `${schoolInfo?.signature_sizes?.academic || 40}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.academic_signature_url ? (
               <img
@@ -525,21 +532,6 @@ function ReportCard({ student, ctx }) {
           <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
             <div style={{ fontWeight: 'bold' }}>Ofisi ya Taaluma</div>
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
-          </div>
-        </div>
-        <div style={{ textAlign: 'center', width: '25%' }}>
-          <div style={{ height: `${schoolInfo?.signature_sizes?.mhuri || 40}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-            {schoolInfo?.mhuri_url ? (
-              <img
-                src={schoolInfo.mhuri_url}
-                alt="Mhuri wa Shule"
-                style={{ height: `${schoolInfo?.signature_sizes?.mhuri || 40}px`, maxWidth: '100%', objectFit: 'contain' }}
-              />
-            ) : null}
-          </div>
-          <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
-            <div style={{ fontWeight: 'bold' }}>Mhuri wa Shule</div>
-            <div style={{ fontSize: '8px', color: '#555' }}>Mhuri</div>
           </div>
         </div>
       </div>
