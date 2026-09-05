@@ -266,9 +266,9 @@ function ReportCard({ student, ctx }) {
 
   const sigHs = sigLayout?.headmaster?.size || 28
   const sigMh = sigLayout?.mhuri?.size || 40
-  const sigDs = sigLayout?.deputy?.size || 28
   const sigAs = sigLayout?.academic?.size || 40
-  const sigAreaHeight = Math.max(sigHs, sigMh, sigDs, sigAs) + 10
+  const sigAreaHeight = Math.max(sigHs, sigMh, sigAs) + 10
+  const sigDate = new Date().toLocaleDateString('en-TZ')
 
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px', lineHeight: '1.35', color: '#000', pageBreakAfter: 'always', background: '#fff', padding: '18px 25px', overflow: 'hidden' }}>
@@ -504,7 +504,7 @@ function ReportCard({ student, ctx }) {
       {/* SIGNATURES */}
       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '4px', marginBottom: '10px' }}>
         {/* Mkuu wa Shule & Mhuri */}
-        <div style={{ textAlign: 'center', width: '33%', padding: '0 4px' }}>
+        <div style={{ textAlign: 'center', width: '50%', padding: '0 4px' }}>
           <div style={{ position: 'relative', height: `${sigAreaHeight}px` }}>
             {schoolInfo?.headmaster_signature_url ? (
               <img
@@ -539,39 +539,16 @@ function ReportCard({ student, ctx }) {
           </div>
           <div style={{ borderTop: '1px solid #000', paddingTop: '3px' }}>
             <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Mkuu wa Shule</div>
-            <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
+            <div style={{ fontSize: '8px', color: '#555' }}>Tarehe: {sigDate}</div>
           </div>
         </div>
-        {/* Makamu wa Mkuu wa Shule */}
-        <div style={{ textAlign: 'center', width: '33%', padding: '0 4px' }}>
-          <div style={{ position: 'relative', height: `${sigAreaHeight}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
-            {schoolInfo?.deputy_signature_url ? (
-              <img
-                src={schoolInfo.deputy_signature_url}
-                alt="Makamu wa Mkuu wa Shule"
-                style={{
-                  height: `${sigDs}px`,
-                  maxWidth: '85%',
-                  objectFit: 'contain',
-                  marginBottom: '4px',
-                  display: 'block',
-                  transform: `translate(${sigLayout?.deputy?.x || 0}px, ${-(sigLayout?.deputy?.y || 0)}px)`,
-                }}
-              />
-            ) : null}
-          </div>
-          <div style={{ borderTop: '1px solid #000', paddingTop: '3px' }}>
-            <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Makamu wa Mkuu wa Shule</div>
-            <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
-          </div>
-        </div>
-        {/* Mwalimu Mkuu wa Masomo (Ofisi ya Taaluma) */}
-        <div style={{ textAlign: 'center', width: '33%', padding: '0 4px' }}>
+        {/* Mwalimu wa Taaluma */}
+        <div style={{ textAlign: 'center', width: '50%', padding: '0 4px' }}>
           <div style={{ position: 'relative', height: `${sigAreaHeight}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.academic_signature_url ? (
               <img
                 src={schoolInfo.academic_signature_url}
-                alt="Mwalimu Mkuu wa Masomo"
+                alt="Mwalimu wa Taaluma"
                 style={{
                   height: `${sigAs}px`,
                   maxWidth: '85%',
@@ -584,8 +561,8 @@ function ReportCard({ student, ctx }) {
             ) : null}
           </div>
           <div style={{ borderTop: '1px solid #000', paddingTop: '3px' }}>
-            <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Mwalimu Mkuu wa Masomo</div>
-            <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
+            <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Mwalimu wa Taaluma</div>
+            <div style={{ fontSize: '8px', color: '#555' }}>Tarehe: {sigDate}</div>
           </div>
         </div>
       </div>

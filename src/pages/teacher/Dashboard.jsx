@@ -171,7 +171,11 @@ function TeacherDashboard() {
         seenGroups.add(groupKey)
 
         const subject = a.subjects || {}
-        const applicableExams = classExamMap[classId] || []
+        // Only the CURRENT exam (status = entering_marks) counts toward pending.
+        // Past exams (processed/published/locked) are no longer shown or counted,
+        // so once an exam is processed there is nothing pending until a new exam.
+        const applicableExams = (classExamMap[classId] || [])
+          .filter(examId => examMeta[examId]?.status === 'entering_marks')
         if (applicableExams.length === 0) continue
 
         // Pool of active students for this class (O-Level) or stream (A-Level)
