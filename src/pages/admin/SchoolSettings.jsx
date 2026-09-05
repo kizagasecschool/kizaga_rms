@@ -1,19 +1,18 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
+import { useNotification } from '../../context/NotificationContext'
 
 export default function SchoolSettings() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [testingSms, setTestingSms] = useState(false)
-  const [message, setMessage] = useState({ type: '', text: '' })
-  const timerRef = useRef(null)
+  const { showToast } = useNotification()
 
   const showMessage = useCallback((a, b) => {
-    if (timerRef.current) clearTimeout(timerRef.current)
     const msg = typeof a === 'string' ? { type: a, text: b || '' } : a
-    setMessage(msg)
-    timerRef.current = setTimeout(() => setMessage({ type: '', text: '' }), 3000)
-  }, [])
+    if (!msg.text) return
+    showToast(msg.text, msg.type === '' ? 'info' : msg.type, 5000)
+  }, [showToast])
   const [settings, setSettings] = useState({
     id: '',
     school_name: '',
@@ -309,16 +308,6 @@ const field = type === 'headmaster' ? 'headmaster_signature_url' : type === 'dep
         <h1 className="text-xl font-bold text-gray-900">School Settings</h1>
         <p className="text-sm text-gray-500 mt-1">Manage your school information and logos</p>
       </div>
-
-      {message.text && (
-        <div className={`p-4 rounded-xl text-sm font-medium mb-6 ${
-          message.type === 'error'
-            ? 'bg-red-50 text-red-700 border border-red-200'
-            : 'bg-green-50 text-green-700 border border-green-200'
-        }`}>
-          {message.text}
-        </div>
-      )}
 
       <form onSubmit={handleSave} className="space-y-6">
         {/* School Name & Code */}

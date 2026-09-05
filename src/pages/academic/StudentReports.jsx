@@ -1,11 +1,26 @@
 import { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { supabase } from '../../lib/supabase'
 import { sortSubjectsByNectaCode } from '../../lib/subjectUtils'
+import { useNotification } from '../../context/NotificationContext'
 
 const SCIENCE_SUBJECTS = ['BIO', 'CHEM', 'PHY', 'BIOS', 'BIO_O', 'CHEM_O', 'PHY_O']
 
 const CONDUCT_CATEGORIES = ['Tabia', 'Uwajibikaji', 'Ubunifu', 'Kujiamini', 'Usafi', 'Ushirikiano', 'Michezo']
-const CONDUCT_GRADES = ['', 'A', 'B', 'C', 'D']
+const CONDUCT_GRADES = ['', 'A', 'B', 'C']
+
+const SIG_FIELDS = {
+  headmaster: 'headmaster_signature_url',
+  deputy: 'deputy_signature_url',
+  academic: 'academic_signature_url',
+  mhuri: 'mhuri_url',
+}
+
+const SIG_LABELS = {
+  headmaster: 'Head of School',
+  deputy: 'Deputy Head of School',
+  academic: 'Academic Office',
+  mhuri: 'School Stamp',
+}
 
 function groupExamsByType(examList) {
   const groups = {}
@@ -249,6 +264,12 @@ function ReportCard({ student, ctx }) {
 
   const cData = mode === 'combined' ? computeCombinedData(s) : null
 
+  const sigHs = sigLayout?.headmaster?.size || 28
+  const sigMh = sigLayout?.mhuri?.size || 40
+  const sigDs = sigLayout?.deputy?.size || 28
+  const sigAs = sigLayout?.academic?.size || 40
+  const sigAreaHeight = Math.max(sigHs, sigMh, sigDs, sigAs) + 10
+
   return (
     <div style={{ fontFamily: 'Arial, sans-serif', fontSize: '13px', lineHeight: '1.35', color: '#000', pageBreakAfter: 'always', background: '#fff', padding: '18px 25px', overflow: 'hidden' }}>
       {/* HEADER: Logos + User Heading */}
@@ -481,56 +502,89 @@ function ReportCard({ student, ctx }) {
       </p>
 
       {/* SIGNATURES */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginBottom: '12px' }}>
-        <div style={{ textAlign: 'center', width: '33%' }}>
-          <div style={{ position: 'relative', height: `${Math.max(sigLayout?.headmaster?.size || 28, sigLayout?.mhuri?.size || 40) + 10 + Math.max(sigLayout?.mhuri?.y || 0, 0)}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '12px', marginTop: '4px', marginBottom: '10px' }}>
+        {/* Mkuu wa Shule & Mhuri */}
+        <div style={{ textAlign: 'center', width: '33%', padding: '0 4px' }}>
+          <div style={{ position: 'relative', height: `${sigAreaHeight}px` }}>
             {schoolInfo?.headmaster_signature_url ? (
               <img
                 src={schoolInfo.headmaster_signature_url}
                 alt="Mkuu wa Shule"
-                style={{ height: `${sigLayout?.headmaster?.size || 28}px`, maxWidth: '100%', objectFit: 'contain', position: 'absolute', bottom: `${sigLayout?.headmaster?.y || 0}px`, left: `calc(8% + ${sigLayout?.headmaster?.x || 0}px)` }}
+                style={{
+                  height: `${sigHs}px`,
+                  maxWidth: '75%',
+                  objectFit: 'contain',
+                  position: 'absolute',
+                  left: '8%',
+                  bottom: '4px',
+                  transform: `translate(${sigLayout?.headmaster?.x || 0}px, ${-(sigLayout?.headmaster?.y || 0)}px)`,
+                }}
               />
             ) : null}
             {schoolInfo?.mhuri_url ? (
               <img
                 src={schoolInfo.mhuri_url}
                 alt="Mhuri wa Shule"
-                style={{ height: `${sigLayout?.mhuri?.size || 40}px`, maxWidth: '100%', objectFit: 'contain', position: 'absolute', bottom: `${10 + (sigLayout?.mhuri?.y || 0)}px`, right: `calc(8% + ${sigLayout?.mhuri?.x || 0}px)` }}
+                style={{
+                  height: `${sigMh}px`,
+                  maxWidth: '60%',
+                  objectFit: 'contain',
+                  position: 'absolute',
+                  right: '6%',
+                  bottom: '4px',
+                  transform: `translate(${sigLayout?.mhuri?.x || 0}px, ${-(sigLayout?.mhuri?.y || 0)}px)`,
+                }}
               />
             ) : null}
           </div>
-          <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
-            <div style={{ fontWeight: 'bold' }}>Mkuu wa Shule & Mhuri wa Shule</div>
+          <div style={{ borderTop: '1px solid #000', paddingTop: '3px' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Mkuu wa Shule</div>
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
           </div>
         </div>
-        <div style={{ textAlign: 'center', width: '33%' }}>
-          <div style={{ height: `${sigLayout?.deputy?.size || 28}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        {/* Makamu wa Mkuu wa Shule */}
+        <div style={{ textAlign: 'center', width: '33%', padding: '0 4px' }}>
+          <div style={{ position: 'relative', height: `${sigAreaHeight}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.deputy_signature_url ? (
               <img
                 src={schoolInfo.deputy_signature_url}
                 alt="Makamu wa Mkuu wa Shule"
-                style={{ height: `${sigLayout?.deputy?.size || 28}px`, maxWidth: '100%', objectFit: 'contain', marginRight: `${sigLayout?.deputy?.x || 0}px`, marginBottom: `${sigLayout?.deputy?.y || 0}px` }}
+                style={{
+                  height: `${sigDs}px`,
+                  maxWidth: '85%',
+                  objectFit: 'contain',
+                  marginBottom: '4px',
+                  display: 'block',
+                  transform: `translate(${sigLayout?.deputy?.x || 0}px, ${-(sigLayout?.deputy?.y || 0)}px)`,
+                }}
               />
             ) : null}
           </div>
-          <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
-            <div style={{ fontWeight: 'bold' }}>Makamu wa Mkuu wa Shule</div>
+          <div style={{ borderTop: '1px solid #000', paddingTop: '3px' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Makamu wa Mkuu wa Shule</div>
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
           </div>
         </div>
-        <div style={{ textAlign: 'center', width: '33%' }}>
-          <div style={{ height: `${sigLayout?.academic?.size || 40}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
+        {/* Mwalimu Mkuu wa Masomo (Ofisi ya Taaluma) */}
+        <div style={{ textAlign: 'center', width: '33%', padding: '0 4px' }}>
+          <div style={{ position: 'relative', height: `${sigAreaHeight}px`, display: 'flex', alignItems: 'flex-end', justifyContent: 'center' }}>
             {schoolInfo?.academic_signature_url ? (
               <img
                 src={schoolInfo.academic_signature_url}
-                alt="Ofisi ya Taaluma"
-                style={{ height: `${sigLayout?.academic?.size || 40}px`, maxWidth: '100%', objectFit: 'contain', marginRight: `${sigLayout?.academic?.x || 0}px`, marginBottom: `${sigLayout?.academic?.y || 0}px` }}
+                alt="Mwalimu Mkuu wa Masomo"
+                style={{
+                  height: `${sigAs}px`,
+                  maxWidth: '85%',
+                  objectFit: 'contain',
+                  marginBottom: '4px',
+                  display: 'block',
+                  transform: `translate(${sigLayout?.academic?.x || 0}px, ${-(sigLayout?.academic?.y || 0)}px)`,
+                }}
               />
             ) : null}
           </div>
-          <div style={{ borderTop: '1px solid #000', paddingTop: '2px' }}>
-            <div style={{ fontWeight: 'bold' }}>Ofisi ya Taaluma</div>
+          <div style={{ borderTop: '1px solid #000', paddingTop: '3px' }}>
+            <div style={{ fontWeight: 'bold', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.4px' }}>Mwalimu Mkuu wa Masomo</div>
             <div style={{ fontSize: '8px', color: '#555' }}>Sahihi na Tarehe</div>
           </div>
         </div>
@@ -628,6 +682,9 @@ function StudentReports() {
     deputy: { size: 28, x: 0, y: 0 },
     academic: { size: 40, x: 0, y: 0 },
   }))
+  const sigInputRefs = useRef({})
+  const [sigUploading, setSigUploading] = useState(null)
+  const { showToast } = useNotification()
 
   useEffect(() => {
     const load = async () => {
@@ -953,19 +1010,49 @@ function StudentReports() {
   }, [students, studentResults])
 
   const autoConductKey = sortedStudents.map(st => st.id).join(',')
-  // Auto-fill behaviour/conduct grades with varied B/C values when not manually set
+  // Auto-fill behaviour/conduct grades — only A/B/C, mixed per student and tied to
+  // their exam performance (position, falling back to average marks for A-Level).
+  // A and C are rare; most students get B. Top performers lean toward A, lower
+  // performers toward C. Deterministic per student so grades don't change.
   useEffect(() => {
     if (!sortedStudents.length) return
     setConductData(prev => {
       let changed = false
       const next = { ...prev }
+      const total = sortedStudents.length
+      // Fallback performance rank from average marks (A-Level may lack positions)
+      const markVals = sortedStudents
+        .map(st => st.result?.average_marks)
+        .filter(v => v != null)
+        .sort((a, b) => b - a)
       sortedStudents.forEach(st => {
         const cur = { ...(next[st.id] || {}) }
+        // Perf: 0 = best, 1 = worst.
+        let perf = null
+        const pos = st.result?.position ?? null
+        if (pos != null && total > 1) {
+          perf = (pos - 1) / (total - 1)
+        } else {
+          const am = st.result?.average_marks ?? null
+          if (am != null && markVals.length > 1) {
+            perf = (markVals.length - markVals.indexOf(am) - 1) / (markVals.length - 1)
+          }
+        }
         for (let ci = 0; ci < CONDUCT_CATEGORIES.length; ci++) {
           if (cur[ci]) continue
-          const v = studentVariation(st.id, 100 + ci)
+          const v = studentVariation(st.id, 200 + ci)
           const r = v % 100
-          cur[ci] = r < 5 ? 'A' : r < 50 ? 'B' : r < 90 ? 'C' : 'D'
+          let grade
+          if (perf == null) {
+            grade = r < 4 ? 'A' : r < 8 ? 'C' : 'B'
+          } else if (perf < 0.15) {
+            grade = r < 30 ? 'A' : 'B'
+          } else if (perf > 0.85) {
+            grade = r < 30 ? 'C' : 'B'
+          } else {
+            grade = r < 3 ? 'A' : r < 6 ? 'C' : 'B'
+          }
+          cur[ci] = grade
           changed = true
         }
         next[st.id] = cur
@@ -998,6 +1085,73 @@ function StudentReports() {
   const handleDownloadClassPDF = useCallback(() => {
     window.print()
   }, [])
+
+  const uploadSignatureImage = async (file, type) => {
+    const ext = file.name.split('.').pop().toLowerCase()
+    const fileName = `${type}-signature-${Date.now()}.${ext}`
+    const filePath = `signatures/${fileName}`
+    const { error } = await supabase.storage
+      .from('signatures')
+      .upload(filePath, file, { cacheControl: '3600', upsert: true })
+    if (error) throw error
+    const { data: { publicUrl } } = supabase.storage.from('signatures').getPublicUrl(filePath)
+    return publicUrl
+  }
+
+  const handleSignatureUpload = useCallback(async (e, type) => {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (!file) return
+    if (!file.type.startsWith('image/')) {
+      showToast('Please select an image file (PNG, JPG, WEBP).', 'error', 5000)
+      return
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      showToast('Image must be less than 3MB.', 'error', 5000)
+      return
+    }
+    try {
+      setSigUploading(type)
+      const field = SIG_FIELDS[type]
+      const url = await uploadSignatureImage(file, type)
+      if (schoolInfo?.id) {
+        const { error: saveErr } = await supabase
+          .from('school_settings')
+          .update({ [field]: url, updated_at: new Date().toISOString() })
+          .eq('id', schoolInfo.id)
+        if (saveErr) throw saveErr
+      }
+      setSchoolInfo(prev => ({ ...prev, [field]: url }))
+      showToast(`${SIG_LABELS[type]} saved successfully.`, 'success', 5000)
+    } catch (err) {
+      console.error('Signature upload error:', err)
+      showToast('Failed to upload signature: ' + (err.message || err), 'error', 5000)
+    } finally {
+      setSigUploading(null)
+    }
+  }, [schoolInfo, showToast])
+
+  const handleSignatureRemove = useCallback(async (type) => {
+    const field = SIG_FIELDS[type]
+    const url = schoolInfo?.[field]
+    if (!url) return
+    try {
+      const path = url.split('/signatures/')[1]
+      if (path) await supabase.storage.from('signatures').remove([path])
+      if (schoolInfo?.id) {
+        const { error: err } = await supabase
+          .from('school_settings')
+          .update({ [field]: null, updated_at: new Date().toISOString() })
+          .eq('id', schoolInfo.id)
+        if (err) throw err
+      }
+      setSchoolInfo(prev => ({ ...prev, [field]: null }))
+      showToast(`${SIG_LABELS[type]} removed.`, 'success', 5000)
+    } catch (err) {
+      console.error('Signature remove error:', err)
+      showToast('Failed to remove signature: ' + (err.message || err), 'error', 5000)
+    }
+  }, [schoolInfo, showToast])
 
   // Load per-class report settings from DB when class changes or report tab opens
   useEffect(() => {
@@ -1033,6 +1187,20 @@ function StudentReports() {
     }, 2000)
     return () => clearTimeout(timer)
   }, [reportHeading, examLabel1, examLabel2, selectedClassId])
+
+  // Persist signature sizes so resize survive reloads and match School Settings
+  useEffect(() => {
+    if (!schoolInfo?.id) return
+    const timer = setTimeout(async () => {
+      const sizes = {}
+      Object.entries(sigLayout).forEach(([k, v]) => { sizes[k] = v.size })
+      await supabase
+        .from('school_settings')
+        .update({ signature_sizes: sizes, updated_at: new Date().toISOString() })
+        .eq('id', schoolInfo.id)
+    }, 900)
+    return () => clearTimeout(timer)
+  }, [sigLayout, schoolInfo?.id])
 
   const computeCombinedData = useCallback((student) => {
     if (mode !== 'combined' || !student) return null
@@ -1429,7 +1597,7 @@ function StudentReports() {
               {/* Conduct Grades Entry Panel */}
               {conductShowPanel && sortedStudents.length > 0 && (
                 <div className="border-b border-gray-200 bg-indigo-50/40 px-5 py-4">
-                  <p className="text-xs font-semibold text-indigo-800 mb-3">Conduct Grades (Mwenendo) — A, B, C or D per category. Leave blank if not assessed.</p>
+                  <p className="text-xs font-semibold text-indigo-800 mb-3">Conduct Grades (Mwenendo) — A, B or C per category. Leave blank if not assessed.</p>
                   <div className="overflow-x-auto">
                     <table className="text-xs border-collapse min-w-full">
                       <thead>
@@ -1596,15 +1764,75 @@ function StudentReports() {
                   <label className="block text-xs font-medium text-gray-600 mb-1">Closing Message</label>
                   <input type="text" value={closingMessage} onChange={e => setClosingMessage(e.target.value)} placeholder="e.g. Asante kwa ushirikiano wenu. Mungu awabariki." className="w-full px-2 py-1.5 text-xs border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-maroon-500" />
                 </div>
+                {/* Signature Uploads */}
+                <div className="border-t border-gray-200 pt-3 mt-3">
+                  <h5 className="text-xs font-semibold text-gray-700 mb-1">Signatures & Stamp</h5>
+                  <p className="text-[10px] text-gray-400 mb-2">Upload or change the signatures for the Head of School, School Stamp, Deputy Head of School and Academic Office. They appear on the report immediately.</p>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {[
+                      { key: 'headmaster', label: SIG_LABELS.headmaster },
+                      { key: 'mhuri', label: SIG_LABELS.mhuri },
+                      { key: 'deputy', label: SIG_LABELS.deputy },
+                      { key: 'academic', label: SIG_LABELS.academic },
+                    ].map(({ key, label }) => {
+                      const field = SIG_FIELDS[key]
+                      const src = schoolInfo ? schoolInfo[field] : null
+                      return (
+                        <div key={key} className="rounded-lg border border-gray-200 bg-gray-50 p-2">
+                          <div className="text-[11px] font-medium text-gray-700 mb-1.5 truncate">{label}</div>
+                          <div className="relative">
+                            {src ? (
+                              <img src={src} alt={label} crossOrigin="anonymous" className="h-14 w-full object-contain bg-white border border-gray-200 rounded-md" />
+                            ) : (
+                              <div className="h-14 border-2 border-dashed border-gray-300 rounded-md flex flex-col items-center justify-center text-gray-400">
+                                <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="1.5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                                </svg>
+                                <span className="text-[9px] mt-0.5">Empty</span>
+                              </div>
+                            )}
+                            {src && (
+                              <button
+                                type="button"
+                                onClick={() => handleSignatureRemove(key)}
+                                title="Ondoa"
+                                className="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition"
+                              >
+                                <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2.5">
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => sigInputRefs.current[key]?.click()}
+                            disabled={sigUploading === key}
+                            className="mt-1.5 w-full px-2 py-1 text-[10px] font-medium text-maroon-700 bg-maroon-50 border border-maroon-200 rounded-md hover:bg-maroon-100 transition disabled:opacity-50"
+                          >
+                            {sigUploading === key ? 'Uploading...' : src ? 'Change' : 'Upload'}
+                          </button>
+                          <input
+                            ref={el => { sigInputRefs.current[key] = el }}
+                            type="file"
+                            accept="image/*"
+                            onChange={e => handleSignatureUpload(e, key)}
+                            className="hidden"
+                          />
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
                 {/* Signature Layout Controls */}
                 <div className="border-t border-gray-200 pt-3 mt-3">
                   <h5 className="text-xs font-semibold text-gray-700 mb-2">Signature Size & Position</h5>
                   <p className="text-[10px] text-gray-400 mb-2">Adjust size and move each signature directly on the report. Changes apply immediately.</p>
                   {[
-                    { key: 'headmaster', label: 'Mkuu wa Shule' },
-                    { key: 'mhuri', label: 'Mhuri wa Shule' },
-                    { key: 'deputy', label: 'Makamu wa Mkuu wa Shule' },
-                    { key: 'academic', label: 'Ofisi ya Taaluma' },
+                    { key: 'headmaster', label: SIG_LABELS.headmaster },
+                    { key: 'mhuri', label: SIG_LABELS.mhuri },
+                    { key: 'deputy', label: SIG_LABELS.deputy },
+                    { key: 'academic', label: SIG_LABELS.academic },
                   ].map(({ key, label }) => (
                     <div key={key} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_2fr] gap-2 items-center mb-2 pb-2 border-b border-gray-100 last:border-0">
                       <span className="text-xs font-medium text-gray-700">{label}</span>
@@ -1612,8 +1840,8 @@ function StudentReports() {
                         <span className="text-[10px] text-gray-400">Size</span>
                         <input
                           type="range"
-                          min="15"
-                          max="90"
+                          min="10"
+                          max="160"
                           value={sigLayout[key]?.size || 28}
                           onChange={e => setSigLayout(prev => ({
                             ...prev,
@@ -1621,7 +1849,17 @@ function StudentReports() {
                           }))}
                           className="flex-1"
                         />
-                        <span className="text-[10px] text-gray-500 w-6 text-right">{sigLayout[key]?.size || 28}</span>
+                        <input
+                          type="number"
+                          min="10"
+                          max="160"
+                          value={sigLayout[key]?.size || 28}
+                          onChange={e => setSigLayout(prev => ({
+                            ...prev,
+                            [key]: { ...prev[key], size: Math.min(160, Math.max(10, parseInt(e.target.value) || 0)) }
+                          }))}
+                          className="w-11 text-center text-[10px] text-gray-500 border border-gray-300 rounded px-0.5 py-0.5"
+                        />
                       </div>
                       <div className="flex items-center justify-start gap-1">
                         <button

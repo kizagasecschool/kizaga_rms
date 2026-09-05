@@ -5,7 +5,7 @@ const NotificationContext = createContext(null)
 export function NotificationProvider({ children }) {
   const [toasts, setToasts] = useState([])
 
-  const showToast = useCallback((message, type = 'info', duration = 4000) => {
+  const showToast = useCallback((message, type = 'info', duration = 5000) => {
     const id = Date.now() + Math.random()
     setToasts((prev) => [...prev, { id, message, type }])
     setTimeout(() => {
