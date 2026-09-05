@@ -102,16 +102,25 @@ export default function SendSMS() {
     return null
   }
 
-  const buildResultsMessage = (student, subjectsWithMarks, resultRow, cls) => {
-    const parts = [`Matokeo ya ${student.first_name} ${student.surname}`]
-    if (cls) parts.push(`Darasa: ${cls}`)
+  const buildResultsMessage = (student, subjectsWithMarks, resultRow, examName, totalStudents, points) => {
+    const fullName = `${student.first_name} ${student.middle_name ? student.middle_name + ' ' : ''}${student.surname}`.trim()
+    const sentences = []
+    if (schoolName) sentences.push(schoolName)
+    const intro = []
+    if (examName) intro.push(`Katika mtihani wa ${examName},`)
+    if (fullName) intro.push(fullName)
+    if (resultRow?.position != null) intro.push(`ameshika nafasi ya ${resultRow.position}`)
+    if (totalStudents) intro.push(`kati ya wanafunzi ${totalStudents}`)
+    if (resultRow?.average_marks != null) intro.push(`akiwa na wastani wa ${resultRow.average_marks}%`)
+    if (intro.length) sentences.push(intro.join(' '))
+    const details = []
+    if (resultRow?.grade) details.push(`Daraja ${resultRow.grade}`)
+    if (resultRow?.division) details.push(`division ya ${String(resultRow.division).replace('Division ', '')}`)
+    if (points != null) details.push(`points ${points}`)
+    if (details.length) sentences.push(details.join(', '))
     const subjList = subjectsWithMarks.slice(0, 10).map(s => `${s.subject_code}: ${s.pct !== null ? s.pct + '%' : 'ABS'}(${s.grade})`)
-    parts.push(subjList.join(', '))
-    if (resultRow?.average_marks != null) parts.push(`Wastani: ${resultRow.average_marks}%`)
-    if (resultRow?.grade) parts.push(`Daraja: ${resultRow.grade}`)
-    if (resultRow?.position) parts.push(`Nafsi: ${resultRow.position}`)
-    if (schoolName) parts.push(`- ${schoolName}`)
-    return parts.join('. ')
+    if (subjList.length) sentences.push(`Masomo: ${subjList.join(', ')}`)
+    return sentences.join('. ')
   }
 
   const studentFilter = async () => {
@@ -131,10 +140,10 @@ export default function SendSMS() {
       const [{ data: students }, { data: marksData }, { data: subjectData }, { data: gradesData }, { data: resultsData }, clsRes] = await Promise.all([
         studentFilter(),
         supabase.from('marks').select('student_id, subject_id, marks_obtained, practical_marks, is_absent').eq('exam_id', examId),
-        supabase.from('subjects').select('id, subject_name, subject_code, has_practical'),
+        supabase.from('subjects').select('id, subject_name, subject_code, has_practical, subject_type'),
         supabase.from('grades').select('*').order('min_mark', { ascending: false }),
-        supabase.from('student_results').select('student_id, total_marks, average_marks, grade, position').eq('exam_id', examId),
-        supabase.from('classes').select('class_name').eq('id', classId).single(),
+        supabase.from('student_results').select('student_id, total_marks, average_marks, grade, position, division').eq('exam_id', examId),
+        supabase.from('classes').select('class_name, level').eq('id', classId).single(),
       ])
 
       if (!students || students.length === 0) { showToast('No students found in this class', 'error'); return }
@@ -149,7 +158,9 @@ export default function SendSMS() {
         return s2 !== 0 ? s2 : (a.surname || '').localeCompare(b.surname || '')
       })
 
-      const cls = clsRes?.data?.class_name || ''
+      const classLevel = clsRes?.data?.level || 'O_LEVEL'
+      const bestN = classLevel === 'A_LEVEL' ? 3 : 7
+      const totalStudents = (resultsData || []).length
       const selectedExam = exams.find(e => e.id === examId)
       const subjMap = {}
       ;(subjectData || []).forEach(s => { subjMap[s.id] = s })
@@ -170,15 +181,23 @@ export default function SendSMS() {
           const total = theory + practical
           const max = hp ? 150 : 100
           const pct = m.is_absent ? null : Math.round((total / max) * 100)
-          const grade = m.is_absent ? 'ABS' : ((gradesData || []).find(g => pct >= g.min_mark)?.grade_letter || 'F')
-          return { subject_name: subj.subject_name, subject_code: subj.subject_code, pct, grade }
+          const grade = m.is_absent ? 'ABS' : ((gradesData || []).find(g => pct >= g.min_mark)?.grade || 'F')
+          return { subject_name: subj.subject_name, subject_code: subj.subject_code, subject_type: subj.subject_type, pct, grade }
         }).filter(Boolean)
+
+        const principalMarks = subjectsWithMarks.filter(s => classLevel !== 'A_LEVEL' || s.subject_type !== 'ELECTIVE')
+        const allPoints = principalMarks
+          .filter(s => s.pct !== null && s.grade !== 'ABS')
+          .map(s => (gradesData || []).find(g => s.pct >= g.min_mark)?.points)
+          .filter(p => p != null)
+        allPoints.sort((a, b) => a - b)
+        const points = allPoints.slice(0, bestN).reduce((s, p) => s + p, 0)
 
         preview.push({
           name: `${st.first_name} ${st.middle_name ? st.middle_name + ' ' : ''}${st.surname}`.trim(),
           parent: st.parent_name || '-',
           phone,
-          message: buildResultsMessage(st, subjectsWithMarks, resultRow, cls),
+          message: buildResultsMessage(st, subjectsWithMarks, resultRow, selectedExam?.name, totalStudents, points),
         })
       })
 
